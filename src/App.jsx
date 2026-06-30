@@ -207,6 +207,71 @@ function DealSummaryRow({ deal }) {
   );
 }
 
+/* ---------- AI 자동 입력 ---------- */
+
+async function parseWithAI(text) {
+  const systemInstruction = `당신은 식자재 주문 요청에서 정보를 추출하는 어시스턴트입니다.
+가능한 품목: 토마토, 바질, 블루베리, 딸기, 로메인, 로즈마리, 애호박, 고수
+숙성도 옵션(품목별로 정확히 일치해야 함):
+- 토마토: 그린(미숙), 브레이커, 터닝, 핑크, 라이트레드, 레드(완숙)
+- 바질/고수: 마이크로그린, 어린잎, 성숙잎
+- 블루베리: 그린, 레드(미숙), 블루(수확기), 완숙 블루
+- 딸기: 화이트(미숙), 핑크, 레드 70%, 완숙(레드 100%)
+- 로메인: 베이비잎, 중간생장, 완전결구
+- 로즈마리: 어린순, 성숙순
+- 애호박: 미니(꽃달림), 중간, 성숙
+등급: 보통, 상, 특
+주기: 단발성(1회), 주 1회, 주 2회, 격주`;
+
+  const userPrompt = `다음 텍스트에서 식자재 주문 정보를 추출하세요. 없는 항목은 null로 채우세요.
+
+텍스트: "${text}"
+
+JSON 형식:
+{
+  "chefName": "레스토랑명 또는 null",
+  "crop": "품목 또는 null",
+  "sizeCondition": "크기 조건 또는 null",
+  "ripeness": "숙성도 또는 null",
+  "grade": "등급 또는 null",
+  "quantity": 수량숫자 또는 null,
+  "deliveryDate": "YYYY-MM-DD 또는 null",
+  "targetPrice": 단가숫자 또는 null,
+  "cycle": "주기 또는 null",
+  "note": "추가사항 또는 null"
+}`;
+
+  const response = await fetch("/api/gemini/models/gemini-1.5-flash:generateContent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents: [{ parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        maxOutputTokens: 512,
+        temperature: 0.1,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    const detail = errBody?.error?.message || errBody?.error?.status || "";
+    throw new Error(`API 오류 (${response.status})${detail ? `: ${detail}` : " — .env.local의 GEMINI_API_KEY를 확인해주세요."}`);
+  }
+
+  const result = await response.json();
+  const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("AI 응답에서 JSON을 파싱할 수 없습니다.");
+    return JSON.parse(match[0]);
+  }
+}
+
 /* ---------- 1. 딜 만들기 (셰프) ---------- */
 
 const DEAL_FIELD_REQUIRED = {
@@ -259,10 +324,52 @@ function DealCreateScreen({ onCreate }) {
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
 
+  const [aiText, setAiText] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [aiParsed, setAiParsed] = useState(false);
+
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
   const handleCropChange = (crop) => {
     const stages = RIPENESS_STAGES[crop] || [];
     setData((d) => ({ ...d, crop, ripeness: stages[Math.floor(stages.length / 2)] || "" }));
+  };
+
+  const handleAIParse = async () => {
+    if (!aiText.trim()) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiParsed(false);
+    try {
+      const parsed = await parseWithAI(aiText);
+      setData((prev) => {
+        const crop = CROP_OPTIONS.includes(parsed.crop) ? parsed.crop : prev.crop;
+        const stages = RIPENESS_STAGES[crop] || [];
+        const ripeness = stages.includes(parsed.ripeness)
+          ? parsed.ripeness
+          : stages[Math.floor(stages.length / 2)] || prev.ripeness;
+        const grade = GRADE_LEVELS.includes(parsed.grade) ? parsed.grade : prev.grade;
+        const cycle = CYCLE_OPTIONS.includes(parsed.cycle) ? parsed.cycle : prev.cycle;
+        return {
+          ...prev,
+          chefName: parsed.chefName || prev.chefName,
+          crop,
+          ripeness,
+          grade,
+          sizeCondition: parsed.sizeCondition || prev.sizeCondition,
+          quantity: parsed.quantity != null ? String(parsed.quantity) : prev.quantity,
+          deliveryDate: parsed.deliveryDate || prev.deliveryDate,
+          targetPrice: parsed.targetPrice != null ? String(parsed.targetPrice) : prev.targetPrice,
+          cycle,
+          note: parsed.note || prev.note,
+        };
+      });
+      setAiParsed(true);
+    } catch (err) {
+      setAiError(err.message || "AI 파싱 중 오류가 발생했습니다.");
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const STEP_FIELDS = {
@@ -328,6 +435,52 @@ function DealCreateScreen({ onCreate }) {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: 24 }}>
+
+      {/* AI 자동 입력 패널 */}
+      <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}55`, borderRadius: 10, padding: 16, marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 14, color: "#7A5C20" }}>✦</span>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#7A5C20", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+            AI 자동 입력
+          </span>
+        </div>
+        <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "0 0 10px", lineHeight: 1.6 }}>
+          원하는 조건을 자유롭게 문장으로 입력하면 AI가 아래 항목을 자동으로 채워드립니다.
+        </p>
+        <textarea
+          rows={4}
+          placeholder={"예: 테이블나인인데요, 콩피용 토마토 100kg 주 1회 납품받고 싶어요.\n라이트레드 단계에 특등급, 지름 5cm 이상으로 부탁드려요.\n납품일은 2026-08-10이고 단가는 23,000원/kg 희망합니다."}
+          value={aiText}
+          onChange={(e) => { setAiText(e.target.value); setAiParsed(false); setAiError(null); }}
+          style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, background: "#FFFDF5" }}
+        />
+        {aiError && <ErrorText text={aiError} />}
+        {aiParsed && (
+          <div style={{ fontSize: 12, color: TOKENS.moss, marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+            <span>✓</span>
+            <span>항목이 자동으로 채워졌습니다. 아래 단계에서 확인하고 수정할 수 있습니다.</span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={handleAIParse}
+          disabled={aiLoading || !aiText.trim()}
+          style={{
+            marginTop: 10,
+            padding: "9px 18px",
+            background: aiLoading || !aiText.trim() ? TOKENS.line : TOKENS.ink,
+            color: aiLoading || !aiText.trim() ? TOKENS.inkSoft : TOKENS.bg,
+            border: "none",
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: aiLoading || !aiText.trim() ? "default" : "pointer",
+          }}
+        >
+          {aiLoading ? "AI 분석 중…" : "AI로 자동 입력"}
+        </button>
+      </div>
+
       <StepIndicator step={step} />
 
       {step === 1 && (
