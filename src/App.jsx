@@ -68,8 +68,8 @@ const RIPENESS_STAGES = {
 
 const GRADE_LEVELS = ["보통", "상", "특"];
 const CYCLE_OPTIONS = ["단발성(1회)", "주 1회", "주 2회", "격주"];
-const DEAL_STATUS_LABEL = { open: "모집중", matched: "진행중", done: "완료" };
-const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKENS.inkSoft };
+const DEAL_STATUS_LABEL = { open: "모집중", matched: "진행중", done: "완료", closed: "마감" };
+const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKENS.inkSoft, closed: TOKENS.rust };
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
 const FARM_KEY = "farm-profile";
@@ -1074,9 +1074,10 @@ function MyProposalsScreen({ deals, userName, onOpenChat }) {
       {myItems.map(({ deal, proposal }) => {
         const isSelected = deal.selectedProposalId === proposal.id;
         const isRejected = deal.selectedProposalId && !isSelected;
-        const statusLabel = isSelected ? "선택됨" : isRejected ? "미선택" : "검토 중";
-        const statusColor = isSelected ? TOKENS.moss : isRejected ? TOKENS.inkSoft : "#B45309";
-        const statusBg = isSelected ? TOKENS.mossSoft : isRejected ? TOKENS.line : "#FEF3C7";
+        const isClosed = deal.status === "closed";
+        const statusLabel = isSelected ? "선택됨" : isRejected ? "미선택" : isClosed ? "마감됨" : "검토 중";
+        const statusColor = isSelected ? TOKENS.moss : isRejected ? TOKENS.inkSoft : isClosed ? TOKENS.rust : "#B45309";
+        const statusBg = isSelected ? TOKENS.mossSoft : isRejected ? TOKENS.line : isClosed ? TOKENS.rustSoft : "#FEF3C7";
 
         return (
           <div key={proposal.id} style={{ background: TOKENS.card, border: `1px solid ${isSelected ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18 }}>
@@ -1441,11 +1442,13 @@ const STATUS_FILTERS = [
   { key: "open", label: "모집중" },
   { key: "matched", label: "진행중" },
   { key: "done", label: "완료" },
+  { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
+  const [closingId, setClosingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState("전체");
 
   if (deals.length === 0) {
@@ -1459,7 +1462,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
   const sorted = [...deals].sort((a, b) => b.createdAt - a.createdAt);
   const filtered = statusFilter === "전체" ? sorted : sorted.filter((d) => d.status === statusFilter);
 
-  const countByStatus = { open: 0, matched: 0, done: 0 };
+  const countByStatus = { open: 0, matched: 0, done: 0, closed: 0 };
   deals.forEach((d) => { if (countByStatus[d.status] !== undefined) countByStatus[d.status]++; });
 
   return (
@@ -1469,8 +1472,8 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
         {STATUS_FILTERS.map((f) => {
           const count = f.key === "전체" ? deals.length : countByStatus[f.key];
           const isActive = statusFilter === f.key;
-          const activeColor = f.key === "open" ? TOKENS.gold : f.key === "matched" ? TOKENS.moss : f.key === "done" ? TOKENS.inkSoft : TOKENS.ink;
-          const activeBg = f.key === "open" ? TOKENS.goldSoft : f.key === "matched" ? TOKENS.mossSoft : f.key === "done" ? TOKENS.line : `${TOKENS.ink}18`;
+          const activeColor = f.key === "open" ? TOKENS.gold : f.key === "matched" ? TOKENS.moss : f.key === "done" ? TOKENS.inkSoft : f.key === "closed" ? TOKENS.rust : TOKENS.ink;
+          const activeBg = f.key === "open" ? TOKENS.goldSoft : f.key === "matched" ? TOKENS.mossSoft : f.key === "done" ? TOKENS.line : f.key === "closed" ? TOKENS.rustSoft : `${TOKENS.ink}18`;
           return (
             <button
               key={f.key}
@@ -1517,7 +1520,23 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
             </div>
             {deal.status === "open" && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: expanded ? 12 : 0, flexWrap: "wrap" }}>
-                {deletingId === deal.id ? (
+                {closingId === deal.id ? (
+                  <>
+                    <span style={{ fontSize: 12, color: TOKENS.rust }}>모집을 마감하시겠어요?{deal.proposals.length > 0 ? ` (들어온 제안 ${deal.proposals.length}건은 미선택 처리됩니다)` : ""}</span>
+                    <button
+                      onClick={() => { onClose(deal.id); setClosingId(null); }}
+                      style={{ fontSize: 12, padding: "4px 12px", background: TOKENS.rust, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+                    >
+                      마감 확인
+                    </button>
+                    <button
+                      onClick={() => setClosingId(null)}
+                      style={{ fontSize: 12, padding: "4px 10px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 6, color: TOKENS.inkSoft, cursor: "pointer" }}
+                    >
+                      취소
+                    </button>
+                  </>
+                ) : deletingId === deal.id ? (
                   <>
                     <span style={{ fontSize: 12, color: TOKENS.rust }}>정말 삭제하시겠어요?{deal.proposals.length > 0 ? ` (제안 ${deal.proposals.length}건도 함께 삭제됩니다)` : ""}</span>
                     <button
@@ -1540,6 +1559,12 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                       style={{ fontSize: 12, padding: "4px 12px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 6, color: TOKENS.ink, cursor: "pointer" }}
                     >
                       수정
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setClosingId(deal.id); }}
+                      style={{ fontSize: 12, padding: "4px 12px", background: "transparent", border: `1px solid ${TOKENS.gold}`, borderRadius: 6, color: "#7A5C20", cursor: "pointer" }}
+                    >
+                      마감
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeletingId(deal.id); }}
@@ -2174,6 +2199,10 @@ export default function FarmToTableApp() {
     persist(deals.filter((d) => d.id !== dealId));
   };
 
+  const handleCloseDeal = (dealId) => {
+    persist(deals.map((d) => d.id === dealId ? { ...d, status: "closed", closedAt: Date.now() } : d));
+  };
+
   if (loadState === "loading") {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
@@ -2282,7 +2311,7 @@ export default function FarmToTableApp() {
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? "new"} onCreate={handleCreateDeal} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={handleCancelEdit} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
           </>
         )}
