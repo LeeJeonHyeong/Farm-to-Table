@@ -113,6 +113,193 @@ const SAMPLE_DEALS = [
     ],
     selectedProposalId: null,
   },
+  {
+    id: "d3",
+    chefName: "오마카세 료",
+    crop: "딸기",
+    sizeCondition: "25g 이상 균일",
+    ripeness: "완숙(레드 100%)",
+    grade: "특",
+    quantity: 30,
+    deliveryDate: "2026-08-05",
+    cycle: "주 1회",
+    targetPrice: 42000,
+    note: "디저트 플레이팅용, 당도 12brix 이상 선호합니다.",
+    status: "open",
+    createdAt: Date.now() - 86400000 * 5,
+    proposals: [
+      {
+        id: "p2",
+        farmName: "햇살딸기농원",
+        region: "경남 진주",
+        price: 41000,
+        availableQty: 50,
+        leadTimeDays: 2,
+        cert: "GAP",
+        rating: 4.7,
+        message: "설향 품종으로 당도 13brix 이상 보장합니다.",
+        createdAt: Date.now() - 86400000 * 2,
+      },
+      {
+        id: "p3",
+        farmName: "베리굿팜",
+        region: "전북 남원",
+        price: 40000,
+        availableQty: 40,
+        leadTimeDays: 1,
+        cert: "유기농",
+        rating: 4.8,
+        message: "유기농 인증 매향 딸기입니다. 냉장 당일 배송 가능합니다.",
+        createdAt: Date.now() - 86400000,
+      },
+    ],
+    selectedProposalId: null,
+  },
+  {
+    id: "d4",
+    chefName: "비스트로 봄",
+    crop: "로메인",
+    sizeCondition: "결구 길이 25cm 이상",
+    ripeness: "완전결구",
+    grade: "상",
+    quantity: 50,
+    deliveryDate: "2026-08-01",
+    cycle: "주 2회",
+    targetPrice: 8000,
+    note: "시저 샐러드 전용, 속잎이 단단한 것으로 부탁드립니다.",
+    status: "open",
+    createdAt: Date.now() - 86400000 * 3,
+    proposals: [],
+    selectedProposalId: null,
+  },
+  {
+    id: "d5",
+    chefName: "파인다이닝 숲",
+    crop: "블루베리",
+    sizeCondition: "지름 14mm 이상",
+    ripeness: "완숙 블루",
+    grade: "특",
+    quantity: 15,
+    deliveryDate: "2026-08-20",
+    cycle: "단발성(1회)",
+    targetPrice: 35000,
+    note: "여름 디저트 메뉴 한정 사용, 냉장 포장 필수.",
+    status: "open",
+    createdAt: Date.now() - 86400000 * 1,
+    proposals: [
+      {
+        id: "p4",
+        farmName: "산들블루팜",
+        region: "강원 춘천",
+        price: 34000,
+        availableQty: 20,
+        leadTimeDays: 2,
+        cert: "무농약",
+        rating: 4.6,
+        message: "고랭지 블루베리라 당도와 크기 모두 우수합니다.",
+        createdAt: Date.now() - 43200000,
+      },
+    ],
+    selectedProposalId: null,
+  },
+  {
+    id: "d6",
+    chefName: "라틴키친",
+    crop: "고수",
+    sizeCondition: "줄기 포함 15cm 이상",
+    ripeness: "어린잎",
+    grade: "보통",
+    quantity: 10,
+    deliveryDate: "2026-07-28",
+    cycle: "주 2회",
+    targetPrice: 12000,
+    note: "타코·세비체용, 향이 강한 것 선호합니다.",
+    status: "open",
+    createdAt: Date.now() - 86400000 * 4,
+    proposals: [],
+    selectedProposalId: null,
+  },
+  {
+    id: "d7",
+    chefName: "이탈리안노트",
+    crop: "애호박",
+    sizeCondition: "꽃 달린 미니 애호박, 길이 12cm 이하",
+    ripeness: "미니(꽃달림)",
+    grade: "특",
+    quantity: 40,
+    deliveryDate: "2026-08-15",
+    cycle: "주 1회",
+    targetPrice: 15000,
+    note: "꽃이 신선하게 달려 있어야 합니다. 당일 수확 후 즉시 배송 요청.",
+    status: "open",
+    createdAt: Date.now() - 3600000 * 6,
+    proposals: [],
+    selectedProposalId: null,
+  },
+  {
+    id: "d8",
+    chefName: "테이블나인",
+    crop: "로즈마리",
+    sizeCondition: "가지 길이 20cm 이상",
+    ripeness: "성숙순",
+    grade: "상",
+    quantity: 5,
+    deliveryDate: "2026-08-10",
+    cycle: "격주",
+    targetPrice: 28000,
+    note: "스테이크 가니쉬 및 인퓨징용, 목질화되지 않은 신선한 순으로.",
+    status: "open",
+    createdAt: Date.now() - 86400000 * 6,
+    proposals: [
+      {
+        id: "p5",
+        farmName: "허브가든",
+        region: "제주 서귀포",
+        price: 27000,
+        availableQty: 10,
+        leadTimeDays: 3,
+        cert: "유기농",
+        rating: 4.9,
+        message: "제주 청정 환경에서 자란 유기농 로즈마리입니다.",
+        createdAt: Date.now() - 86400000 * 2,
+      },
+    ],
+    selectedProposalId: null,
+  },
+  {
+    id: "d9",
+    chefName: "모던한식 연",
+    crop: "토마토",
+    sizeCondition: "지름 3cm 이하 방울토마토",
+    ripeness: "레드(완숙)",
+    grade: "상",
+    quantity: 25,
+    deliveryDate: "2026-08-03",
+    cycle: "주 1회",
+    targetPrice: 19000,
+    note: "코스 요리 고명용, 색상이 균일하고 껍질이 얇은 것 선호.",
+    status: "open",
+    createdAt: Date.now() - 3600000 * 10,
+    proposals: [],
+    selectedProposalId: null,
+  },
+  {
+    id: "d10",
+    chefName: "카페 아르떼",
+    crop: "바질",
+    sizeCondition: "잎 폭 3cm 이상",
+    ripeness: "성숙잎",
+    grade: "보통",
+    quantity: 8,
+    deliveryDate: "2026-07-30",
+    cycle: "주 1회",
+    targetPrice: 14000,
+    note: "바질 레모네이드·스무디용, 향이 강하면 더 좋습니다.",
+    status: "open",
+    createdAt: Date.now() - 3600000 * 2,
+    proposals: [],
+    selectedProposalId: null,
+  },
 ];
 
 function chipBadge(bg, color) {
@@ -1259,6 +1446,11 @@ export default function FarmToTableApp() {
     await storage.set(FARM_KEY, JSON.stringify(farmData));
   };
 
+  const handleResetData = async () => {
+    await storage.set(DEALS_KEY, JSON.stringify(SAMPLE_DEALS));
+    setDeals(SAMPLE_DEALS);
+  };
+
   const handleCreateDeal = (deal) => {
     persist([deal, ...deals]);
     setTab("mydeals");
@@ -1352,6 +1544,13 @@ export default function FarmToTableApp() {
             </button>
           ))}
           <div style={{ flex: 1 }} />
+          <button
+            onClick={handleResetData}
+            title="샘플 데이터로 초기화"
+            style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", marginBottom: 10 }}
+          >
+            샘플 초기화
+          </button>
           <span style={{ fontSize: 11, color: saveState === "error" ? TOKENS.rust : TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", paddingBottom: 10 }}>
             {saveState === "saving" && "저장 중…"}
             {saveState === "saved" && "저장됨"}
