@@ -1,5 +1,15 @@
 import { useState, useEffect } from "react";
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
+
 const DEALS_KEY = "deals-list";
 
 // Claude.ai Artifacts 환경에서는 window.storage가 자동으로 주입되지만,
@@ -481,22 +491,25 @@ const DEAL_STEPS = [
 ];
 
 function StepIndicator({ step }) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+    <div style={{ display: "flex", gap: isMobile ? 4 : 6, marginBottom: 20, overflowX: "auto" }}>
       {DEAL_STEPS.map((s) => (
-        <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div key={s.key} style={{ display: "flex", alignItems: "center", gap: isMobile ? 3 : 6, flexShrink: 0 }}>
           <div
             style={{
-              width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontFamily: "'IBM Plex Mono', monospace",
+              width: isMobile ? 22 : 26, height: isMobile ? 22 : 26, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontFamily: "'IBM Plex Mono', monospace",
               background: s.key <= step ? TOKENS.ink : TOKENS.line,
               color: s.key <= step ? TOKENS.bg : TOKENS.inkSoft,
             }}
           >
             {s.key}
           </div>
-          <span style={{ fontSize: 12, color: s.key === step ? TOKENS.ink : TOKENS.inkSoft }}>{s.label}</span>
-          {s.key !== DEAL_STEPS.length && <div style={{ width: 16, height: 1, background: TOKENS.line }} />}
+          {!isMobile && <span style={{ fontSize: 12, color: s.key === step ? TOKENS.ink : TOKENS.inkSoft }}>{s.label}</span>}
+          {isMobile && s.key === step && <span style={{ fontSize: 11, color: TOKENS.ink }}>{s.label}</span>}
+          {s.key !== DEAL_STEPS.length && <div style={{ width: isMobile ? 10 : 16, height: 1, background: TOKENS.line }} />}
         </div>
       ))}
     </div>
@@ -620,10 +633,11 @@ function DealCreateScreen({ onCreate }) {
     );
   }
 
+  const isMobile = useIsMobile();
   const stages = RIPENESS_STAGES[data.crop] || [];
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: 24 }}>
+    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 14 : 24 }}>
 
       {/* AI 자동 입력 패널 */}
       <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}55`, borderRadius: 10, padding: 16, marginBottom: 24 }}>
@@ -720,7 +734,7 @@ function DealCreateScreen({ onCreate }) {
 
       {step === 4 && (
         <Section title="4. 납품일 · 희망 가격">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
             <div>
               <FieldLabel required>희망 납품일</FieldLabel>
               <input type="date" value={data.deliveryDate} onChange={(e) => update("deliveryDate", e.target.value)} style={inputStyle} />
@@ -797,6 +811,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
   const blank = { farmName: "", region: "", price: "", availableQty: "", leadTimeDays: "", cert: "", message: "" };
   const [data, setData] = useState(blank);
   const [errors, setErrors] = useState({});
+  const isMobile = useIsMobile();
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
 
   const loadFromProfile = () => {
@@ -845,7 +860,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
           </button>
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
         <div>
           <FieldLabel required>농가명</FieldLabel>
           <input type="text" placeholder="예: 신선팜" value={data.farmName} onChange={(e) => update("farmName", e.target.value)} style={inputStyle} />
@@ -907,6 +922,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
   const [cropFilter, setCropFilter] = useState("전체");
   const [gradeFilter, setGradeFilter] = useState("전체");
   const [sortBy, setSortBy] = useState("latest");
+  const isMobile = useIsMobile();
 
   const openDeals = deals.filter((d) => d.status === "open");
 
@@ -960,7 +976,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
       </div>
 
       {/* 필터 행 */}
-      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: "12px 14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: isMobile ? "10px 10px" : "12px 14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>품목</span>
           {["전체", ...CROP_OPTIONS].map((c) => (
@@ -979,7 +995,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", rowGap: 6 }}>
           <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>등급</span>
           {["전체", ...GRADE_LEVELS].map((g) => (
             <button
@@ -996,7 +1012,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
             </button>
           ))}
 
-          <div style={{ flex: 1 }} />
+          {!isMobile && <div style={{ flex: 1 }} />}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -1284,6 +1300,7 @@ function FarmProfileScreen({ profile, onSave }) {
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
+  const isMobile = useIsMobile();
 
   const update = (key, value) => { setData((d) => ({ ...d, [key]: value })); setSaved(false); };
   const toggleSpecialty = (crop) => {
@@ -1308,7 +1325,7 @@ function FarmProfileScreen({ profile, onSave }) {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: 24 }}>
+    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 14 : 24 }}>
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 4px" }}>
         내 농가 정보
       </h2>
@@ -1316,7 +1333,7 @@ function FarmProfileScreen({ profile, onSave }) {
         저장해두면 제안서 작성 시 자동으로 불러올 수 있습니다.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
         <div>
           <FieldLabel required>농가명</FieldLabel>
           <input type="text" placeholder="예: 신선팜" value={data.farmName} onChange={(e) => update("farmName", e.target.value)} style={inputStyle} />
@@ -1398,6 +1415,7 @@ export default function FarmToTableApp() {
   const [farm, setFarm] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let cancelled = false;
@@ -1495,7 +1513,7 @@ export default function FarmToTableApp() {
   const openCount = deals.filter((d) => d.status === "open").length;
 
   return (
-    <div style={{ background: TOKENS.bg, minHeight: "100%", padding: "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
+    <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"
@@ -1505,7 +1523,7 @@ export default function FarmToTableApp() {
           <span style={{ fontSize: 12, letterSpacing: "0.08em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
             역경매 방식 선주문 플랫폼
           </span>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 28, margin: "6px 0 4px" }}>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 20 : 28, margin: "6px 0 4px" }}>
             셰프가 딜을 만들면, 농가가 제안합니다
           </h1>
           <p style={{ fontSize: 14, color: TOKENS.inkSoft, margin: 0 }}>
@@ -1513,7 +1531,7 @@ export default function FarmToTableApp() {
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24, borderBottom: `1px solid ${TOKENS.line}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 0 : 8, marginBottom: 24, borderBottom: `1px solid ${TOKENS.line}`, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           {[
             { key: "create", label: "딜 만들기" },
             { key: "browse", label: "딜 찾기 (농가)" },
@@ -1524,10 +1542,10 @@ export default function FarmToTableApp() {
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{
-                padding: "10px 18px", background: "transparent", border: "none",
+                padding: isMobile ? "10px 12px" : "10px 18px", background: "transparent", border: "none",
                 borderBottom: `2px solid ${tab === t.key ? TOKENS.rust : "transparent"}`,
                 color: tab === t.key ? TOKENS.ink : TOKENS.inkSoft,
-                fontSize: 14, fontWeight: tab === t.key ? 500 : 400, cursor: "pointer", marginBottom: -1,
+                fontSize: isMobile ? 13 : 14, fontWeight: tab === t.key ? 500 : 400, cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap", flexShrink: 0,
               }}
             >
               {t.label}
@@ -1544,18 +1562,22 @@ export default function FarmToTableApp() {
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <button
-            onClick={handleResetData}
-            title="샘플 데이터로 초기화"
-            style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", marginBottom: 10 }}
-          >
-            샘플 초기화
-          </button>
-          <span style={{ fontSize: 11, color: saveState === "error" ? TOKENS.rust : TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", paddingBottom: 10 }}>
-            {saveState === "saving" && "저장 중…"}
-            {saveState === "saved" && "저장됨"}
-            {saveState === "error" && "저장 실패"}
-          </span>
+          {!isMobile && (
+            <button
+              onClick={handleResetData}
+              title="샘플 데이터로 초기화"
+              style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", marginBottom: 10, flexShrink: 0 }}
+            >
+              샘플 초기화
+            </button>
+          )}
+          {!isMobile && (
+            <span style={{ fontSize: 11, color: saveState === "error" ? TOKENS.rust : TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", paddingBottom: 10, flexShrink: 0 }}>
+              {saveState === "saving" && "저장 중…"}
+              {saveState === "saved" && "저장됨"}
+              {saveState === "error" && "저장 실패"}
+            </span>
+          )}
         </div>
 
         {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} />}
