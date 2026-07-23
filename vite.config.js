@@ -7,14 +7,13 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       proxy: {
-        "/api/gemini": {
-          target: "https://generativelanguage.googleapis.com",
+        "/api/groq": {
+          target: "https://api.groq.com",
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/gemini/, "/v1beta"),
+          rewrite: (path) => path.replace(/^\/api\/groq/, ""),
           configure: (proxy) => {
             proxy.on("proxyReq", (proxyReq) => {
-              const sep = proxyReq.path.includes("?") ? "&" : "?";
-              proxyReq.path = proxyReq.path + sep + `key=${env.GEMINI_API_KEY || ""}`;
+              proxyReq.setHeader("Authorization", `Bearer ${env.GROQ_API_KEY || ""}`);
             });
           },
         },

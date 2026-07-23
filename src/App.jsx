@@ -409,8 +409,114 @@ function DealSummaryRow({ deal }) {
 
 /* ---------- AI 자동 입력 ---------- */
 
+function parseWithRules(text) {
+  const CROP_MAP = {
+    "토마토": ["토마토"],
+    "바질": ["바질"],
+    "블루베리": ["블루베리"],
+    "딸기": ["딸기"],
+    "로메인": ["로메인"],
+    "로즈마리": ["로즈마리"],
+    "애호박": ["애호박", "호박"],
+    "고수": ["고수"],
+  };
+  let crop = null;
+  for (const [name, kws] of Object.entries(CROP_MAP)) {
+    if (kws.some((k) => text.includes(k))) { crop = name; break; }
+  }
+
+  let sizeCondition = null;
+  if (/소형|작은|소\s*크기/.test(text)) sizeCondition = "소형";
+  else if (/대형|큰|대\s*크기/.test(text)) sizeCondition = "대형";
+  else if (/중간|중형|중\s*크기/.test(text)) sizeCondition = "중간";
+
+  let grade = null;
+  if (/특급|특품|특\s*등/.test(text)) grade = "특";
+  else if (/상품|상\s*등/.test(text)) grade = "상";
+
+  let ripeness = null;
+  if (crop === "토마토") {
+    if (/완숙|레드|빨강/.test(text)) ripeness = "레드(완숙)";
+    else if (/핑크/.test(text)) ripeness = "핑크";
+    else if (/미숙|그린|초록/.test(text)) ripeness = "그린(미숙)";
+  } else if (crop === "딸기") {
+    if (/완숙/.test(text)) ripeness = "완숙(레드 100%)";
+    else if (/핑크/.test(text)) ripeness = "핑크";
+  } else if (crop === "바질" || crop === "고수") {
+    if (/어린|마이크로/.test(text)) ripeness = "어린잎";
+    else if (/성숙/.test(text)) ripeness = "성숙잎";
+  } else if (crop === "블루베리") {
+    if (/완숙/.test(text)) ripeness = "완숙 블루";
+    else if (/수확/.test(text)) ripeness = "블루(수확기)";
+  } else if (crop === "로메인") {
+    if (/베이비|어린/.test(text)) ripeness = "베이비잎";
+    else if (/완전/.test(text)) ripeness = "완전결구";
+  } else if (crop === "로즈마리") {
+    if (/어린/.test(text)) ripeness = "어린순";
+    else if (/성숙/.test(text)) ripeness = "성숙순";
+  } else if (crop === "애호박") {
+    if (/꽃|미니/.test(text)) ripeness = "미니(꽃달림)";
+    else if (/성숙/.test(text)) ripeness = "성숙";
+    else if (/중간/.test(text)) ripeness = "중간";
+  }
+
+  let quantity = null;
+  const qtyMatch = text.match(/(\d+(?:\.\d+)?)\s*(kg|킬로|개|박스|상자|단|g|그램)/);
+  if (qtyMatch) quantity = parseFloat(qtyMatch[1]);
+
+  const DAY_INDEX = { 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6, 일: 0 };
+  function calcDate(daysOffset) {
+    const d = new Date();
+    d.setDate(d.getDate() + daysOffset);
+    return d.toISOString().split("T")[0];
+  }
+  function nextWeekday(dayIdx, forceNextWeek = false) {
+    const today = new Date().getDay();
+    let diff = (dayIdx - today + 7) % 7;
+    if (diff === 0) diff = 7;
+    if (forceNextWeek && diff < 7) diff += 7;
+    return calcDate(diff);
+  }
+
+  let deliveryDate = null;
+  if (/내일/.test(text)) deliveryDate = calcDate(1);
+  else if (/모레/.test(text)) deliveryDate = calcDate(2);
+  else {
+    const nDaysMatch = text.match(/(\d+)\s*일\s*후/);
+    if (nDaysMatch) deliveryDate = calcDate(parseInt(nDaysMatch[1]));
+  }
+  if (!deliveryDate) {
+    const isNextWeek = /다음\s*주/.test(text);
+    for (const [dayChar, idx] of Object.entries(DAY_INDEX)) {
+      if (new RegExp(dayChar + "요일").test(text)) {
+        deliveryDate = nextWeekday(idx, isNextWeek);
+        break;
+      }
+    }
+  }
+
+  const notes = [];
+  if (/신선/.test(text)) notes.push("신선한 것");
+  if (/유기농/.test(text)) notes.push("유기농");
+  if (/당일/.test(text)) notes.push("당일 수확");
+  if (/무농약/.test(text)) notes.push("무농약");
+
+  return {
+    _usedRules: true,
+    chefName: null, crop, sizeCondition, ripeness, grade,
+    quantity, deliveryDate, targetPrice: null, cycle: null,
+    note: notes.length > 0 ? notes.join(", ") : null,
+  };
+}
+
 async function parseWithAI(text) {
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const dayNames = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+  const todayDay = dayNames[now.getDay()];
+
   const systemInstruction = `당신은 식자재 주문 요청에서 정보를 추출하는 어시스턴트입니다.
+오늘 날짜: ${todayStr} (${todayDay}). 상대적 날짜 표현(내일, 다음주 수요일, 3일 후 등)은 오늘 기준으로 계산해 YYYY-MM-DD로 변환하세요.
 가능한 품목: 토마토, 바질, 블루베리, 딸기, 로메인, 로즈마리, 애호박, 고수
 숙성도 옵션(품목별로 정확히 일치해야 함):
 - 토마토: 그린(미숙), 브레이커, 터닝, 핑크, 라이트레드, 레드(완숙)
@@ -441,45 +547,34 @@ JSON 형식:
   "note": "추가사항 또는 null"
 }`;
 
-  const MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash-latest"];
-  const body = JSON.stringify({
-    system_instruction: { parts: [{ text: systemInstruction }] },
-    contents: [{ parts: [{ text: userPrompt }] }],
-    generationConfig: { maxOutputTokens: 512, temperature: 0.1, responseMimeType: "application/json" },
+  const response = await fetch("/api/groq/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 512,
+      response_format: { type: "json_object" },
+    }),
   });
 
-  let lastError = "";
-  for (const model of MODELS) {
-    const response = await fetch(`/api/gemini/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-
-    if (response.status === 404) {
-      const errBody = await response.json().catch(() => ({}));
-      lastError = errBody?.error?.message || `${model} 모델을 찾을 수 없습니다.`;
-      continue;
-    }
-
-    if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      const detail = errBody?.error?.message || "";
-      throw new Error(`API 오류 (${response.status})${detail ? `: ${detail}` : " — .env.local의 GEMINI_API_KEY를 확인해주세요."}`);
-    }
-
-    const result = await response.json();
-    const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-    try {
-      return JSON.parse(rawText);
-    } catch {
-      const match = rawText.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("AI 응답에서 JSON을 파싱할 수 없습니다.");
-      return JSON.parse(match[0]);
-    }
+  if (!response.ok) {
+    return parseWithRules(text);
   }
 
-  throw new Error(`사용 가능한 모델을 찾지 못했습니다. ${lastError}`);
+  const result = await response.json();
+  const rawText = result.choices?.[0]?.message?.content?.trim() ?? "";
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) return parseWithRules(text);
+    return JSON.parse(match[0]);
+  }
 }
 
 /* ---------- 1. 딜 만들기 (셰프) ---------- */
@@ -541,6 +636,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [aiParsed, setAiParsed] = useState(false);
+  const [aiNote, setAiNote] = useState(null);
 
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
   const handleCropChange = (crop) => {
@@ -553,6 +649,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
     setAiLoading(true);
     setAiError(null);
     setAiParsed(false);
+    setAiNote(null);
     try {
       const parsed = await parseWithAI(aiText);
       setData((prev) => {
@@ -577,7 +674,11 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
           note: parsed.note || prev.note,
         };
       });
-      setAiParsed(true);
+      if (parsed._usedRules) {
+        setAiNote("AI 서버 연결 불가 — 키워드 분석으로 자동 입력했습니다.");
+      } else {
+        setAiParsed(true);
+      }
     } catch (err) {
       setAiError(err.message || "AI 파싱 중 오류가 발생했습니다.");
     } finally {
@@ -669,6 +770,11 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
           style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, background: "#FFFDF5" }}
         />
         {aiError && <ErrorText text={aiError} />}
+        {aiNote && (
+          <div style={{ fontSize: 12, color: "#B45309", marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+            <span>⚠</span><span>{aiNote}</span>
+          </div>
+        )}
         {aiParsed && (
           <div style={{ fontSize: 12, color: TOKENS.moss, marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
             <span>✓</span>
