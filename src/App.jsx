@@ -625,13 +625,18 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate, defaultChefName = "" }) {
+function DealCreateScreen({ onCreate, defaultChefName = "", editingDeal = null, onUpdate = null, onCancelEdit = null }) {
+  const isEditing = !!editingDeal;
   const blank = {
     chefName: defaultChefName, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
     grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "",
   };
   const [step, setStep] = useState(1);
-  const [data, setData] = useState(blank);
+  const [data, setData] = useState(
+    isEditing
+      ? { ...editingDeal, quantity: String(editingDeal.quantity), targetPrice: String(editingDeal.targetPrice) }
+      : blank
+  );
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
 
@@ -713,17 +718,21 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
 
   const handleSubmit = () => {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
-    onCreate({
-      id: `d${Date.now()}`,
-      ...data,
-      quantity: Number(data.quantity),
-      targetPrice: Number(data.targetPrice),
-      status: "open",
-      createdAt: Date.now(),
-      proposals: [],
-      selectedProposalId: null,
-    });
-    setDone(true);
+    if (isEditing) {
+      onUpdate({ ...editingDeal, ...data, quantity: Number(data.quantity), targetPrice: Number(data.targetPrice) });
+    } else {
+      onCreate({
+        id: `d${Date.now()}`,
+        ...data,
+        quantity: Number(data.quantity),
+        targetPrice: Number(data.targetPrice),
+        status: "open",
+        createdAt: Date.now(),
+        proposals: [],
+        selectedProposalId: null,
+      });
+      setDone(true);
+    }
   };
 
   if (done) {
@@ -804,6 +813,11 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
         </button>
       </div>
 
+      {isEditing && (
+        <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 13, color: "#7A5C20" }}>
+          ✎ <strong>{editingDeal.crop}</strong> 딜 수정 중
+        </div>
+      )}
       <StepIndicator step={step} />
 
       {step === 1 && (
@@ -876,7 +890,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
       )}
 
       {step === 5 && (
-        <Section title="5. 등록 전 확인">
+        <Section title={isEditing ? "5. 수정 내용 확인" : "5. 등록 전 확인"}>
           <div style={{ background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{data.crop}</span>
@@ -903,13 +917,18 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
             이전
           </button>
         )}
+        {isEditing && step === 1 && (
+          <button onClick={onCancelEdit} style={{ padding: "12px 16px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, color: TOKENS.inkSoft, fontSize: 14, cursor: "pointer" }}>
+            취소
+          </button>
+        )}
         {step < 5 ? (
           <button onClick={goNext} style={{ flex: 1, padding: "12px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
             다음
           </button>
         ) : (
           <button onClick={handleSubmit} style={{ flex: 1, padding: "12px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-            딜 등록하고 농가 제안 받기
+            {isEditing ? "딜 수정하기" : "딜 등록하고 농가 제안 받기"}
           </button>
         )}
       </div>
@@ -1417,8 +1436,9 @@ function DealTimeline({ deal }) {
   );
 }
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
+  const [deletingId, setDeletingId] = useState(null);
 
   if (deals.length === 0) {
     return (
@@ -1449,9 +1469,45 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat }) 
               <StatusBadge status={deal.status} />
             </div>
             <DealSummaryRow deal={deal} />
-            <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: expanded ? 12 : 0 }}>
+            <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: deal.status === "open" ? 8 : (expanded ? 12 : 0) }}>
               희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg · 납품일 {deal.deliveryDate} · 받은 제안 {deal.proposals.length}건
             </div>
+            {deal.status === "open" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: expanded ? 12 : 0, flexWrap: "wrap" }}>
+                {deletingId === deal.id ? (
+                  <>
+                    <span style={{ fontSize: 12, color: TOKENS.rust }}>정말 삭제하시겠어요?{deal.proposals.length > 0 ? ` (제안 ${deal.proposals.length}건도 함께 삭제됩니다)` : ""}</span>
+                    <button
+                      onClick={() => { onDelete(deal.id); setDeletingId(null); }}
+                      style={{ fontSize: 12, padding: "4px 12px", background: TOKENS.rust, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+                    >
+                      삭제 확인
+                    </button>
+                    <button
+                      onClick={() => setDeletingId(null)}
+                      style={{ fontSize: 12, padding: "4px 10px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 6, color: TOKENS.inkSoft, cursor: "pointer" }}
+                    >
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
+                      style={{ fontSize: 12, padding: "4px 12px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 6, color: TOKENS.ink, cursor: "pointer" }}
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeletingId(deal.id); }}
+                      style={{ fontSize: 12, padding: "4px 12px", background: "transparent", border: `1px solid ${TOKENS.rustSoft}`, borderRadius: 6, color: TOKENS.rust, cursor: "pointer" }}
+                    >
+                      삭제
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {expanded && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>
@@ -1929,6 +1985,7 @@ export default function FarmToTableApp() {
   const [saveState, setSaveState] = useState("idle");
   const [chats, setChats] = useState({});
   const [chatTarget, setChatTarget] = useState(null);
+  const [editingDeal, setEditingDeal] = useState(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -2063,6 +2120,17 @@ export default function FarmToTableApp() {
 
   const handleOpenChat = (target) => { setChatTarget(target); };
 
+  const handleEditDeal = (deal) => { setEditingDeal(deal); setTab("create"); };
+  const handleCancelEdit = () => { setEditingDeal(null); setTab("mydeals"); };
+  const handleUpdateDeal = (updated) => {
+    persist(deals.map((d) => d.id === updated.id ? updated : d));
+    setEditingDeal(null);
+    setTab("mydeals");
+  };
+  const handleDeleteDeal = (dealId) => {
+    persist(deals.filter((d) => d.id !== dealId));
+  };
+
   if (loadState === "loading") {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
@@ -2089,7 +2157,7 @@ export default function FarmToTableApp() {
     : [];
 
   const TABS = isChef
-    ? [{ key: "create", label: "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
+    ? [{ key: "create", label: editingDeal ? "딜 수정" : "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
     : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안" }, { key: "farm", label: "내 농가" }];
 
   return (
@@ -2128,7 +2196,7 @@ export default function FarmToTableApp() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => { if (t.key !== "create") setEditingDeal(null); setTab(t.key); }}
               style={{
                 padding: isMobile ? "10px 12px" : "10px 18px", background: "transparent", border: "none",
                 borderBottom: `2px solid ${tab === t.key ? TOKENS.rust : "transparent"}`,
@@ -2168,10 +2236,10 @@ export default function FarmToTableApp() {
           />
         ) : (
           <>
-            {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} defaultChefName={user.name} />}
+            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? "new"} onCreate={handleCreateDeal} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={handleCancelEdit} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
           </>
         )}
