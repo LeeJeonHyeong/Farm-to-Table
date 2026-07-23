@@ -73,6 +73,7 @@ const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKEN
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
 const FARM_KEY = "farm-profile";
+const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
 const SAMPLE_DEALS = [
@@ -516,9 +517,9 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate }) {
+function DealCreateScreen({ onCreate, defaultChefName = "" }) {
   const blank = {
-    chefName: "", crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
+    chefName: defaultChefName, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
     grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "",
   };
   const [step, setStep] = useState(1);
@@ -1295,8 +1296,8 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal }) {
 
 /* ---------- 4. 내 농가 등록 ---------- */
 
-function FarmProfileScreen({ profile, onSave }) {
-  const blank = { farmName: "", region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "" };
+function FarmProfileScreen({ profile, onSave, defaultFarmName = "" }) {
+  const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
@@ -1407,9 +1408,84 @@ function FarmProfileScreen({ profile, onSave }) {
   );
 }
 
+/* ---------- 5. 로그인 ---------- */
+
+function LoginScreen({ onLogin }) {
+  const [role, setRole] = useState(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const isMobile = useIsMobile();
+
+  const handleStart = () => {
+    if (!role) { setError("역할을 선택해주세요."); return; }
+    if (!name.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
+    onLogin({ role, name: name.trim() });
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: TOKENS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+      <div style={{ maxWidth: 400, width: "100%" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <span style={{ fontSize: 11, letterSpacing: "0.08em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
+            역경매 방식 선주문 플랫폼
+          </span>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 26 : 32, margin: "8px 0 6px", color: TOKENS.ink }}>
+            Farm-to-Table
+          </h1>
+          <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0 }}>역할을 선택하고 시작하세요</p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+          {[
+            { key: "chef", label: "셰프", desc: "딜 등록·제안 선택", color: TOKENS.rust, soft: TOKENS.rustSoft },
+            { key: "farmer", label: "농가", desc: "딜 찾기·제안 보내기", color: TOKENS.moss, soft: TOKENS.mossSoft },
+          ].map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => { setRole(r.key); setName(""); setError(""); }}
+              style={{
+                padding: "20px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
+                border: `2px solid ${role === r.key ? r.color : TOKENS.line}`,
+                background: role === r.key ? r.soft : "#FFFFFF",
+                transition: "all 0.15s",
+              }}
+            >
+              <div style={{ fontSize: 30, marginBottom: 8 }}>{r.key === "chef" ? "🍳" : "🌱"}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink, marginBottom: 3 }}>{r.label}</div>
+              <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{r.desc}</div>
+            </button>
+          ))}
+        </div>
+
+        <FieldLabel required>{role === "chef" ? "레스토랑명" : role === "farmer" ? "농가명" : "이름"}</FieldLabel>
+        <input
+          type="text"
+          placeholder={role === "chef" ? "예: 테이블나인" : role === "farmer" ? "예: 신선팜" : "위에서 역할을 먼저 선택하세요"}
+          value={name}
+          disabled={!role}
+          onChange={(e) => { setName(e.target.value); setError(""); }}
+          onKeyDown={(e) => e.key === "Enter" && handleStart()}
+          style={{ ...inputStyle, opacity: role ? 1 : 0.5 }}
+        />
+        {error && <ErrorText text={error} />}
+
+        <button
+          onClick={handleStart}
+          style={{ marginTop: 16, width: "100%", padding: "13px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer" }}
+        >
+          시작하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- App shell ---------- */
 
 export default function FarmToTableApp() {
+  const [user, setUser] = useState(null);
   const [tab, setTab] = useState("create");
   const [deals, setDeals] = useState([]);
   const [farm, setFarm] = useState(null);
@@ -1421,6 +1497,12 @@ export default function FarmToTableApp() {
     let cancelled = false;
     (async () => {
       try {
+        const userResult = await storage.get(USER_KEY);
+        if (!cancelled && userResult && userResult.value) {
+          const savedUser = JSON.parse(userResult.value);
+          setUser(savedUser);
+          setTab(savedUser.role === "farmer" ? "browse" : "create");
+        }
         const result = await storage.get(DEALS_KEY, true);
         if (cancelled) return;
         if (result && result.value) {
@@ -1457,6 +1539,18 @@ export default function FarmToTableApp() {
     } catch (err) {
       setSaveState("error");
     }
+  };
+
+  const handleLogin = async (userData) => {
+    setUser(userData);
+    setTab(userData.role === "farmer" ? "browse" : "create");
+    await storage.set(USER_KEY, JSON.stringify(userData));
+  };
+
+  const handleLogout = async () => {
+    setUser(null);
+    setTab("create");
+    await storage.set(USER_KEY, "");
   };
 
   const handleSaveFarm = async (farmData) => {
@@ -1497,8 +1591,8 @@ export default function FarmToTableApp() {
 
   if (loadState === "loading") {
     return (
-      <div style={{ background: TOKENS.bg, minHeight: "100%", padding: "60px 24px", textAlign: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
-        딜 데이터를 불러오는 중입니다…
+      <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
+        불러오는 중…
       </div>
     );
   }
@@ -1510,7 +1604,15 @@ export default function FarmToTableApp() {
     );
   }
 
+  if (!user) return <LoginScreen onLogin={handleLogin} />;
+
+  const isChef = user.role === "chef";
   const openCount = deals.filter((d) => d.status === "open").length;
+  const myDeals = isChef ? deals.filter((d) => d.chefName === user.name) : [];
+
+  const TABS = isChef
+    ? [{ key: "create", label: "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
+    : [{ key: "browse", label: "딜 찾기" }, { key: "farm", label: "내 농가" }];
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
@@ -1519,25 +1621,33 @@ export default function FarmToTableApp() {
         href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"
       />
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ marginBottom: 20 }}>
-          <span style={{ fontSize: 12, letterSpacing: "0.08em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
-            역경매 방식 선주문 플랫폼
-          </span>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 20 : 28, margin: "6px 0 4px" }}>
-            셰프가 딜을 만들면, 농가가 제안합니다
-          </h1>
-          <p style={{ fontSize: 14, color: TOKENS.inkSoft, margin: 0 }}>
-            셰프가 원하는 조건의 식자재 요청서(딜)를 올리면 농가들이 가격과 조건을 제안하고, 셰프가 그중 하나를 선택합니다.
-          </p>
+        {/* 헤더 */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, gap: 12 }}>
+          <div>
+            <span style={{ fontSize: 11, letterSpacing: "0.08em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
+              역경매 방식 선주문 플랫폼
+            </span>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 20 : 28, margin: "6px 0 0" }}>
+              Farm-to-Table
+            </h1>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexShrink: 0 }}>
+            <span style={chipBadge(isChef ? TOKENS.rustSoft : TOKENS.mossSoft, isChef ? TOKENS.rust : TOKENS.moss)}>
+              {isChef ? "셰프" : "농가"}
+            </span>
+            <span style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500 }}>{user.name}</span>
+            <button
+              onClick={handleLogout}
+              style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
 
+        {/* 탭바 */}
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 0 : 8, marginBottom: 24, borderBottom: `1px solid ${TOKENS.line}`, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-          {[
-            { key: "create", label: "딜 만들기" },
-            { key: "browse", label: "딜 찾기 (농가)" },
-            { key: "mydeals", label: "내 거래" },
-            { key: "farm", label: "내 농가" },
-          ].map((t) => (
+          {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
@@ -1545,29 +1655,18 @@ export default function FarmToTableApp() {
                 padding: isMobile ? "10px 12px" : "10px 18px", background: "transparent", border: "none",
                 borderBottom: `2px solid ${tab === t.key ? TOKENS.rust : "transparent"}`,
                 color: tab === t.key ? TOKENS.ink : TOKENS.inkSoft,
-                fontSize: isMobile ? 13 : 14, fontWeight: tab === t.key ? 500 : 400, cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap", flexShrink: 0,
+                fontSize: isMobile ? 13 : 14, fontWeight: tab === t.key ? 500 : 400,
+                cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap", flexShrink: 0,
               }}
             >
               {t.label}
-              {t.key === "browse" && (
-                <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
-                  {openCount}
-                </span>
-              )}
-              {t.key === "mydeals" && (
-                <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
-                  {deals.length}
-                </span>
-              )}
+              {t.key === "browse" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{openCount}</span>}
+              {t.key === "mydeals" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{myDeals.length}</span>}
             </button>
           ))}
           <div style={{ flex: 1 }} />
           {!isMobile && (
-            <button
-              onClick={handleResetData}
-              title="샘플 데이터로 초기화"
-              style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", marginBottom: 10, flexShrink: 0 }}
-            >
+            <button onClick={handleResetData} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", marginBottom: 10, flexShrink: 0 }}>
               샘플 초기화
             </button>
           )}
@@ -1580,10 +1679,10 @@ export default function FarmToTableApp() {
           )}
         </div>
 
-        {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} />}
+        {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} defaultChefName={user.name} />}
         {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} />}
-        {tab === "mydeals" && <MyDealsScreen deals={deals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} />}
-        {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} />}
+        {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} />}
+        {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
       </div>
     </div>
   );
