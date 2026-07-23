@@ -707,52 +707,174 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
   );
 }
 
+const SORT_OPTIONS = [
+  { value: "latest", label: "최신순" },
+  { value: "priceAsc", label: "단가 낮은순" },
+  { value: "priceDesc", label: "단가 높은순" },
+  { value: "proposals", label: "제안 많은순" },
+];
+
 function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
   const [openFormId, setOpenFormId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [cropFilter, setCropFilter] = useState("전체");
+  const [gradeFilter, setGradeFilter] = useState("전체");
+  const [sortBy, setSortBy] = useState("latest");
+
   const openDeals = deals.filter((d) => d.status === "open");
 
-  if (openDeals.length === 0) {
-    return (
-      <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 32, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
-        현재 모집 중인 딜이 없습니다.
-      </div>
-    );
-  }
+  const filtered = openDeals
+    .filter((d) => {
+      if (cropFilter !== "전체" && d.crop !== cropFilter) return false;
+      if (gradeFilter !== "전체" && d.grade !== gradeFilter) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        return (
+          d.crop.toLowerCase().includes(q) ||
+          d.chefName.toLowerCase().includes(q) ||
+          (d.note || "").toLowerCase().includes(q) ||
+          d.sizeCondition.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "priceAsc") return a.targetPrice - b.targetPrice;
+      if (sortBy === "priceDesc") return b.targetPrice - a.targetPrice;
+      if (sortBy === "proposals") return b.proposals.length - a.proposals.length;
+      return b.createdAt - a.createdAt;
+    });
+
+  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || sortBy !== "latest";
+  const resetFilters = () => { setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setSortBy("latest"); };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 720, margin: "0 auto" }}>
-      {openDeals.map((deal) => (
-        <div key={deal.id} style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
-            <StatusBadge status={deal.status} />
-          </div>
-          <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 2 }}>
-            {deal.chefName} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
-          </div>
-          <DealSummaryRow deal={deal} />
-          {deal.note && <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10 }}>"{deal.note}"</p>}
-          <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 10 }}>
-            희망 납품일 {deal.deliveryDate} · 들어온 제안 {deal.proposals.length}건
-          </div>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      {/* 검색창 */}
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: TOKENS.inkSoft, fontSize: 14, pointerEvents: "none" }}>
+          ⌕
+        </span>
+        <input
+          type="text"
+          placeholder="품목, 레스토랑명, 요청사항으로 검색"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ ...inputStyle, paddingLeft: 34, fontSize: 13 }}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 16, lineHeight: 1 }}
+          >
+            ×
+          </button>
+        )}
+      </div>
 
-          {openFormId === deal.id ? (
-            <ProposalForm
-              deal={deal}
-              onSubmit={(id, proposal) => { onSubmitProposal(id, proposal); setOpenFormId(null); }}
-              onCancel={() => setOpenFormId(null)}
-              farmProfile={farmProfile}
-            />
-          ) : (
+      {/* 필터 행 */}
+      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: "12px 14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>품목</span>
+          {["전체", ...CROP_OPTIONS].map((c) => (
             <button
-              onClick={() => setOpenFormId(deal.id)}
-              style={{ padding: "8px 16px", background: TOKENS.moss, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+              key={c}
+              onClick={() => setCropFilter(c)}
+              style={{
+                padding: "4px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                border: `1px solid ${cropFilter === c ? TOKENS.moss : TOKENS.line}`,
+                background: cropFilter === c ? TOKENS.mossSoft : "#FFFFFF",
+                color: cropFilter === c ? TOKENS.moss : TOKENS.inkSoft,
+              }}
             >
-              이 딜에 제안 보내기
+              {c}
             </button>
-          )}
+          ))}
         </div>
-      ))}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>등급</span>
+          {["전체", ...GRADE_LEVELS].map((g) => (
+            <button
+              key={g}
+              onClick={() => setGradeFilter(g)}
+              style={{
+                padding: "4px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                border: `1px solid ${gradeFilter === g ? TOKENS.gold : TOKENS.line}`,
+                background: gradeFilter === g ? TOKENS.goldSoft : "#FFFFFF",
+                color: gradeFilter === g ? "#7A5C20" : TOKENS.inkSoft,
+              }}
+            >
+              {g === "전체" ? g : `${g}등급`}
+            </button>
+          ))}
+
+          <div style={{ flex: 1 }} />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{ ...inputStyle, width: "auto", fontSize: 12, padding: "4px 10px", color: TOKENS.inkSoft }}
+          >
+            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* 결과 수 + 초기화 */}
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 12, gap: 10 }}>
+        <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+          {filtered.length}건 / 전체 {openDeals.length}건
+        </span>
+        {hasFilters && (
+          <button
+            onClick={resetFilters}
+            style={{ fontSize: 11, color: TOKENS.rust, background: "none", border: `1px solid ${TOKENS.rustSoft}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+          >
+            필터 초기화
+          </button>
+        )}
+      </div>
+
+      {/* 딜 목록 */}
+      {filtered.length === 0 ? (
+        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 32, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
+          {openDeals.length === 0 ? "현재 모집 중인 딜이 없습니다." : "검색 조건에 맞는 딜이 없습니다."}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {filtered.map((deal) => (
+            <div key={deal.id} style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
+                <StatusBadge status={deal.status} />
+              </div>
+              <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 2 }}>
+                {deal.chefName} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
+              </div>
+              <DealSummaryRow deal={deal} />
+              {deal.note && <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10 }}>"{deal.note}"</p>}
+              <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 10 }}>
+                희망 납품일 {deal.deliveryDate} · 들어온 제안 {deal.proposals.length}건
+              </div>
+              {openFormId === deal.id ? (
+                <ProposalForm
+                  deal={deal}
+                  onSubmit={(id, proposal) => { onSubmitProposal(id, proposal); setOpenFormId(null); }}
+                  onCancel={() => setOpenFormId(null)}
+                  farmProfile={farmProfile}
+                />
+              ) : (
+                <button
+                  onClick={() => setOpenFormId(deal.id)}
+                  style={{ padding: "8px 16px", background: TOKENS.moss, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  이 딜에 제안 보내기
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
