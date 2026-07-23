@@ -74,6 +74,8 @@ const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
 const FARM_KEY = "farm-profile";
 const USER_KEY = "current-user";
+const ACCOUNTS_KEY = "accounts-registry";
+const SAVED_LOGIN_KEY = "saved-login";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
 const SAMPLE_DEALS = [
@@ -921,26 +923,22 @@ const PROPOSAL_FIELD_REQUIRED = {
   region: "지역",
   price: "제안 단가",
   availableQty: "가능 수량",
-  leadTimeDays: "납품 가능 일수",
+  availableDate: "납품 가능일",
 };
 
-function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
-  const blank = { farmName: "", region: "", price: "", availableQty: "", leadTimeDays: "", cert: "", message: "" };
-  const [data, setData] = useState(blank);
+function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
+  const [data, setData] = useState({
+    farmName: farmProfile?.farmName || farmerName || "",
+    region: farmProfile?.region || "",
+    price: "",
+    availableQty: "",
+    availableDate: "",
+    cert: (farmProfile?.cert && farmProfile.cert !== "인증 없음") ? farmProfile.cert : "",
+    message: "",
+  });
   const [errors, setErrors] = useState({});
   const isMobile = useIsMobile();
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
-
-  const loadFromProfile = () => {
-    if (!farmProfile) return;
-    setData((d) => ({
-      ...d,
-      farmName: farmProfile.farmName || d.farmName,
-      region: farmProfile.region || d.region,
-      cert: farmProfile.cert && farmProfile.cert !== "인증 없음" ? farmProfile.cert : d.cert,
-      leadTimeDays: farmProfile.leadTimeDays || d.leadTimeDays,
-    }));
-  };
 
   const handleSubmit = () => {
     const nextErrors = {};
@@ -951,11 +949,12 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
     if (Object.keys(nextErrors).length === 0) {
       onSubmit(deal.id, {
         id: `p${Date.now()}`,
+        farmerName,
         farmName: data.farmName,
         region: data.region,
         price: Number(data.price),
         availableQty: Number(data.availableQty),
-        leadTimeDays: Number(data.leadTimeDays),
+        availableDate: data.availableDate,
         cert: data.cert || "인증 없음",
         rating: 4.0,
         message: data.message,
@@ -967,14 +966,8 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
   return (
     <div style={{ background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
       {farmProfile?.farmName && (
-        <div style={{ marginBottom: 14 }}>
-          <button
-            type="button"
-            onClick={loadFromProfile}
-            style={{ padding: "7px 14px", background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}55`, borderRadius: 8, color: TOKENS.moss, fontSize: 12, fontWeight: 500, cursor: "pointer" }}
-          >
-            ↓ 내 농가 정보 불러오기 ({farmProfile.farmName})
-          </button>
+        <div style={{ fontSize: 12, color: TOKENS.moss, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          <span>✓</span><span>내 농가 정보({farmProfile.farmName})가 자동으로 입력되었습니다.</span>
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
@@ -999,9 +992,9 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
           {errors.availableQty && <ErrorText text={errors.availableQty} />}
         </div>
         <div>
-          <FieldLabel required>납품 가능 일수 (일)</FieldLabel>
-          <input type="number" min={0} value={data.leadTimeDays} onChange={(e) => update("leadTimeDays", e.target.value)} style={inputStyle} />
-          {errors.leadTimeDays && <ErrorText text={errors.leadTimeDays} />}
+          <FieldLabel required>납품 가능일</FieldLabel>
+          <input type="date" min={new Date().toISOString().split("T")[0]} value={data.availableDate} onChange={(e) => update("availableDate", e.target.value)} style={inputStyle} />
+          {errors.availableDate && <ErrorText text={errors.availableDate} />}
         </div>
         <div>
           <FieldLabel>보유 인증</FieldLabel>
@@ -1033,7 +1026,81 @@ const SORT_OPTIONS = [
   { value: "proposals", label: "제안 많은순" },
 ];
 
-function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
+function MyProposalsScreen({ deals, userName }) {
+  const isMobile = useIsMobile();
+  const myItems = [];
+  for (const deal of deals) {
+    const proposal = deal.proposals.find((p) => p.farmerName === userName);
+    if (proposal) myItems.push({ deal, proposal });
+  }
+  myItems.sort((a, b) => b.proposal.createdAt - a.proposal.createdAt);
+
+  if (myItems.length === 0) {
+    return (
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 40, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
+          아직 보낸 제안이 없습니다.<br />
+          <span style={{ fontSize: 12, marginTop: 6, display: "block" }}>딜 찾기에서 마음에 드는 딜에 제안을 보내보세요.</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginBottom: 2 }}>
+        총 {myItems.length}건의 제안
+      </div>
+      {myItems.map(({ deal, proposal }) => {
+        const isSelected = deal.selectedProposalId === proposal.id;
+        const isRejected = deal.selectedProposalId && !isSelected;
+        const statusLabel = isSelected ? "선택됨" : isRejected ? "미선택" : "검토 중";
+        const statusColor = isSelected ? TOKENS.moss : isRejected ? TOKENS.inkSoft : "#B45309";
+        const statusBg = isSelected ? TOKENS.mossSoft : isRejected ? TOKENS.line : "#FEF3C7";
+
+        return (
+          <div key={proposal.id} style={{ background: TOKENS.card, border: `1px solid ${isSelected ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div>
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
+                <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{deal.chefName}</span>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 999, background: statusBg, color: statusColor }}>
+                {statusLabel}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div style={{ background: "#F8F8F6", borderRadius: 8, padding: "8px 12px" }}>
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 2 }}>내 제안가</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: TOKENS.ink }}>{proposal.price.toLocaleString()}원/kg</div>
+              </div>
+              <div style={{ background: "#F8F8F6", borderRadius: 8, padding: "8px 12px" }}>
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 2 }}>제안 수량</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: TOKENS.ink }}>{proposal.availableQty}kg</div>
+              </div>
+              <div style={{ background: "#F8F8F6", borderRadius: 8, padding: "8px 12px" }}>
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 2 }}>셰프 희망가</div>
+                <div style={{ fontSize: 14, color: TOKENS.inkSoft }}>{deal.targetPrice.toLocaleString()}원/kg</div>
+              </div>
+              <div style={{ background: "#F8F8F6", borderRadius: 8, padding: "8px 12px" }}>
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 2 }}>납품 가능일</div>
+                <div style={{ fontSize: 14, color: TOKENS.inkSoft }}>{proposal.availableDate || "-"}</div>
+              </div>
+            </div>
+            {proposal.message && (
+              <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: "0 0 8px", fontStyle: "italic" }}>"{proposal.message}"</p>
+            )}
+            <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>
+              제안일 {new Date(proposal.createdAt).toLocaleDateString("ko-KR")} · 셰프 희망 납품일 {deal.deliveryDate}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
   const [openFormId, setOpenFormId] = useState(null);
   const [search, setSearch] = useState("");
   const [cropFilter, setCropFilter] = useState("전체");
@@ -1176,21 +1243,41 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
               <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 10 }}>
                 희망 납품일 {deal.deliveryDate} · 들어온 제안 {deal.proposals.length}건
               </div>
-              {openFormId === deal.id ? (
-                <ProposalForm
-                  deal={deal}
-                  onSubmit={(id, proposal) => { onSubmitProposal(id, proposal); setOpenFormId(null); }}
-                  onCancel={() => setOpenFormId(null)}
-                  farmProfile={farmProfile}
-                />
-              ) : (
-                <button
-                  onClick={() => setOpenFormId(deal.id)}
-                  style={{ padding: "8px 16px", background: TOKENS.moss, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-                >
-                  이 딜에 제안 보내기
-                </button>
-              )}
+              {(() => {
+                const myProposal = deal.proposals.find(p => p.farmerName === userName);
+                if (myProposal) {
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: TOKENS.mossSoft, borderRadius: 8, fontSize: 13 }}>
+                      <span style={{ color: TOKENS.moss, fontWeight: 500 }}>✓ 제안 완료</span>
+                      <span style={{ color: TOKENS.inkSoft }}>제안가 {myProposal.price.toLocaleString()}원/kg · {myProposal.availableQty}kg</span>
+                      {deal.selectedProposalId === myProposal.id
+                        ? <span style={{ marginLeft: "auto", color: TOKENS.moss, fontWeight: 600 }}>🎉 선택됨</span>
+                        : deal.selectedProposalId
+                        ? <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>미선택</span>
+                        : <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>검토 중</span>}
+                    </div>
+                  );
+                }
+                if (openFormId === deal.id) {
+                  return (
+                    <ProposalForm
+                      deal={deal}
+                      onSubmit={(id, proposal) => { onSubmitProposal(id, proposal); setOpenFormId(null); }}
+                      onCancel={() => setOpenFormId(null)}
+                      farmProfile={farmProfile}
+                      farmerName={userName}
+                    />
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => setOpenFormId(deal.id)}
+                    style={{ padding: "8px 16px", background: TOKENS.moss, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                  >
+                    이 딜에 제안 보내기
+                  </button>
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -1224,7 +1311,7 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable }) {
           )}
         </span>
         <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{proposal.cert}</span>
-        <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>리드타임 {proposal.leadTimeDays}일</span>
+        <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>납품가능일 {proposal.availableDate || "-"}</span>
         <span style={chipBadge(TOKENS.line, TOKENS.inkSoft)}>가능수량 {proposal.availableQty}kg</span>
       </div>
       {proposal.message && (
@@ -1529,13 +1616,56 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "" }) {
 function LoginScreen({ onLogin }) {
   const [role, setRole] = useState(null);
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [saveId, setSaveId] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  const handleStart = () => {
+  useEffect(() => {
+    (async () => {
+      const result = await storage.get(SAVED_LOGIN_KEY);
+      if (result?.value) {
+        try {
+          const saved = JSON.parse(result.value);
+          if (saved.name) { setName(saved.name); setSaveId(true); }
+          if (saved.role) setRole(saved.role);
+          if (saved.password) setAutoLogin(true);
+        } catch {}
+      }
+    })();
+  }, []);
+
+  const handleStart = async () => {
     if (!role) { setError("역할을 선택해주세요."); return; }
     if (!name.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
-    onLogin({ role, name: name.trim() });
+    if (!password) { setError("비밀번호를 입력해주세요."); return; }
+    setLoading(true);
+    try {
+      const accountsResult = await storage.get(ACCOUNTS_KEY);
+      const accounts = accountsResult?.value ? JSON.parse(accountsResult.value) : {};
+      const key = `${name.trim()}_${role}`;
+      if (accounts[key] !== undefined) {
+        if (accounts[key] !== password) { setError("비밀번호가 올바르지 않습니다."); setLoading(false); return; }
+      } else {
+        accounts[key] = password;
+        await storage.set(ACCOUNTS_KEY, JSON.stringify(accounts));
+      }
+      if (autoLogin) {
+        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ name: name.trim(), role, password }));
+      } else if (saveId) {
+        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ name: name.trim(), role }));
+      } else {
+        await storage.set(SAVED_LOGIN_KEY, "");
+      }
+      onLogin({ role, name: name.trim() });
+    } catch {
+      setError("오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1560,7 +1690,7 @@ function LoginScreen({ onLogin }) {
             <button
               key={r.key}
               type="button"
-              onClick={() => { setRole(r.key); setName(""); setError(""); }}
+              onClick={() => { setRole(r.key); setError(""); }}
               style={{
                 padding: "20px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
                 border: `2px solid ${role === r.key ? r.color : TOKENS.line}`,
@@ -1585,14 +1715,60 @@ function LoginScreen({ onLogin }) {
           onKeyDown={(e) => e.key === "Enter" && handleStart()}
           style={{ ...inputStyle, opacity: role ? 1 : 0.5 }}
         />
+
+        <FieldLabel required>비밀번호</FieldLabel>
+        <div style={{ position: "relative" }}>
+          <input
+            type={showPw ? "text" : "password"}
+            placeholder="비밀번호 입력 (첫 로그인 시 자동 등록)"
+            value={password}
+            disabled={!role}
+            onChange={(e) => { setPassword(e.target.value); setError(""); }}
+            onKeyDown={(e) => e.key === "Enter" && handleStart()}
+            style={{ ...inputStyle, paddingRight: 44, opacity: role ? 1 : 0.5 }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 15 }}
+          >
+            {showPw ? "🙈" : "👁"}
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: 16, marginTop: 12, marginBottom: 4 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={saveId}
+              onChange={(e) => { setSaveId(e.target.checked); if (!e.target.checked) setAutoLogin(false); }}
+              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }}
+            />
+            아이디 저장
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={autoLogin}
+              onChange={(e) => { setAutoLogin(e.target.checked); if (e.target.checked) setSaveId(true); }}
+              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }}
+            />
+            자동 로그인
+          </label>
+        </div>
+
         {error && <ErrorText text={error} />}
 
         <button
           onClick={handleStart}
-          style={{ marginTop: 16, width: "100%", padding: "13px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer" }}
+          disabled={loading}
+          style={{ marginTop: 14, width: "100%", padding: "13px 0", background: loading ? TOKENS.line : TOKENS.ink, color: loading ? TOKENS.inkSoft : TOKENS.bg, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: loading ? "default" : "pointer" }}
         >
-          시작하기
+          {loading ? "확인 중…" : "시작하기"}
         </button>
+        <p style={{ fontSize: 11, color: TOKENS.inkSoft, textAlign: "center", marginTop: 10 }}>
+          처음 로그인하면 입력한 비밀번호로 계정이 자동 생성됩니다.
+        </p>
       </div>
     </div>
   );
@@ -1618,6 +1794,25 @@ export default function FarmToTableApp() {
           const savedUser = JSON.parse(userResult.value);
           setUser(savedUser);
           setTab(savedUser.role === "farmer" ? "browse" : "create");
+        } else {
+          // 자동 로그인 확인
+          const savedLoginResult = await storage.get(SAVED_LOGIN_KEY);
+          if (!cancelled && savedLoginResult?.value) {
+            try {
+              const saved = JSON.parse(savedLoginResult.value);
+              if (saved.password) {
+                const accountsResult = await storage.get(ACCOUNTS_KEY);
+                const accounts = accountsResult?.value ? JSON.parse(accountsResult.value) : {};
+                const key = `${saved.name}_${saved.role}`;
+                if (accounts[key] === saved.password) {
+                  const userData = { role: saved.role, name: saved.name };
+                  setUser(userData);
+                  setTab(saved.role === "farmer" ? "browse" : "create");
+                  await storage.set(USER_KEY, JSON.stringify(userData));
+                }
+              }
+            } catch {}
+          }
         }
         const result = await storage.get(DEALS_KEY, true);
         if (cancelled) return;
@@ -1728,7 +1923,7 @@ export default function FarmToTableApp() {
 
   const TABS = isChef
     ? [{ key: "create", label: "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
-    : [{ key: "browse", label: "딜 찾기" }, { key: "farm", label: "내 농가" }];
+    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안" }, { key: "farm", label: "내 농가" }];
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
@@ -1796,7 +1991,8 @@ export default function FarmToTableApp() {
         </div>
 
         {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} defaultChefName={user.name} />}
-        {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} />}
+        {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
+        {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} />}
         {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} />}
         {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
       </div>
