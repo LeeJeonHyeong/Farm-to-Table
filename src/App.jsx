@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -76,6 +76,7 @@ const FARM_KEY = "farm-profile";
 const USER_KEY = "current-user";
 const ACCOUNTS_KEY = "accounts-registry";
 const SAVED_LOGIN_KEY = "saved-login";
+const CHATS_KEY = "chats-data";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
 const SAMPLE_DEALS = [
@@ -664,7 +665,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "" }) {
         const cycle = CYCLE_OPTIONS.includes(parsed.cycle) ? parsed.cycle : prev.cycle;
         return {
           ...prev,
-          chefName: parsed.chefName || prev.chefName,
+          chefName: prev.chefName, // 로그인 상호명 유지 (AI가 덮어쓰지 않음)
           crop,
           ripeness,
           grade,
@@ -1026,7 +1027,7 @@ const SORT_OPTIONS = [
   { value: "proposals", label: "제안 많은순" },
 ];
 
-function MyProposalsScreen({ deals, userName }) {
+function MyProposalsScreen({ deals, userName, onOpenChat }) {
   const isMobile = useIsMobile();
   const myItems = [];
   for (const deal of deals) {
@@ -1090,9 +1091,17 @@ function MyProposalsScreen({ deals, userName }) {
             {proposal.message && (
               <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: "0 0 8px", fontStyle: "italic" }}>"{proposal.message}"</p>
             )}
-            <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>
+            <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: isSelected ? 10 : 0 }}>
               제안일 {new Date(proposal.createdAt).toLocaleDateString("ko-KR")} · 셰프 희망 납품일 {deal.deliveryDate}
             </div>
+            {isSelected && (
+              <button
+                onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
+                style={{ width: "100%", padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+              >
+                💬 {deal.chefName}과 채팅
+              </button>
+            )}
           </div>
         );
       })}
@@ -1408,7 +1417,7 @@ function DealTimeline({ deal }) {
   );
 }
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
 
   if (deals.length === 0) {
@@ -1478,14 +1487,22 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal }) {
                   <>
                     <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} />
                     <SettlementCard deal={deal} proposal={selectedProposal} />
-                    {deal.status === "matched" && (
+                    <div style={{ display: "flex", gap: 8 }}>
                       <button
-                        onClick={() => onCompleteDeal(deal.id)}
-                        style={{ padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                        onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: selectedProposal.farmName })}
+                        style={{ flex: 1, padding: "10px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
                       >
-                        납품 확인 후 정산 완료 처리
+                        💬 {selectedProposal.farmName}과 채팅
                       </button>
-                    )}
+                      {deal.status === "matched" && (
+                        <button
+                          onClick={() => onCompleteDeal(deal.id)}
+                          style={{ flex: 1, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                        >
+                          납품 확인 후 정산 완료 처리
+                        </button>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -1493,6 +1510,92 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ---------- 채팅 ---------- */
+
+function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) {
+  const [text, setText] = useState("");
+  const bottomRef = useRef(null);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = () => {
+    if (!text.trim()) return;
+    onSend(text.trim());
+    setText("");
+  };
+
+  const partnerName = userRole === "chef" ? dealInfo.farmName : dealInfo.chefName;
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", height: "calc(100vh - 180px)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <button onClick={onBack}
+          style={{ background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer", color: TOKENS.inkSoft }}>
+          ← 뒤로
+        </button>
+        <div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink }}>{dealInfo.crop} 딜 채팅</div>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft }}>{partnerName}와의 대화</div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, padding: isMobile ? "12px 10px" : "16px", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, marginBottom: 12 }}>
+        {messages.length === 0 && (
+          <div style={{ textAlign: "center", color: TOKENS.inkSoft, fontSize: 13, padding: "40px 0" }}>
+            매칭이 완료되었습니다!<br />
+            <span style={{ fontSize: 12, marginTop: 4, display: "block" }}>납품 세부사항을 조율해보세요.</span>
+          </div>
+        )}
+        {messages.map((m) => {
+          const isMe = m.senderName === userName;
+          return (
+            <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+              {!isMe && <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 3 }}>{m.senderName}</div>}
+              <div style={{
+                maxWidth: isMobile ? "85%" : "65%",
+                padding: "9px 14px",
+                borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                background: isMe ? TOKENS.ink : "#FFFFFF",
+                color: isMe ? TOKENS.bg : TOKENS.ink,
+                fontSize: 14,
+                lineHeight: 1.5,
+                border: isMe ? "none" : `1px solid ${TOKENS.line}`,
+              }}>
+                {m.text}
+              </div>
+              <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 3 }}>
+                {new Date(m.ts).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          type="text"
+          placeholder="메시지를 입력하세요… (Enter로 전송)"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!text.trim()}
+          style={{ padding: "10px 18px", background: text.trim() ? TOKENS.ink : TOKENS.line, color: text.trim() ? TOKENS.bg : TOKENS.inkSoft, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: text.trim() ? "pointer" : "default", whiteSpace: "nowrap" }}
+        >
+          전송
+        </button>
+      </div>
     </div>
   );
 }
@@ -1615,11 +1718,13 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "" }) {
 
 function LoginScreen({ onLogin }) {
   const [role, setRole] = useState(null);
-  const [name, setName] = useState("");
+  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [saveId, setSaveId] = useState(false);
   const [autoLogin, setAutoLogin] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
@@ -1630,37 +1735,71 @@ function LoginScreen({ onLogin }) {
       if (result?.value) {
         try {
           const saved = JSON.parse(result.value);
-          if (saved.name) { setName(saved.name); setSaveId(true); }
+          const savedId = saved.userId || saved.name || "";
+          if (savedId) { setUserId(savedId); setSaveId(true); }
           if (saved.role) setRole(saved.role);
           if (saved.password) setAutoLogin(true);
+          if (savedId && saved.role) {
+            const ar = await storage.get(ACCOUNTS_KEY);
+            if (ar?.value) {
+              const accounts = JSON.parse(ar.value);
+              const acc = accounts[`${savedId}_${saved.role}`];
+              if (acc) {
+                setDisplayName(typeof acc === "object" ? acc.displayName : savedId);
+                setIsReturning(true);
+              }
+            }
+          }
         } catch {}
       }
     })();
   }, []);
 
+  const lookupAccount = async (id, r) => {
+    if (!id || !r) return;
+    try {
+      const ar = await storage.get(ACCOUNTS_KEY);
+      if (ar?.value) {
+        const accounts = JSON.parse(ar.value);
+        const acc = accounts[`${id}_${r}`];
+        if (acc) {
+          setDisplayName(typeof acc === "object" ? acc.displayName : id);
+          setIsReturning(true);
+        } else {
+          setIsReturning(false);
+        }
+      }
+    } catch {}
+  };
+
   const handleStart = async () => {
     if (!role) { setError("역할을 선택해주세요."); return; }
-    if (!name.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
+    if (!userId.trim()) { setError("아이디를 입력해주세요."); return; }
     if (!password) { setError("비밀번호를 입력해주세요."); return; }
+    if (!displayName.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
     setLoading(true);
     try {
-      const accountsResult = await storage.get(ACCOUNTS_KEY);
-      const accounts = accountsResult?.value ? JSON.parse(accountsResult.value) : {};
-      const key = `${name.trim()}_${role}`;
-      if (accounts[key] !== undefined) {
-        if (accounts[key] !== password) { setError("비밀번호가 올바르지 않습니다."); setLoading(false); return; }
+      const ar = await storage.get(ACCOUNTS_KEY);
+      const accounts = ar?.value ? JSON.parse(ar.value) : {};
+      const key = `${userId.trim()}_${role}`;
+      const acc = accounts[key];
+      if (acc !== undefined) {
+        const storedPw = typeof acc === "object" ? acc.password : acc;
+        if (storedPw !== password) { setError("비밀번호가 올바르지 않습니다."); setLoading(false); return; }
+        accounts[key] = { password, displayName: displayName.trim() };
       } else {
-        accounts[key] = password;
-        await storage.set(ACCOUNTS_KEY, JSON.stringify(accounts));
+        accounts[key] = { password, displayName: displayName.trim() };
       }
+      await storage.set(ACCOUNTS_KEY, JSON.stringify(accounts));
+
       if (autoLogin) {
-        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ name: name.trim(), role, password }));
+        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ userId: userId.trim(), role, password }));
       } else if (saveId) {
-        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ name: name.trim(), role }));
+        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ userId: userId.trim(), role }));
       } else {
         await storage.set(SAVED_LOGIN_KEY, "");
       }
-      onLogin({ role, name: name.trim() });
+      onLogin({ role, userId: userId.trim(), name: displayName.trim() });
     } catch {
       setError("오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
@@ -1690,7 +1829,7 @@ function LoginScreen({ onLogin }) {
             <button
               key={r.key}
               type="button"
-              onClick={() => { setRole(r.key); setError(""); }}
+              onClick={() => { setRole(r.key); setIsReturning(false); setError(""); lookupAccount(userId, r.key); }}
               style={{
                 padding: "20px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
                 border: `2px solid ${role === r.key ? r.color : TOKENS.line}`,
@@ -1705,13 +1844,14 @@ function LoginScreen({ onLogin }) {
           ))}
         </div>
 
-        <FieldLabel required>{role === "chef" ? "레스토랑명" : role === "farmer" ? "농가명" : "이름"}</FieldLabel>
+        <FieldLabel required>아이디</FieldLabel>
         <input
           type="text"
-          placeholder={role === "chef" ? "예: 테이블나인" : role === "farmer" ? "예: 신선팜" : "위에서 역할을 먼저 선택하세요"}
-          value={name}
+          placeholder={role ? "로그인 아이디 입력" : "위에서 역할을 먼저 선택하세요"}
+          value={userId}
           disabled={!role}
-          onChange={(e) => { setName(e.target.value); setError(""); }}
+          onChange={(e) => { setUserId(e.target.value); setIsReturning(false); setError(""); }}
+          onBlur={() => lookupAccount(userId.trim(), role)}
           onKeyDown={(e) => e.key === "Enter" && handleStart()}
           style={{ ...inputStyle, opacity: role ? 1 : 0.5 }}
         />
@@ -1720,55 +1860,59 @@ function LoginScreen({ onLogin }) {
         <div style={{ position: "relative" }}>
           <input
             type={showPw ? "text" : "password"}
-            placeholder="비밀번호 입력 (첫 로그인 시 자동 등록)"
+            placeholder="비밀번호 입력"
             value={password}
             disabled={!role}
             onChange={(e) => { setPassword(e.target.value); setError(""); }}
             onKeyDown={(e) => e.key === "Enter" && handleStart()}
             style={{ ...inputStyle, paddingRight: 44, opacity: role ? 1 : 0.5 }}
           />
-          <button
-            type="button"
-            onClick={() => setShowPw((v) => !v)}
-            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 15 }}
-          >
+          <button type="button" onClick={() => setShowPw((v) => !v)}
+            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 15 }}>
             {showPw ? "🙈" : "👁"}
           </button>
         </div>
 
+        <FieldLabel required>{role === "chef" ? "레스토랑명" : "농가명"} <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontWeight: 400 }}>(앱에 표시되는 상호명)</span></FieldLabel>
+        {isReturning && (
+          <div style={{ fontSize: 11, color: TOKENS.moss, marginBottom: 4 }}>✓ 기존 계정 — 상호명을 변경할 수 있습니다.</div>
+        )}
+        <input
+          type="text"
+          placeholder={role === "chef" ? "예: 테이블나인" : "예: 신선팜"}
+          value={displayName}
+          disabled={!role}
+          onChange={(e) => { setDisplayName(e.target.value); setError(""); }}
+          onKeyDown={(e) => e.key === "Enter" && handleStart()}
+          style={{ ...inputStyle, opacity: role ? 1 : 0.5 }}
+        />
+
         <div style={{ display: "flex", gap: 16, marginTop: 12, marginBottom: 4 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={saveId}
+            <input type="checkbox" checked={saveId}
               onChange={(e) => { setSaveId(e.target.checked); if (!e.target.checked) setAutoLogin(false); }}
-              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }}
-            />
+              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }} />
             아이디 저장
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={autoLogin}
+            <input type="checkbox" checked={autoLogin}
               onChange={(e) => { setAutoLogin(e.target.checked); if (e.target.checked) setSaveId(true); }}
-              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }}
-            />
+              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }} />
             자동 로그인
           </label>
         </div>
 
         {error && <ErrorText text={error} />}
 
-        <button
-          onClick={handleStart}
-          disabled={loading}
-          style={{ marginTop: 14, width: "100%", padding: "13px 0", background: loading ? TOKENS.line : TOKENS.ink, color: loading ? TOKENS.inkSoft : TOKENS.bg, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: loading ? "default" : "pointer" }}
-        >
-          {loading ? "확인 중…" : "시작하기"}
+        <button onClick={handleStart} disabled={loading}
+          style={{ marginTop: 14, width: "100%", padding: "13px 0", background: loading ? TOKENS.line : TOKENS.ink, color: loading ? TOKENS.inkSoft : TOKENS.bg, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: loading ? "default" : "pointer" }}>
+          {loading ? "확인 중…" : isReturning ? "로그인" : "가입 후 시작하기"}
         </button>
-        <p style={{ fontSize: 11, color: TOKENS.inkSoft, textAlign: "center", marginTop: 10 }}>
-          처음 로그인하면 입력한 비밀번호로 계정이 자동 생성됩니다.
-        </p>
+        {!isReturning && (
+          <p style={{ fontSize: 11, color: TOKENS.inkSoft, textAlign: "center", marginTop: 10 }}>
+            처음 로그인 시 입력한 정보로 계정이 자동 생성됩니다.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1783,6 +1927,8 @@ export default function FarmToTableApp() {
   const [farm, setFarm] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
+  const [chats, setChats] = useState({});
+  const [chatTarget, setChatTarget] = useState(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -1800,12 +1946,16 @@ export default function FarmToTableApp() {
           if (!cancelled && savedLoginResult?.value) {
             try {
               const saved = JSON.parse(savedLoginResult.value);
-              if (saved.password) {
+              const savedId = saved.userId || saved.name || "";
+              if (saved.password && savedId && saved.role) {
                 const accountsResult = await storage.get(ACCOUNTS_KEY);
                 const accounts = accountsResult?.value ? JSON.parse(accountsResult.value) : {};
-                const key = `${saved.name}_${saved.role}`;
-                if (accounts[key] === saved.password) {
-                  const userData = { role: saved.role, name: saved.name };
+                const key = `${savedId}_${saved.role}`;
+                const acc = accounts[key];
+                const storedPw = typeof acc === "object" ? acc?.password : acc;
+                if (storedPw === saved.password) {
+                  const displayName = typeof acc === "object" ? acc.displayName : savedId;
+                  const userData = { role: saved.role, userId: savedId, name: displayName };
                   setUser(userData);
                   setTab(saved.role === "farmer" ? "browse" : "create");
                   await storage.set(USER_KEY, JSON.stringify(userData));
@@ -1825,6 +1975,10 @@ export default function FarmToTableApp() {
         const farmResult = await storage.get(FARM_KEY);
         if (!cancelled && farmResult && farmResult.value) {
           setFarm(JSON.parse(farmResult.value));
+        }
+        const chatsResult = await storage.get(CHATS_KEY);
+        if (!cancelled && chatsResult && chatsResult.value) {
+          setChats(JSON.parse(chatsResult.value));
         }
         setLoadState("ready");
       } catch (err) {
@@ -1875,7 +2029,7 @@ export default function FarmToTableApp() {
   };
 
   const handleCreateDeal = (deal) => {
-    persist([deal, ...deals]);
+    persist([{ ...deal, createdBy: user.userId || user.name }, ...deals]);
     setTab("mydeals");
   };
 
@@ -1900,6 +2054,15 @@ export default function FarmToTableApp() {
     persist(next);
   };
 
+  const handleSendMessage = async (dealId, text) => {
+    const newMsg = { id: `m${Date.now()}`, senderName: user.name, senderRole: user.role, text, ts: Date.now() };
+    const updated = { ...chats, [dealId]: [...(chats[dealId] || []), newMsg] };
+    setChats(updated);
+    await storage.set(CHATS_KEY, JSON.stringify(updated));
+  };
+
+  const handleOpenChat = (target) => { setChatTarget(target); };
+
   if (loadState === "loading") {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
@@ -1919,7 +2082,11 @@ export default function FarmToTableApp() {
 
   const isChef = user.role === "chef";
   const openCount = deals.filter((d) => d.status === "open").length;
-  const myDeals = isChef ? deals.filter((d) => d.chefName === user.name) : [];
+  const myDeals = isChef
+    ? deals.filter((d) =>
+        d.createdBy === (user.userId || user.name) || d.chefName === user.name
+      )
+    : [];
 
   const TABS = isChef
     ? [{ key: "create", label: "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
@@ -1990,11 +2157,24 @@ export default function FarmToTableApp() {
           )}
         </div>
 
-        {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} defaultChefName={user.name} />}
-        {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
-        {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} />}
-        {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} />}
-        {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
+        {chatTarget ? (
+          <ChatScreen
+            dealInfo={chatTarget}
+            userName={user.name}
+            userRole={user.role}
+            messages={chats[chatTarget.dealId] || []}
+            onSend={(text) => handleSendMessage(chatTarget.dealId, text)}
+            onBack={() => setChatTarget(null)}
+          />
+        ) : (
+          <>
+            {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} defaultChefName={user.name} />}
+            {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
+            {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} />}
+            {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
+          </>
+        )}
       </div>
     </div>
   );
