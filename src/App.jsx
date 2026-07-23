@@ -1436,9 +1436,17 @@ function DealTimeline({ deal }) {
   );
 }
 
+const STATUS_FILTERS = [
+  { key: "전체", label: "전체" },
+  { key: "open", label: "모집중" },
+  { key: "matched", label: "진행중" },
+  { key: "done", label: "완료" },
+];
+
 function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("전체");
 
   if (deals.length === 0) {
     return (
@@ -1449,10 +1457,45 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
   }
 
   const sorted = [...deals].sort((a, b) => b.createdAt - a.createdAt);
+  const filtered = statusFilter === "전체" ? sorted : sorted.filter((d) => d.status === statusFilter);
+
+  const countByStatus = { open: 0, matched: 0, done: 0 };
+  deals.forEach((d) => { if (countByStatus[d.status] !== undefined) countByStatus[d.status]++; });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 720, margin: "0 auto" }}>
-      {sorted.map((deal) => {
+      {/* 상태 필터 */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {STATUS_FILTERS.map((f) => {
+          const count = f.key === "전체" ? deals.length : countByStatus[f.key];
+          const isActive = statusFilter === f.key;
+          const activeColor = f.key === "open" ? TOKENS.gold : f.key === "matched" ? TOKENS.moss : f.key === "done" ? TOKENS.inkSoft : TOKENS.ink;
+          const activeBg = f.key === "open" ? TOKENS.goldSoft : f.key === "matched" ? TOKENS.mossSoft : f.key === "done" ? TOKENS.line : `${TOKENS.ink}18`;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              style={{
+                padding: "6px 14px", borderRadius: 999, fontSize: 13, cursor: "pointer",
+                border: `1px solid ${isActive ? activeColor : TOKENS.line}`,
+                background: isActive ? activeBg : "#FFFFFF",
+                color: isActive ? activeColor : TOKENS.inkSoft,
+                fontWeight: isActive ? 500 : 400,
+              }}
+            >
+              {f.label}
+              <span style={{ marginLeft: 6, fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 24, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
+          {STATUS_FILTERS.find((f) => f.key === statusFilter)?.label} 딜이 없습니다.
+        </div>
+      )}
+      {filtered.map((deal) => {
         const expanded = expandedId === deal.id;
         const sortedProposals = [...deal.proposals].sort((a, b) => a.price - b.price);
         const selectedProposal = deal.proposals.find((p) => p.id === deal.selectedProposalId);
