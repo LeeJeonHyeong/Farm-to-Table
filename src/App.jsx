@@ -62,6 +62,8 @@ const DEAL_STATUS_LABEL = { open: "모집중", matched: "진행중", done: "완�
 const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKENS.inkSoft };
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
+const FARM_KEY = "farm-profile";
+const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
 const SAMPLE_DEALS = [
   {
@@ -604,11 +606,22 @@ const PROPOSAL_FIELD_REQUIRED = {
   leadTimeDays: "납품 가능 일수",
 };
 
-function ProposalForm({ deal, onSubmit, onCancel }) {
+function ProposalForm({ deal, onSubmit, onCancel, farmProfile }) {
   const blank = { farmName: "", region: "", price: "", availableQty: "", leadTimeDays: "", cert: "", message: "" };
   const [data, setData] = useState(blank);
   const [errors, setErrors] = useState({});
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
+
+  const loadFromProfile = () => {
+    if (!farmProfile) return;
+    setData((d) => ({
+      ...d,
+      farmName: farmProfile.farmName || d.farmName,
+      region: farmProfile.region || d.region,
+      cert: farmProfile.cert && farmProfile.cert !== "인증 없음" ? farmProfile.cert : d.cert,
+      leadTimeDays: farmProfile.leadTimeDays || d.leadTimeDays,
+    }));
+  };
 
   const handleSubmit = () => {
     const nextErrors = {};
@@ -634,6 +647,17 @@ function ProposalForm({ deal, onSubmit, onCancel }) {
 
   return (
     <div style={{ background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
+      {farmProfile?.farmName && (
+        <div style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={loadFromProfile}
+            style={{ padding: "7px 14px", background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}55`, borderRadius: 8, color: TOKENS.moss, fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+          >
+            ↓ 내 농가 정보 불러오기 ({farmProfile.farmName})
+          </button>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div>
           <FieldLabel required>농가명</FieldLabel>
@@ -683,7 +707,7 @@ function ProposalForm({ deal, onSubmit, onCancel }) {
   );
 }
 
-function DealBrowseScreen({ deals, onSubmitProposal }) {
+function DealBrowseScreen({ deals, onSubmitProposal, farmProfile }) {
   const [openFormId, setOpenFormId] = useState(null);
   const openDeals = deals.filter((d) => d.status === "open");
 
@@ -717,6 +741,7 @@ function DealBrowseScreen({ deals, onSubmitProposal }) {
               deal={deal}
               onSubmit={(id, proposal) => { onSubmitProposal(id, proposal); setOpenFormId(null); }}
               onCancel={() => setOpenFormId(null)}
+              farmProfile={farmProfile}
             />
           ) : (
             <button
@@ -943,11 +968,125 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal }) {
   );
 }
 
+/* ---------- 4. 내 농가 등록 ---------- */
+
+function FarmProfileScreen({ profile, onSave }) {
+  const blank = { farmName: "", region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "" };
+  const [data, setData] = useState(profile || blank);
+  const [errors, setErrors] = useState({});
+  const [saved, setSaved] = useState(false);
+
+  const update = (key, value) => { setData((d) => ({ ...d, [key]: value })); setSaved(false); };
+  const toggleSpecialty = (crop) => {
+    setData((d) => ({
+      ...d,
+      specialty: d.specialty.includes(crop)
+        ? d.specialty.filter((c) => c !== crop)
+        : [...d.specialty, crop],
+    }));
+    setSaved(false);
+  };
+
+  const handleSave = () => {
+    const nextErrors = {};
+    if (!data.farmName) nextErrors.farmName = "농가명을 입력해주세요";
+    if (!data.region) nextErrors.region = "지역을 입력해주세요";
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) {
+      onSave(data);
+      setSaved(true);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: 24 }}>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 4px" }}>
+        내 농가 정보
+      </h2>
+      <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "0 0 20px", lineHeight: 1.6 }}>
+        저장해두면 제안서 작성 시 자동으로 불러올 수 있습니다.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div>
+          <FieldLabel required>농가명</FieldLabel>
+          <input type="text" placeholder="예: 신선팜" value={data.farmName} onChange={(e) => update("farmName", e.target.value)} style={inputStyle} />
+          {errors.farmName && <ErrorText text={errors.farmName} />}
+        </div>
+        <div>
+          <FieldLabel required>지역</FieldLabel>
+          <input type="text" placeholder="예: 경기 이천" value={data.region} onChange={(e) => update("region", e.target.value)} style={inputStyle} />
+          {errors.region && <ErrorText text={errors.region} />}
+        </div>
+      </div>
+
+      <FieldLabel>보유 인증</FieldLabel>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+        {CERT_OPTIONS.map((c) => (
+          <Chip key={c} label={c} active={data.cert === c} onClick={() => update("cert", c)} />
+        ))}
+      </div>
+
+      <FieldLabel>주요 재배 품목 (복수 선택 가능)</FieldLabel>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+        {CROP_OPTIONS.map((c) => (
+          <Chip key={c} label={c} active={data.specialty.includes(c)} onClick={() => toggleSpecialty(c)} />
+        ))}
+      </div>
+
+      <FieldLabel>기본 납품 리드타임 (일)</FieldLabel>
+      <input
+        type="number" min={0} placeholder="예: 2"
+        value={data.leadTimeDays} onChange={(e) => update("leadTimeDays", e.target.value)}
+        style={{ ...inputStyle, maxWidth: 160 }}
+      />
+
+      <FieldLabel>농가 소개 (선택)</FieldLabel>
+      <textarea
+        rows={3}
+        placeholder="예: 충북 음성에서 20년간 토마토를 재배해온 농가입니다. 당일 수확 후 새벽 배송 가능합니다."
+        value={data.description}
+        onChange={(e) => update("description", e.target.value)}
+        style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
+      />
+
+      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14 }}>
+        <button
+          onClick={handleSave}
+          style={{ padding: "11px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}
+        >
+          저장하기
+        </button>
+        {saved && <span style={{ fontSize: 13, color: TOKENS.moss }}>✓ 저장됐습니다</span>}
+      </div>
+
+      {(data.farmName || data.specialty.length > 0) && (
+        <div style={{ marginTop: 20, background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+            미리보기
+          </div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6 }}>
+            {data.farmName || "—"}
+            <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{data.region}</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: data.description ? 8 : 0 }}>
+            {data.cert && data.cert !== "인증 없음" && <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{data.cert}</span>}
+            {data.specialty.map((c) => <span key={c} style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>{c}</span>)}
+            {data.leadTimeDays && <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>리드타임 {data.leadTimeDays}일</span>}
+          </div>
+          {data.description && <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.6 }}>"{data.description}"</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- App shell ---------- */
 
 export default function FarmToTableApp() {
   const [tab, setTab] = useState("create");
   const [deals, setDeals] = useState([]);
+  const [farm, setFarm] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
 
@@ -962,6 +1101,10 @@ export default function FarmToTableApp() {
         } else {
           setDeals(SAMPLE_DEALS);
           await storage.set(DEALS_KEY, JSON.stringify(SAMPLE_DEALS), true);
+        }
+        const farmResult = await storage.get(FARM_KEY);
+        if (!cancelled && farmResult && farmResult.value) {
+          setFarm(JSON.parse(farmResult.value));
         }
         setLoadState("ready");
       } catch (err) {
@@ -987,6 +1130,11 @@ export default function FarmToTableApp() {
     } catch (err) {
       setSaveState("error");
     }
+  };
+
+  const handleSaveFarm = async (farmData) => {
+    setFarm(farmData);
+    await storage.set(FARM_KEY, JSON.stringify(farmData));
   };
 
   const handleCreateDeal = (deal) => {
@@ -1056,6 +1204,7 @@ export default function FarmToTableApp() {
             { key: "create", label: "딜 만들기" },
             { key: "browse", label: "딜 찾기 (농가)" },
             { key: "mydeals", label: "내 거래" },
+            { key: "farm", label: "내 농가" },
           ].map((t) => (
             <button
               key={t.key}
@@ -1089,8 +1238,9 @@ export default function FarmToTableApp() {
         </div>
 
         {tab === "create" && <DealCreateScreen onCreate={handleCreateDeal} />}
-        {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} />}
+        {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} />}
         {tab === "mydeals" && <MyDealsScreen deals={deals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} />}
+        {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} />}
       </div>
     </div>
   );
