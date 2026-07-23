@@ -953,7 +953,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
     price: "",
     availableQty: "",
     availableDate: "",
-    cert: (farmProfile?.cert && farmProfile.cert !== "인증 없음") ? farmProfile.cert : "",
+    cert: farmProfile?.cert || "인증 없음",
     message: "",
   });
   const [errors, setErrors] = useState({});
@@ -975,7 +975,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
         price: Number(data.price),
         availableQty: Number(data.availableQty),
         availableDate: data.availableDate,
-        cert: data.cert || "인증 없음",
+        cert: data.cert,
         rating: 4.0,
         message: data.message,
         createdAt: Date.now(),
@@ -1016,9 +1016,13 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
           <input type="date" min={new Date().toISOString().split("T")[0]} value={data.availableDate} onChange={(e) => update("availableDate", e.target.value)} style={inputStyle} />
           {errors.availableDate && <ErrorText text={errors.availableDate} />}
         </div>
-        <div>
+        <div style={{ gridColumn: "1 / -1" }}>
           <FieldLabel>보유 인증</FieldLabel>
-          <input type="text" placeholder="예: GAP" value={data.cert} onChange={(e) => update("cert", e.target.value)} style={inputStyle} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+            {CERT_OPTIONS.map((c) => (
+              <Chip key={c} label={c} active={data.cert === c} onClick={() => update("cert", c)} />
+            ))}
+          </div>
         </div>
       </div>
       <FieldLabel>셰프에게 전할 메시지 (선택)</FieldLabel>
