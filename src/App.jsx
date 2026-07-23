@@ -441,35 +441,45 @@ JSON 형식:
   "note": "추가사항 또는 null"
 }`;
 
-  const response = await fetch("/api/gemini/models/gemini-1.5-flash:generateContent", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        maxOutputTokens: 512,
-        temperature: 0.1,
-        responseMimeType: "application/json",
-      },
-    }),
+  const MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash-latest"];
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: systemInstruction }] },
+    contents: [{ parts: [{ text: userPrompt }] }],
+    generationConfig: { maxOutputTokens: 512, temperature: 0.1, responseMimeType: "application/json" },
   });
 
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    const detail = errBody?.error?.message || errBody?.error?.status || "";
-    throw new Error(`API 오류 (${response.status})${detail ? `: ${detail}` : " — .env.local의 GEMINI_API_KEY를 확인해주세요."}`);
+  let lastError = "";
+  for (const model of MODELS) {
+    const response = await fetch(`/api/gemini/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+
+    if (response.status === 404) {
+      const errBody = await response.json().catch(() => ({}));
+      lastError = errBody?.error?.message || `${model} 모델을 찾을 수 없습니다.`;
+      continue;
+    }
+
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      const detail = errBody?.error?.message || "";
+      throw new Error(`API 오류 (${response.status})${detail ? `: ${detail}` : " — .env.local의 GEMINI_API_KEY를 확인해주세요."}`);
+    }
+
+    const result = await response.json();
+    const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+    try {
+      return JSON.parse(rawText);
+    } catch {
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("AI 응답에서 JSON을 파싱할 수 없습니다.");
+      return JSON.parse(match[0]);
+    }
   }
 
-  const result = await response.json();
-  const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-  try {
-    return JSON.parse(rawText);
-  } catch {
-    const match = rawText.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("AI 응답에서 JSON을 파싱할 수 없습니다.");
-    return JSON.parse(match[0]);
-  }
+  throw new Error(`사용 가능한 모델을 찾지 못했습니다. ${lastError}`);
 }
 
 /* ---------- 1. 딜 만들기 (셰프) ---------- */
