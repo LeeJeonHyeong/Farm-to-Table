@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { storage, db } from "./firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -11,23 +13,6 @@ function useIsMobile() {
 }
 
 const DEALS_KEY = "deals-list";
-
-// Claude.ai Artifacts 환경에서는 window.storage가 자동으로 주입되지만,
-// 일반 브라우저(이 VS Code/Vite 프로젝트)에서는 없으므로 localStorage로 대체합니다.
-// 실제 서비스로 전환할 때는 이 부분을 백엔드 API 호출로 교체하세요.
-const storage =
-  typeof window !== "undefined" && window.storage
-    ? window.storage
-    : {
-        async get(key) {
-          const value = localStorage.getItem(key);
-          return value !== null ? { key, value, shared: false } : null;
-        },
-        async set(key, value) {
-          localStorage.setItem(key, value);
-          return { key, value, shared: false };
-        },
-      };
 
 const TOKENS = {
   bg: "#F3F1E7",
@@ -2239,6 +2224,22 @@ export default function FarmToTableApp() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // 딜·채팅 실시간 동기화
+  useEffect(() => {
+    if (loadState !== "ready") return;
+    const unsubDeals = onSnapshot(doc(db, "storage", DEALS_KEY), (snap) => {
+      if (snap.exists()) {
+        try { setDeals(JSON.parse(snap.data().value)); } catch {}
+      }
+    });
+    const unsubChats = onSnapshot(doc(db, "storage", CHATS_KEY), (snap) => {
+      if (snap.exists()) {
+        try { setChats(JSON.parse(snap.data().value)); } catch {}
+      }
+    });
+    return () => { unsubDeals(); unsubChats(); };
+  }, [loadState]);
 
   const persist = async (next) => {
     setDeals(next);
