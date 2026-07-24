@@ -448,7 +448,6 @@ function RatingPanel({ farmName, onSubmit }) {
     </div>
   );
 }
-}
 
 function StatusBadge({ status }) {
   return (
