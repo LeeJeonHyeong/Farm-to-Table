@@ -391,6 +391,65 @@ function ErrorText({ text }) {
   return <div style={{ fontSize: 11, color: TOKENS.rust, marginTop: 4 }}>{text}</div>;
 }
 
+function StarRating({ value, onChange, size = 18 }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div style={{ display: "flex", gap: 2 }}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange?.(star)}
+          onMouseEnter={() => onChange && setHover(star)}
+          onMouseLeave={() => onChange && setHover(0)}
+          style={{
+            background: "none", border: "none",
+            cursor: onChange ? "pointer" : "default",
+            fontSize: size, padding: 0, lineHeight: 1,
+            color: star <= (hover || Math.round(value || 0)) ? TOKENS.gold : TOKENS.line,
+          }}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RatingPanel({ farmName, onSubmit }) {
+  const [rating, setRating] = useState(0);
+  const [review, setReview] = useState("");
+  return (
+    <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: 14 }}>
+      <div style={{ fontSize: 11, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
+        {farmName} 평가하기
+      </div>
+      <StarRating value={rating} onChange={setRating} size={26} />
+      {rating === 0 && (
+        <p style={{ fontSize: 12, color: "#B45309", margin: "6px 0 0" }}>별점을 선택해주세요</p>
+      )}
+      {rating > 0 && (
+        <>
+          <textarea
+            rows={2}
+            placeholder="후기를 남겨주세요 (선택)"
+            value={review}
+            onChange={(e) => setReview(e.target.value)}
+            style={{ ...inputStyle, marginTop: 10, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
+          />
+          <button
+            onClick={() => onSubmit(rating, review)}
+            style={{ marginTop: 8, padding: "8px 18px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+          >
+            평가 제출
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+}
+
 function StatusBadge({ status }) {
   return (
     <span style={chipBadge(`${DEAL_STATUS_COLOR[status]}22`, DEAL_STATUS_COLOR[status])}>
@@ -1116,9 +1175,17 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal }) {
             {proposal.message && (
               <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: "0 0 8px", fontStyle: "italic" }}>"{proposal.message}"</p>
             )}
-            <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: (isSelected || deal.status === "open") ? 10 : 0 }}>
+            <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: (isSelected || deal.status === "open" || proposal.ratedAt) ? 10 : 0 }}>
               제안일 {new Date(proposal.createdAt).toLocaleDateString("ko-KR")} · 셰프 희망 납품일 {deal.deliveryDate}
             </div>
+            {proposal.ratedAt && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isSelected ? 10 : 0, background: TOKENS.goldSoft, borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ fontSize: 11, color: "#7A5C20" }}>받은 평점</span>
+                <StarRating value={proposal.rating} size={14} />
+                <span style={{ fontSize: 12, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating.toFixed(1)}</span>
+                {proposal.review && <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>· "{proposal.review}"</span>}
+              </div>
+            )}
             {deal.status === "open" && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isSelected ? 10 : 0 }}>
                 {cancellingId === proposal.id ? (
@@ -1375,6 +1442,9 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable }) {
         <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{proposal.cert}</span>
         <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>납품가능일 {proposal.availableDate || "-"}</span>
         <span style={chipBadge(TOKENS.line, TOKENS.inkSoft)}>가능수량 {proposal.availableQty}kg</span>
+        {proposal.ratedAt && (
+          <span style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>★ {proposal.rating.toFixed(1)}</span>
+        )}
       </div>
       {proposal.message && (
         <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10, lineHeight: 1.5 }}>"{proposal.message}"</p>
@@ -1478,7 +1548,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -1660,6 +1730,24 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                         </button>
                       )}
                     </div>
+                    {deal.status === "done" && (
+                      selectedProposal.ratedAt ? (
+                        <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: 14 }}>
+                          <div style={{ fontSize: 11, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                            내가 남긴 평가 · {selectedProposal.farmName}
+                          </div>
+                          <StarRating value={selectedProposal.rating} size={16} />
+                          {selectedProposal.review && (
+                            <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "6px 0 0", fontStyle: "italic" }}>"{selectedProposal.review}"</p>
+                          )}
+                        </div>
+                      ) : (
+                        <RatingPanel
+                          farmName={selectedProposal.farmName}
+                          onSubmit={(rating, review) => onRateProposal(deal.id, selectedProposal.id, rating, review)}
+                        />
+                      )
+                    )}
                   </>
                 )}
               </div>
@@ -2242,6 +2330,14 @@ export default function FarmToTableApp() {
     ));
   };
 
+  const handleRateProposal = (dealId, proposalId, rating, review) => {
+    persist(deals.map((d) =>
+      d.id === dealId
+        ? { ...d, proposals: d.proposals.map((p) => p.id === proposalId ? { ...p, rating, review, ratedAt: Date.now() } : p) }
+        : d
+    ));
+  };
+
   if (loadState === "loading") {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
@@ -2350,7 +2446,7 @@ export default function FarmToTableApp() {
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? "new"} onCreate={handleCreateDeal} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={handleCancelEdit} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
           </>
         )}
