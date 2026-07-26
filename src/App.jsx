@@ -739,8 +739,9 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate, defaultChefName = "", editingDeal = null, onUpdate = null, onCancelEdit = null }) {
+function DealCreateScreen({ onCreate, defaultChefName = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null }) {
   const isEditing = !!editingDeal;
+  const isCloning = !!cloningFrom;
   const blank = {
     chefName: defaultChefName, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
     grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "",
@@ -749,6 +750,8 @@ function DealCreateScreen({ onCreate, defaultChefName = "", editingDeal = null, 
   const [data, setData] = useState(
     isEditing
       ? { ...editingDeal, quantity: String(editingDeal.quantity), targetPrice: String(editingDeal.targetPrice) }
+      : isCloning
+      ? { ...cloningFrom, quantity: String(cloningFrom.quantity), targetPrice: String(cloningFrom.targetPrice) }
       : blank
   );
   const [errors, setErrors] = useState({});
@@ -930,6 +933,11 @@ function DealCreateScreen({ onCreate, defaultChefName = "", editingDeal = null, 
       {isEditing && (
         <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 13, color: "#7A5C20" }}>
           ✎ <strong>{editingDeal.crop}</strong> 딜 수정 중
+        </div>
+      )}
+      {isCloning && (
+        <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 13, color: TOKENS.moss }}>
+          ⎘ <strong>{cloningFrom.crop}</strong> 딜 복제 중 — 내용을 확인 후 제출하세요
         </div>
       )}
       <StepIndicator step={step} />
@@ -1622,7 +1630,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -1692,9 +1700,19 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
               <StatusBadge status={deal.status} />
             </div>
             <DealSummaryRow deal={deal} />
-            <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: deal.status === "open" ? 8 : (expanded ? 12 : 0) }}>
+            <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 6 }}>
               희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg · 납품일 {deal.deliveryDate} · 받은 제안 {deal.proposals.length}건
             </div>
+            {deal.status !== "open" && (
+              <div style={{ marginBottom: expanded ? 12 : 0 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onClone(deal); }}
+                  style={{ fontSize: 12, padding: "4px 12px", background: "transparent", border: `1px solid ${TOKENS.moss}`, borderRadius: 6, color: TOKENS.moss, cursor: "pointer" }}
+                >
+                  ⎘ 이 딜 복제하기
+                </button>
+              </div>
+            )}
             {deal.status === "open" && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: expanded ? 12 : 0, flexWrap: "wrap" }}>
                 {closingId === deal.id ? (
@@ -1736,6 +1754,12 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                       style={{ fontSize: 12, padding: "4px 12px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 6, color: TOKENS.ink, cursor: "pointer" }}
                     >
                       수정
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onClone(deal); }}
+                      style={{ fontSize: 12, padding: "4px 12px", background: "transparent", border: `1px solid ${TOKENS.moss}`, borderRadius: 6, color: TOKENS.moss, cursor: "pointer" }}
+                    >
+                      복제
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setClosingId(deal.id); }}
@@ -2249,6 +2273,7 @@ export default function FarmToTableApp() {
   const [chats, setChats] = useState({});
   const [chatTarget, setChatTarget] = useState(null);
   const [editingDeal, setEditingDeal] = useState(null);
+  const [cloningDeal, setCloningDeal] = useState(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -2399,8 +2424,10 @@ export default function FarmToTableApp() {
 
   const handleOpenChat = (target) => { setChatTarget(target); };
 
-  const handleEditDeal = (deal) => { setEditingDeal(deal); setTab("create"); };
+  const handleEditDeal = (deal) => { setEditingDeal(deal); setCloningDeal(null); setTab("create"); };
   const handleCancelEdit = () => { setEditingDeal(null); setTab("mydeals"); };
+  const handleCloneDeal = (deal) => { setCloningDeal(deal); setEditingDeal(null); setTab("create"); };
+  const handleCancelClone = () => { setCloningDeal(null); setTab("mydeals"); };
   const handleUpdateDeal = (updated) => {
     persist(deals.map((d) => d.id === updated.id ? updated : d));
     setEditingDeal(null);
@@ -2454,7 +2481,7 @@ export default function FarmToTableApp() {
     : [];
 
   const TABS = isChef
-    ? [{ key: "create", label: editingDeal ? "딜 수정" : "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
+    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
     : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안" }, { key: "farm", label: "내 농가" }];
 
   return (
@@ -2533,10 +2560,10 @@ export default function FarmToTableApp() {
           />
         ) : (
           <>
-            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? "new"} onCreate={handleCreateDeal} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={handleCancelEdit} />}
+            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
           </>
         )}
