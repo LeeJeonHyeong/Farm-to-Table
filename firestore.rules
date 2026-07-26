@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /storage/{key} {
+      // 딜 목록, 계정, 농가 프로필, 채팅 — 모두 읽기 허용
+      allow read: if true;
+
+      // 쓰기는 value 필드가 문자열인 올바른 구조만 허용
+      allow write: if request.resource.data.keys().hasAll(['value'])
+                   && request.resource.data.value is string
+                   && request.resource.data.value.size() < 1048576; // 1MB 제한
+    }
+  }
+}
