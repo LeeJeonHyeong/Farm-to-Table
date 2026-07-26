@@ -1158,6 +1158,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
 }
 
 const SORT_OPTIONS = [
+  { value: "smart", label: "내 전문 품목 우선" },
   { value: "latest", label: "최신순" },
   { value: "priceAsc", label: "단가 낮은순" },
   { value: "priceDesc", label: "단가 높은순" },
@@ -1289,9 +1290,11 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
   const [search, setSearch] = useState("");
   const [cropFilter, setCropFilter] = useState("전체");
   const [gradeFilter, setGradeFilter] = useState("전체");
-  const [sortBy, setSortBy] = useState("latest");
+  const hasSpecialty = (farmProfile?.specialty?.length ?? 0) > 0;
+  const [sortBy, setSortBy] = useState(hasSpecialty ? "smart" : "latest");
   const isMobile = useIsMobile();
 
+  const specialty = new Set(farmProfile?.specialty ?? []);
   const openDeals = deals.filter((d) => d.status === "open");
 
   const filtered = openDeals
@@ -1310,14 +1313,20 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
       return true;
     })
     .sort((a, b) => {
+      if (sortBy === "smart") {
+        const aMatch = specialty.has(a.crop) ? 0 : 1;
+        const bMatch = specialty.has(b.crop) ? 0 : 1;
+        if (aMatch !== bMatch) return aMatch - bMatch;
+        return b.createdAt - a.createdAt;
+      }
       if (sortBy === "priceAsc") return a.targetPrice - b.targetPrice;
       if (sortBy === "priceDesc") return b.targetPrice - a.targetPrice;
       if (sortBy === "proposals") return b.proposals.length - a.proposals.length;
       return b.createdAt - a.createdAt;
     });
 
-  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || sortBy !== "latest";
-  const resetFilters = () => { setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setSortBy("latest"); };
+  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest");
+  const resetFilters = () => { setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest"); };
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -1413,10 +1422,19 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {filtered.map((deal) => (
-            <div key={deal.id} style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 18 }}>
+          {filtered.map((deal) => {
+            const isMySpecialty = specialty.has(deal.crop);
+            return (
+            <div key={deal.id} style={{ background: TOKENS.card, border: `1px solid ${isMySpecialty ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
+                  {isMySpecialty && (
+                    <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss, background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}44`, borderRadius: 4, padding: "1px 6px", letterSpacing: "0.04em" }}>
+                      내 전문 품목
+                    </span>
+                  )}
+                </div>
                 <StatusBadge status={deal.status} />
               </div>
               <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 2 }}>
@@ -1463,7 +1481,8 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
                 );
               })()}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
