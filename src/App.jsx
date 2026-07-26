@@ -30,25 +30,49 @@ const TOKENS = {
 
 const CROPS = {
   토마토: { unit: "kg" },
-  바질: { unit: "kg" },
-  블루베리: { unit: "kg" },
   딸기: { unit: "kg" },
+  블루베리: { unit: "kg" },
+  복숭아: { unit: "kg" },
+  무화과: { unit: "kg" },
   로메인: { unit: "kg" },
-  로즈마리: { unit: "kg" },
+  케일: { unit: "kg" },
+  루꼴라: { unit: "kg" },
+  시금치: { unit: "kg" },
+  깻잎: { unit: "kg" },
+  비트: { unit: "kg" },
+  파프리카: { unit: "kg" },
+  가지: { unit: "kg" },
   애호박: { unit: "kg" },
+  바질: { unit: "kg" },
   고수: { unit: "kg" },
+  민트: { unit: "kg" },
+  파슬리: { unit: "kg" },
+  로즈마리: { unit: "kg" },
+  표고버섯: { unit: "kg" },
 };
 const CROP_OPTIONS = Object.keys(CROPS);
 
 const RIPENESS_STAGES = {
   토마토: ["그린(미숙)", "브레이커", "터닝", "핑크", "라이트레드", "레드(완숙)"],
-  바질: ["마이크로그린", "어린잎", "성숙잎"],
-  블루베리: ["그린", "레드(미숙)", "블루(수확기)", "완숙 블루"],
   딸기: ["화이트(미숙)", "핑크", "레드 70%", "완숙(레드 100%)"],
+  블루베리: ["그린", "레드(미숙)", "블루(수확기)", "완숙 블루"],
+  복숭아: ["그린(미숙)", "브레이커", "완숙"],
+  무화과: ["브레이커", "핑크", "완숙"],
   로메인: ["베이비잎", "중간생장", "완전결구"],
-  로즈마리: ["어린순", "성숙순"],
+  케일: ["베이비잎", "어린잎", "성숙잎"],
+  루꼴라: ["마이크로그린", "베이비잎", "성숙잎"],
+  시금치: ["베이비잎", "어린잎", "성숙잎"],
+  깻잎: ["소엽(연잎)", "중엽", "대엽"],
+  비트: ["베이비(잎+뿌리)", "중간", "완숙"],
+  파프리카: ["그린(미숙)", "옐로우/오렌지", "레드(완숙)"],
+  가지: ["미니", "중간", "성숙"],
   애호박: ["미니(꽃달림)", "중간", "성숙"],
+  바질: ["마이크로그린", "어린잎", "성숙잎"],
   고수: ["마이크로그린", "어린잎", "성숙잎"],
+  민트: ["어린순", "성숙잎"],
+  파슬리: ["마이크로그린", "어린잎", "성숙잎"],
+  로즈마리: ["어린순", "성숙순"],
+  표고버섯: ["복돈(갓 미개)", "반개", "완전개산"],
 };
 
 const GRADE_LEVELS = ["보통", "상", "특"];
@@ -458,13 +482,25 @@ function DealSummaryRow({ deal }) {
 function parseWithRules(text) {
   const CROP_MAP = {
     "토마토": ["토마토"],
-    "바질": ["바질"],
-    "블루베리": ["블루베리"],
     "딸기": ["딸기"],
+    "블루베리": ["블루베리"],
+    "복숭아": ["복숭아"],
+    "무화과": ["무화과"],
     "로메인": ["로메인"],
-    "로즈마리": ["로즈마리"],
+    "케일": ["케일"],
+    "루꼴라": ["루꼴라", "아루굴라", "루콜라"],
+    "시금치": ["시금치"],
+    "깻잎": ["깻잎"],
+    "비트": ["비트"],
+    "파프리카": ["파프리카"],
+    "가지": ["가지"],
     "애호박": ["애호박", "호박"],
+    "바질": ["바질"],
     "고수": ["고수"],
+    "민트": ["민트"],
+    "파슬리": ["파슬리"],
+    "로즈마리": ["로즈마리"],
+    "표고버섯": ["표고버섯", "표고", "버섯"],
   };
   let crop = null;
   for (const [name, kws] of Object.entries(CROP_MAP)) {
@@ -488,22 +524,49 @@ function parseWithRules(text) {
   } else if (crop === "딸기") {
     if (/완숙/.test(text)) ripeness = "완숙(레드 100%)";
     else if (/핑크/.test(text)) ripeness = "핑크";
-  } else if (crop === "바질" || crop === "고수") {
-    if (/어린|마이크로/.test(text)) ripeness = "어린잎";
-    else if (/성숙/.test(text)) ripeness = "성숙잎";
   } else if (crop === "블루베리") {
     if (/완숙/.test(text)) ripeness = "완숙 블루";
     else if (/수확/.test(text)) ripeness = "블루(수확기)";
-  } else if (crop === "로메인") {
+  } else if (crop === "복숭아") {
+    if (/완숙/.test(text)) ripeness = "완숙";
+    else if (/미숙|그린/.test(text)) ripeness = "그린(미숙)";
+  } else if (crop === "무화과") {
+    if (/완숙/.test(text)) ripeness = "완숙";
+    else if (/핑크/.test(text)) ripeness = "핑크";
+  } else if (crop === "로메인" || crop === "케일" || crop === "시금치") {
     if (/베이비|어린/.test(text)) ripeness = "베이비잎";
-    else if (/완전/.test(text)) ripeness = "완전결구";
+    else if (/성숙/.test(text)) ripeness = "성숙잎";
+  } else if (crop === "루꼴라" || crop === "파슬리") {
+    if (/마이크로/.test(text)) ripeness = "마이크로그린";
+    else if (/베이비|어린/.test(text)) ripeness = "베이비잎";
+    else if (/성숙/.test(text)) ripeness = "성숙잎";
+  } else if (crop === "바질" || crop === "고수") {
+    if (/마이크로/.test(text)) ripeness = "마이크로그린";
+    else if (/어린/.test(text)) ripeness = "어린잎";
+    else if (/성숙/.test(text)) ripeness = "성숙잎";
+  } else if (crop === "깻잎") {
+    if (/소엽|연잎|작/.test(text)) ripeness = "소엽(연잎)";
+    else if (/대엽|큰/.test(text)) ripeness = "대엽";
+  } else if (crop === "비트") {
+    if (/베이비|어린/.test(text)) ripeness = "베이비(잎+뿌리)";
+    else if (/완숙/.test(text)) ripeness = "완숙";
+  } else if (crop === "파프리카") {
+    if (/완숙|레드|빨강/.test(text)) ripeness = "레드(완숙)";
+    else if (/미숙|그린/.test(text)) ripeness = "그린(미숙)";
+    else if (/노랑|옐로|오렌지/.test(text)) ripeness = "옐로우/오렌지";
+  } else if (crop === "가지" || crop === "애호박") {
+    if (/꽃|미니/.test(text)) ripeness = crop === "애호박" ? "미니(꽃달림)" : "미니";
+    else if (/성숙/.test(text)) ripeness = "성숙";
+    else if (/중간/.test(text)) ripeness = "중간";
+  } else if (crop === "민트") {
+    if (/어린/.test(text)) ripeness = "어린순";
+    else if (/성숙/.test(text)) ripeness = "성숙잎";
   } else if (crop === "로즈마리") {
     if (/어린/.test(text)) ripeness = "어린순";
     else if (/성숙/.test(text)) ripeness = "성숙순";
-  } else if (crop === "애호박") {
-    if (/꽃|미니/.test(text)) ripeness = "미니(꽃달림)";
-    else if (/성숙/.test(text)) ripeness = "성숙";
-    else if (/중간/.test(text)) ripeness = "중간";
+  } else if (crop === "표고버섯") {
+    if (/완전|펼/.test(text)) ripeness = "완전개산";
+    else if (/반/.test(text)) ripeness = "반개";
   }
 
   let quantity = null;
@@ -563,15 +626,23 @@ async function parseWithAI(text) {
 
   const systemInstruction = `당신은 식자재 주문 요청에서 정보를 추출하는 어시스턴트입니다.
 오늘 날짜: ${todayStr} (${todayDay}). 상대적 날짜 표현(내일, 다음주 수요일, 3일 후 등)은 오늘 기준으로 계산해 YYYY-MM-DD로 변환하세요.
-가능한 품목: 토마토, 바질, 블루베리, 딸기, 로메인, 로즈마리, 애호박, 고수
+가능한 품목: 토마토, 딸기, 블루베리, 복숭아, 무화과, 로메인, 케일, 루꼴라, 시금치, 깻잎, 비트, 파프리카, 가지, 애호박, 바질, 고수, 민트, 파슬리, 로즈마리, 표고버섯
 숙성도 옵션(품목별로 정확히 일치해야 함):
 - 토마토: 그린(미숙), 브레이커, 터닝, 핑크, 라이트레드, 레드(완숙)
-- 바질/고수: 마이크로그린, 어린잎, 성숙잎
-- 블루베리: 그린, 레드(미숙), 블루(수확기), 완숙 블루
 - 딸기: 화이트(미숙), 핑크, 레드 70%, 완숙(레드 100%)
-- 로메인: 베이비잎, 중간생장, 완전결구
+- 블루베리: 그린, 레드(미숙), 블루(수확기), 완숙 블루
+- 복숭아: 그린(미숙), 브레이커, 완숙
+- 무화과: 브레이커, 핑크, 완숙
+- 로메인/케일/시금치: 베이비잎, 어린잎, 성숙잎
+- 루꼴라/파슬리: 마이크로그린, 베이비잎, 성숙잎
+- 바질/고수: 마이크로그린, 어린잎, 성숙잎
+- 깻잎: 소엽(연잎), 중엽, 대엽
+- 비트: 베이비(잎+뿌리), 중간, 완숙
+- 파프리카: 그린(미숙), 옐로우/오렌지, 레드(완숙)
+- 가지/애호박: 미니, 중간, 성숙 (애호박 미니는 미니(꽃달림))
+- 민트: 어린순, 성숙잎
 - 로즈마리: 어린순, 성숙순
-- 애호박: 미니(꽃달림), 중간, 성숙
+- 표고버섯: 복돈(갓 미개), 반개, 완전개산
 등급: 보통, 상, 특
 주기: 단발성(1회), 주 1회, 주 2회, 격주`;
 
