@@ -2314,6 +2314,8 @@ export default function FarmToTableApp() {
   const [chatTarget, setChatTarget] = useState(null);
   const [editingDeal, setEditingDeal] = useState(null);
   const [cloningDeal, setCloningDeal] = useState(null);
+  const [lastMyDealsVisit, setLastMyDealsVisit] = useState(() => Number(localStorage.getItem("last-mydeals-visit") || 0));
+  const [seenSelections, setSeenSelections] = useState(() => { try { return JSON.parse(localStorage.getItem("seen-selections") || "[]"); } catch { return []; } });
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -2534,9 +2536,39 @@ export default function FarmToTableApp() {
       )
     : [];
 
+  const newProposalCount = isChef
+    ? myDeals.reduce((sum, d) => sum + d.proposals.filter((p) => p.createdAt > lastMyDealsVisit).length, 0)
+    : 0;
+
+  const newSelectionCount = !isChef
+    ? deals.filter((d) => {
+        if (!d.selectedProposalId) return false;
+        const mine = d.proposals.find((p) => p.farmerName === user.name && p.id === d.selectedProposalId);
+        return mine && !seenSelections.includes(d.id);
+      }).length
+    : 0;
+
+  const handleTabClick = (key) => {
+    if (key !== "create") setEditingDeal(null);
+    if (key === "mydeals" && isChef) {
+      const now = Date.now();
+      setLastMyDealsVisit(now);
+      localStorage.setItem("last-mydeals-visit", String(now));
+    }
+    if (key === "myproposals" && !isChef) {
+      const selectedDealIds = deals
+        .filter((d) => d.selectedProposalId && d.proposals.find((p) => p.farmerName === user.name && p.id === d.selectedProposalId))
+        .map((d) => d.id);
+      const next = [...new Set([...seenSelections, ...selectedDealIds])];
+      setSeenSelections(next);
+      localStorage.setItem("seen-selections", JSON.stringify(next));
+    }
+    setTab(key);
+  };
+
   const TABS = isChef
-    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래" }]
-    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안" }, { key: "farm", label: "내 농가" }];
+    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount }]
+    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount }, { key: "farm", label: "내 농가" }];
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
@@ -2574,18 +2606,31 @@ export default function FarmToTableApp() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => { if (t.key !== "create") setEditingDeal(null); setTab(t.key); }}
+              onClick={() => handleTabClick(t.key)}
               style={{
                 padding: isMobile ? "10px 12px" : "10px 18px", background: "transparent", border: "none",
                 borderBottom: `2px solid ${tab === t.key ? TOKENS.rust : "transparent"}`,
                 color: tab === t.key ? TOKENS.ink : TOKENS.inkSoft,
                 fontSize: isMobile ? 13 : 14, fontWeight: tab === t.key ? 500 : 400,
                 cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap", flexShrink: 0,
+                position: "relative",
               }}
             >
               {t.label}
               {t.key === "browse" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{openCount}</span>}
               {t.key === "mydeals" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{myDeals.length}</span>}
+              {t.badge > 0 && (
+                <span style={{
+                  position: "absolute", top: 6, right: isMobile ? 0 : 4,
+                  minWidth: 16, height: 16, borderRadius: 999,
+                  background: TOKENS.rust, color: "#fff",
+                  fontSize: 10, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: "0 4px", lineHeight: 1,
+                }}>
+                  {t.badge > 99 ? "99+" : t.badge}
+                </span>
+              )}
             </button>
           ))}
           <div style={{ flex: 1 }} />
