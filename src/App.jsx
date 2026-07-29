@@ -82,6 +82,7 @@ const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKEN
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
 const FARM_KEY = "farm-profile";
+const CHEF_PROFILE_KEY = "chef-profile";
 const USER_KEY = "current-user";
 const ACCOUNTS_KEY = "accounts-registry";
 const SAVED_LOGIN_KEY = "saved-login";
@@ -2004,6 +2005,113 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
   );
 }
 
+/* ---------- 4-0. 내 레스토랑 (셰프) ---------- */
+
+function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
+  const blank = { restaurantName: defaultRestaurantName, region: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체" };
+  const [data, setData] = useState(profile || blank);
+  const [errors, setErrors] = useState({});
+  const [saved, setSaved] = useState(false);
+  const isMobile = useIsMobile();
+
+  const update = (key, value) => { setData((d) => ({ ...d, [key]: value })); setSaved(false); };
+  const toggleCrop = (crop) => {
+    setData((d) => ({
+      ...d,
+      preferCrops: d.preferCrops.includes(crop)
+        ? d.preferCrops.filter((c) => c !== crop)
+        : [...d.preferCrops, crop],
+    }));
+    setSaved(false);
+  };
+
+  const handleSave = () => {
+    const nextErrors = {};
+    if (!data.restaurantName) nextErrors.restaurantName = "레스토랑명을 입력해주세요";
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length === 0) { onSave(data); setSaved(true); }
+  };
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 14 : 24 }}>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 4px" }}>
+        내 레스토랑 정보
+      </h2>
+      <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "0 0 20px", lineHeight: 1.6 }}>
+        저장하면 농가에게 레스토랑 정보가 표시되고, 딜 작성 시 자동으로 불러옵니다.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div>
+          <FieldLabel required>레스토랑명</FieldLabel>
+          <input type="text" placeholder="예: 테이블나인" value={data.restaurantName} onChange={(e) => update("restaurantName", e.target.value)} style={inputStyle} />
+          {errors.restaurantName && <ErrorText text={errors.restaurantName} />}
+        </div>
+        <div>
+          <FieldLabel>지역</FieldLabel>
+          <input type="text" placeholder="예: 서울 강남" value={data.region} onChange={(e) => update("region", e.target.value)} style={inputStyle} />
+        </div>
+      </div>
+
+      <FieldLabel>선호 품목 (복수 선택 가능)</FieldLabel>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6, marginBottom: 14 }}>
+        {CROP_OPTIONS.map((c) => (
+          <Chip key={c} label={c} active={data.preferCrops.includes(c)} onClick={() => toggleCrop(c)} />
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div>
+          <FieldLabel>선호 등급</FieldLabel>
+          <select value={data.preferGrade} onChange={(e) => update("preferGrade", e.target.value)} style={inputStyle}>
+            {["전체", ...GRADE_LEVELS].map((g) => <option key={g} value={g}>{g === "전체" ? "무관" : `${g}등급`}</option>)}
+          </select>
+        </div>
+        <div>
+          <FieldLabel>주요 납품 주기</FieldLabel>
+          <select value={data.preferCycle} onChange={(e) => update("preferCycle", e.target.value)} style={inputStyle}>
+            {["전체", ...CYCLE_OPTIONS].map((c) => <option key={c} value={c}>{c === "전체" ? "무관" : c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <FieldLabel>레스토랑 소개 (선택)</FieldLabel>
+      <textarea
+        rows={3}
+        placeholder="예: 제철 식재료를 활용한 파인다이닝 레스토랑입니다. 주 1회 정기 납품을 선호합니다."
+        value={data.description}
+        onChange={(e) => update("description", e.target.value)}
+        style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
+      />
+
+      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14 }}>
+        <button onClick={handleSave} style={{ padding: "11px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          저장하기
+        </button>
+        {saved && <span style={{ fontSize: 13, color: TOKENS.moss }}>✓ 저장됐습니다</span>}
+      </div>
+
+      {(data.restaurantName || data.preferCrops.length > 0) && (
+        <div style={{ marginTop: 20, background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+            미리보기
+          </div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6 }}>
+            {data.restaurantName || "—"}
+            {data.region && <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{data.region}</span>}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: data.description ? 8 : 0 }}>
+            {data.preferGrade !== "전체" && <span style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>{data.preferGrade}등급 선호</span>}
+            {data.preferCycle !== "전체" && <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>{data.preferCycle}</span>}
+            {data.preferCrops.map((c) => <span key={c} style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{c}</span>)}
+          </div>
+          {data.description && <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.6 }}>"{data.description}"</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- 4. 내 농가 등록 ---------- */
 
 function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "" }) {
@@ -2362,6 +2470,7 @@ export default function FarmToTableApp() {
   const [tab, setTab] = useState("create");
   const [deals, setDeals] = useState([]);
   const [farm, setFarm] = useState(null);
+  const [chefProfile, setChefProfile] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
   const [chats, setChats] = useState({});
@@ -2416,6 +2525,10 @@ export default function FarmToTableApp() {
         const farmResult = await storage.get(FARM_KEY);
         if (!cancelled && farmResult && farmResult.value) {
           setFarm(JSON.parse(farmResult.value));
+        }
+        const chefResult = await storage.get(CHEF_PROFILE_KEY);
+        if (!cancelled && chefResult && chefResult.value) {
+          setChefProfile(JSON.parse(chefResult.value));
         }
         const chatsResult = await storage.get(CHATS_KEY);
         if (!cancelled && chatsResult && chatsResult.value) {
@@ -2492,6 +2605,11 @@ export default function FarmToTableApp() {
   const handleSaveFarm = async (farmData) => {
     setFarm(farmData);
     await storage.set(FARM_KEY, JSON.stringify(farmData));
+  };
+
+  const handleSaveChefProfile = async (profileData) => {
+    setChefProfile(profileData);
+    await storage.set(CHEF_PROFILE_KEY, JSON.stringify(profileData));
   };
 
   const handleResetData = async () => {
@@ -2621,7 +2739,7 @@ export default function FarmToTableApp() {
   };
 
   const TABS = isChef
-    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount }]
+    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount }, { key: "chefprofile", label: "내 레스토랑" }]
     : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount }, { key: "farm", label: "내 농가" }];
 
   return (
@@ -2718,6 +2836,7 @@ export default function FarmToTableApp() {
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} />}
             {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} />}
+            {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} />}
           </>
         )}
       </div>
