@@ -1952,12 +1952,19 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
 
 /* ---------- 4. 내 농가 등록 ---------- */
 
-function FarmProfileScreen({ profile, onSave, defaultFarmName = "" }) {
+function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "" }) {
   const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
   const isMobile = useIsMobile();
+
+  const ratedProposals = deals.flatMap((d) =>
+    d.proposals.filter((p) => p.farmerName === userName && p.ratedAt)
+  );
+  const avgRating = ratedProposals.length > 0
+    ? ratedProposals.reduce((sum, p) => sum + p.rating, 0) / ratedProposals.length
+    : null;
 
   const update = (key, value) => { setData((d) => ({ ...d, [key]: value })); setSaved(false); };
   const toggleSpecialty = (crop) => {
@@ -1986,9 +1993,30 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "" }) {
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 4px" }}>
         내 농가 정보
       </h2>
-      <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "0 0 20px", lineHeight: 1.6 }}>
+      <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "0 0 16px", lineHeight: 1.6 }}>
         저장해두면 제안서 작성 시 자동으로 불러올 수 있습니다.
       </p>
+
+      {avgRating !== null ? (
+        <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: "#7A5C20", lineHeight: 1 }}>
+              {avgRating.toFixed(1)}
+            </div>
+            <StarRating value={avgRating} size={14} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: "#7A5C20" }}>누적 평균 평점</div>
+            <div style={{ fontSize: 11, color: "#7A5C20", opacity: 0.7, marginTop: 2 }}>
+              총 {ratedProposals.length}건의 거래 후기
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 10, padding: "10px 14px", marginBottom: 20, fontSize: 12, color: TOKENS.inkSoft }}>
+          거래가 완료되고 셰프가 평가를 남기면 평점이 표시됩니다.
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
         <div>
@@ -2048,9 +2076,14 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "" }) {
           <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
             미리보기
           </div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6 }}>
-            {data.farmName || "—"}
-            <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{data.region}</span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink }}>
+              {data.farmName || "—"}
+            </span>
+            <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft }}>{data.region}</span>
+            {avgRating !== null && (
+              <span style={{ fontSize: 12, color: "#7A5C20", marginLeft: "auto" }}>★ {avgRating.toFixed(1)} ({ratedProposals.length}건)</span>
+            )}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: data.description ? 8 : 0 }}>
             {data.cert && data.cert !== "인증 없음" && <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{data.cert}</span>}
@@ -2585,7 +2618,7 @@ export default function FarmToTableApp() {
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} />}
             {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} />}
-            {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} />}
+            {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} />}
           </>
         )}
       </div>
