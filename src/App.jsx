@@ -1300,6 +1300,13 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
   const [gradeFilter, setGradeFilter] = useState("전체");
   const hasSpecialty = (farmProfile?.specialty?.length ?? 0) > 0;
   const [sortBy, setSortBy] = useState(hasSpecialty ? "smart" : "latest");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [qtyMin, setQtyMin] = useState("");
+  const [qtyMax, setQtyMax] = useState("");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
   const isMobile = useIsMobile();
 
   const specialty = new Set(farmProfile?.specialty ?? []);
@@ -1309,6 +1316,12 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
     .filter((d) => {
       if (cropFilter !== "전체" && d.crop !== cropFilter) return false;
       if (gradeFilter !== "전체" && d.grade !== gradeFilter) return false;
+      if (dateFrom && d.deliveryDate < dateFrom) return false;
+      if (dateTo && d.deliveryDate > dateTo) return false;
+      if (qtyMin && d.quantity < Number(qtyMin)) return false;
+      if (qtyMax && d.quantity > Number(qtyMax)) return false;
+      if (priceMin && d.targetPrice < Number(priceMin)) return false;
+      if (priceMax && d.targetPrice > Number(priceMax)) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         return (
@@ -1333,8 +1346,12 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
       return b.createdAt - a.createdAt;
     });
 
-  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest");
-  const resetFilters = () => { setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest"); };
+  const hasAdvanced = dateFrom || dateTo || qtyMin || qtyMax || priceMin || priceMax;
+  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
+  const resetFilters = () => {
+    setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
+    setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax("");
+  };
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -1406,6 +1423,43 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
             {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
+
+        {/* 상세 필터 토글 */}
+        <button
+          onClick={() => setShowAdvanced((v) => !v)}
+          style={{ alignSelf: "flex-start", fontSize: 11, color: hasAdvanced ? TOKENS.moss : TOKENS.inkSoft, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}
+        >
+          {showAdvanced ? "▲" : "▼"} 상세 필터{hasAdvanced ? " (적용 중)" : ""}
+        </button>
+
+        {showAdvanced && (
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10, paddingTop: 4, borderTop: `1px solid ${TOKENS.line}` }}>
+            <div>
+              <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>납품일</div>
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...inputStyle, fontSize: 11, padding: "4px 6px", flex: 1 }} />
+                <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>~</span>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ ...inputStyle, fontSize: 11, padding: "4px 6px", flex: 1 }} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>수량 (kg)</div>
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input type="number" min={0} placeholder="최소" value={qtyMin} onChange={(e) => setQtyMin(e.target.value)} style={{ ...inputStyle, fontSize: 12, padding: "4px 8px", flex: 1 }} />
+                <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>~</span>
+                <input type="number" min={0} placeholder="최대" value={qtyMax} onChange={(e) => setQtyMax(e.target.value)} style={{ ...inputStyle, fontSize: 12, padding: "4px 8px", flex: 1 }} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>단가 (원/kg)</div>
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input type="number" min={0} placeholder="최소" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} style={{ ...inputStyle, fontSize: 12, padding: "4px 8px", flex: 1 }} />
+                <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>~</span>
+                <input type="number" min={0} placeholder="최대" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} style={{ ...inputStyle, fontSize: 12, padding: "4px 8px", flex: 1 }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 결과 수 + 초기화 */}
