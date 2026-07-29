@@ -1697,7 +1697,14 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
                 <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{deal.chefName}</span>
               </div>
-              <StatusBadge status={deal.status} />
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {deal.closeReason === "expired" && (
+                  <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px" }}>
+                    납품일 만료
+                  </span>
+                )}
+                <StatusBadge status={deal.status} />
+              </div>
             </div>
             <DealSummaryRow deal={deal} />
             <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 6 }}>
@@ -2339,6 +2346,20 @@ export default function FarmToTableApp() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // 납품일 지난 모집중 딜 자동 마감
+  useEffect(() => {
+    if (loadState !== "ready" || deals.length === 0) return;
+    const today = new Date().toISOString().split("T")[0];
+    const expired = deals.filter((d) => d.status === "open" && d.deliveryDate && d.deliveryDate < today);
+    if (expired.length > 0) {
+      persist(deals.map((d) =>
+        d.status === "open" && d.deliveryDate && d.deliveryDate < today
+          ? { ...d, status: "closed", closedAt: Date.now(), closeReason: "expired" }
+          : d
+      ));
+    }
+  }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 딜·채팅 실시간 동기화
   useEffect(() => {
