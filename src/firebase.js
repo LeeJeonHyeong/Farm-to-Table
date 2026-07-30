@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,9 +13,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-// 기기별 세션 데이터는 localStorage, 공유 데이터는 Firestore
-const LOCAL_KEYS = new Set(["current-user", "saved-login"]);
+const LOCAL_KEYS = new Set(["current-user"]);
 
 export const storage = {
   async get(key) {
