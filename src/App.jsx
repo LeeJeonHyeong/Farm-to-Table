@@ -1735,6 +1735,12 @@ function fmtDate(ts) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function fmtDateTime(ts) {
+  if (!ts) return "-";
+  const d = new Date(ts);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function SettlementCard({ deal, proposal }) {
   const total = proposal.price * deal.quantity;
   const fee = Math.round(total * FEE_RATE);
@@ -1775,32 +1781,101 @@ function DealTimeline({ deal }) {
   const firstProposalAt = deal.proposals.length > 0
     ? Math.min(...deal.proposals.map((p) => p.createdAt))
     : null;
+  const selectedProposal = deal.proposals.find((p) => p.id === deal.selectedProposalId);
+  const isClosed = deal.status === "closed";
+  const isDone = deal.status === "done";
+  const isMatched = deal.status === "matched";
+  const hasSelected = isDone || isMatched;
+
   const steps = [
-    { label: "딜 등록", done: true, at: deal.createdAt },
-    { label: "농가 제안 도착", done: !!firstProposalAt, at: firstProposalAt },
-    { label: "농가 선택 완료", done: deal.status !== "open", at: deal.selectedAt },
-    { label: "납품 · 정산 완료", done: deal.status === "done", at: deal.completedAt },
+    {
+      label: "딜 등록",
+      sub: `${deal.chefName} · ${deal.crop} ${deal.quantity}kg`,
+      done: true,
+      current: deal.status === "open" && deal.proposals.length === 0,
+      at: deal.createdAt,
+    },
+    {
+      label: isClosed && !firstProposalAt ? "제안 없이 마감" : "농가 제안 도착",
+      sub: firstProposalAt
+        ? `총 ${deal.proposals.length}건 접수`
+        : isClosed ? "모집 기간 내 제안 없음" : "제안 대기 중",
+      done: !!firstProposalAt || isClosed,
+      current: deal.status === "open" && deal.proposals.length > 0,
+      at: firstProposalAt,
+    },
+    {
+      label: isClosed ? "딜 마감" : "농가 선택 완료",
+      sub: isClosed
+        ? (deal.closeReason === "expired" ? "납품일 만료로 자동 마감" : "셰프가 직접 마감")
+        : selectedProposal
+        ? `${selectedProposal.farmName} · ${selectedProposal.price.toLocaleString()}원/kg`
+        : "제안 검토 중",
+      done: hasSelected || isClosed,
+      current: deal.status === "open" && deal.proposals.length > 0 && !hasSelected,
+      at: isClosed ? deal.closedAt : deal.selectedAt,
+    },
+    ...(!isClosed ? [{
+      label: "납품 희망일",
+      sub: deal.deliveryDate,
+      done: isDone,
+      current: isMatched,
+      at: isDone ? deal.completedAt : null,
+      isDelivery: true,
+    },
+    {
+      label: "납품 · 정산 완료",
+      sub: isDone && selectedProposal
+        ? `총 ${(selectedProposal.price * deal.quantity).toLocaleString()}원 정산`
+        : "납품 확인 후 완료 처리",
+      done: isDone,
+      current: false,
+      at: deal.completedAt,
+    }] : []),
   ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {steps.map((s, i) => (
-        <div key={s.label} style={{ display: "flex", gap: 10 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div
-              style={{
-                width: 10, height: 10, borderRadius: "50%",
-                background: s.done ? TOKENS.moss : TOKENS.line,
+      {steps.map((s, i) => {
+        const dotColor = s.done ? TOKENS.moss : s.current ? TOKENS.gold : TOKENS.line;
+        const dotSize = s.current ? 12 : 10;
+        return (
+          <div key={s.label} style={{ display: "flex", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{
+                width: dotSize, height: dotSize, borderRadius: "50%",
+                background: dotColor,
                 marginTop: 4,
-              }}
-            />
-            {i < steps.length - 1 && <div style={{ width: 1, flex: 1, minHeight: 22, background: TOKENS.line }} />}
+                boxShadow: s.current ? `0 0 0 3px ${TOKENS.goldSoft}` : "none",
+                flexShrink: 0,
+              }} />
+              {i < steps.length - 1 && (
+                <div style={{ width: 1, flex: 1, minHeight: 24, background: s.done ? TOKENS.moss + "55" : TOKENS.line }} />
+              )}
+            </div>
+            <div style={{ paddingBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: s.current ? 500 : 400, color: s.done || s.current ? TOKENS.ink : TOKENS.inkSoft }}>
+                {s.label}
+              </div>
+              {s.sub && (
+                <div style={{ fontSize: 11, color: s.done ? TOKENS.inkSoft : s.current ? "#7A5C20" : TOKENS.line, fontFamily: "'IBM Plex Mono', monospace", marginTop: 1 }}>
+                  {s.sub}
+                </div>
+              )}
+              {s.at && (
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
+                  {s.isDelivery ? s.sub : fmtDateTime(s.at)}
+                </div>
+              )}
+              {!s.at && s.isDelivery && (
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
+                  {deal.deliveryDate}
+                </div>
+              )}
+            </div>
           </div>
-          <div style={{ paddingBottom: 14 }}>
-            <div style={{ fontSize: 13, color: s.done ? TOKENS.ink : TOKENS.inkSoft }}>{s.label}</div>
-            {s.at && <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{fmtDate(s.at)}</div>}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
