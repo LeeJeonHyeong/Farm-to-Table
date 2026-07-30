@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { storage, db } from "./firebase";
+import { storage, db, auth } from "./firebase";
 import { doc, onSnapshot } from "firebase/firestore";
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -84,8 +85,6 @@ const FEE_RATE = 0.1;
 const FARM_KEY = "farm-profile";
 const CHEF_PROFILE_KEY = "chef-profile";
 const USER_KEY = "current-user";
-const ACCOUNTS_KEY = "accounts-registry";
-const SAVED_LOGIN_KEY = "saved-login";
 const CHATS_KEY = "chats-data";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
@@ -2502,92 +2501,59 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
 
 /* ---------- 5. 로그인 ---------- */
 
+const AUTH_ERRORS = {
+  "auth/invalid-email": "이메일 형식이 올바르지 않습니다.",
+  "auth/user-not-found": "등록된 계정이 없습니다. 가입 후 시작하세요.",
+  "auth/wrong-password": "비밀번호가 올바르지 않습니다.",
+  "auth/invalid-credential": "이메일 또는 비밀번호가 올바르지 않습니다.",
+  "auth/email-already-in-use": "이미 가입된 이메일입니다. 로그인 탭을 이용하세요.",
+  "auth/weak-password": "비밀번호는 6자 이상이어야 합니다.",
+  "auth/too-many-requests": "잠시 후 다시 시도해주세요.",
+  "auth/network-request-failed": "네트워크 오류가 발생했습니다.",
+};
+
 function LoginScreen({ onLogin }) {
+  const [mode, setMode] = useState("login"); // "login" | "signup"
   const [role, setRole] = useState(null);
-  const [userId, setUserId] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [saveId, setSaveId] = useState(false);
-  const [autoLogin, setAutoLogin] = useState(false);
-  const [isReturning, setIsReturning] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  useEffect(() => {
-    (async () => {
-      const result = await storage.get(SAVED_LOGIN_KEY);
-      if (result?.value) {
-        try {
-          const saved = JSON.parse(result.value);
-          const savedId = saved.userId || saved.name || "";
-          if (savedId) { setUserId(savedId); setSaveId(true); }
-          if (saved.role) setRole(saved.role);
-          if (saved.password) setAutoLogin(true);
-          if (savedId && saved.role) {
-            const ar = await storage.get(ACCOUNTS_KEY);
-            if (ar?.value) {
-              const accounts = JSON.parse(ar.value);
-              const acc = accounts[`${savedId}_${saved.role}`];
-              if (acc) {
-                setDisplayName(typeof acc === "object" ? acc.displayName : savedId);
-                setIsReturning(true);
-              }
-            }
-          }
-        } catch {}
-      }
-    })();
-  }, []);
+  const handleSubmit = async () => {
+    setError("");
+    if (mode === "signup") {
+      if (!role) { setError("역할을 선택해주세요."); return; }
+      if (!email.trim()) { setError("이메일을 입력해주세요."); return; }
+      if (!password) { setError("비밀번호를 입력해주세요."); return; }
+      if (!displayName.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
+    } else {
+      if (!email.trim()) { setError("이메일을 입력해주세요."); return; }
+      if (!password) { setError("비밀번호를 입력해주세요."); return; }
+    }
 
-  const lookupAccount = async (id, r) => {
-    if (!id || !r) return;
-    try {
-      const ar = await storage.get(ACCOUNTS_KEY);
-      if (ar?.value) {
-        const accounts = JSON.parse(ar.value);
-        const acc = accounts[`${id}_${r}`];
-        if (acc) {
-          setDisplayName(typeof acc === "object" ? acc.displayName : id);
-          setIsReturning(true);
-        } else {
-          setIsReturning(false);
-        }
-      }
-    } catch {}
-  };
-
-  const handleStart = async () => {
-    if (!role) { setError("역할을 선택해주세요."); return; }
-    if (!userId.trim()) { setError("아이디를 입력해주세요."); return; }
-    if (!password) { setError("비밀번호를 입력해주세요."); return; }
-    if (!displayName.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
     setLoading(true);
     try {
-      const ar = await storage.get(ACCOUNTS_KEY);
-      const accounts = ar?.value ? JSON.parse(ar.value) : {};
-      const key = `${userId.trim()}_${role}`;
-      const acc = accounts[key];
-      if (acc !== undefined) {
-        const storedPw = typeof acc === "object" ? acc.password : acc;
-        if (storedPw !== password) { setError("비밀번호가 올바르지 않습니다."); setLoading(false); return; }
-        accounts[key] = { password, displayName: displayName.trim() };
+      if (mode === "signup") {
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        await storage.set(`user-profile-${cred.user.uid}`, JSON.stringify({ role, displayName: displayName.trim() }));
+        onLogin({ uid: cred.user.uid, email: cred.user.email, role, name: displayName.trim() });
       } else {
-        accounts[key] = { password, displayName: displayName.trim() };
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const profileResult = await storage.get(`user-profile-${cred.user.uid}`);
+        if (profileResult?.value) {
+          const { role: savedRole, displayName: savedName } = JSON.parse(profileResult.value);
+          onLogin({ uid: cred.user.uid, email: cred.user.email, role: savedRole, name: savedName });
+        } else {
+          setError("계정 정보를 찾을 수 없습니다. 관리자에게 문의하세요.");
+          await signOut(auth);
+        }
       }
-      await storage.set(ACCOUNTS_KEY, JSON.stringify(accounts));
-
-      if (autoLogin) {
-        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ userId: userId.trim(), role, password }));
-      } else if (saveId) {
-        await storage.set(SAVED_LOGIN_KEY, JSON.stringify({ userId: userId.trim(), role }));
-      } else {
-        await storage.set(SAVED_LOGIN_KEY, "");
-      }
-      onLogin({ role, userId: userId.trim(), name: displayName.trim() });
-    } catch {
-      setError("오류가 발생했습니다. 다시 시도해주세요.");
+    } catch (err) {
+      setError(AUTH_ERRORS[err.code] || "오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setLoading(false);
     }
@@ -2604,101 +2570,83 @@ function LoginScreen({ onLogin }) {
           <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 26 : 32, margin: "8px 0 6px", color: TOKENS.ink }}>
             Farm-to-Table
           </h1>
-          <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0 }}>역할을 선택하고 시작하세요</p>
+          <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0 }}>
+            {mode === "login" ? "이메일로 로그인하세요" : "역할을 선택하고 가입하세요"}
+          </p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-          {[
-            { key: "chef", label: "셰프", desc: "딜 등록·제안 선택", color: TOKENS.rust, soft: TOKENS.rustSoft },
-            { key: "farmer", label: "농가", desc: "딜 찾기·제안 보내기", color: TOKENS.moss, soft: TOKENS.mossSoft },
-          ].map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              onClick={() => { setRole(r.key); setIsReturning(false); setError(""); lookupAccount(userId, r.key); }}
-              style={{
-                padding: "20px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
-                border: `2px solid ${role === r.key ? r.color : TOKENS.line}`,
-                background: role === r.key ? r.soft : "#FFFFFF",
-                transition: "all 0.15s",
-              }}
-            >
-              <div style={{ fontSize: 30, marginBottom: 8 }}>{r.key === "chef" ? "🍳" : "🌱"}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink, marginBottom: 3 }}>{r.label}</div>
-              <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{r.desc}</div>
+        {/* 탭 전환 */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginBottom: 24, border: `1px solid ${TOKENS.line}`, borderRadius: 8, overflow: "hidden" }}>
+          {[{ key: "login", label: "로그인" }, { key: "signup", label: "신규 가입" }].map((m) => (
+            <button key={m.key} type="button" onClick={() => { setMode(m.key); setError(""); }}
+              style={{ padding: "10px 0", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 500,
+                background: mode === m.key ? TOKENS.ink : "#FFFFFF",
+                color: mode === m.key ? TOKENS.bg : TOKENS.inkSoft }}>
+              {m.label}
             </button>
           ))}
         </div>
 
-        <FieldLabel required>아이디</FieldLabel>
-        <input
-          type="text"
-          placeholder={role ? "로그인 아이디 입력" : "위에서 역할을 먼저 선택하세요"}
-          value={userId}
-          disabled={!role}
-          onChange={(e) => { setUserId(e.target.value); setIsReturning(false); setError(""); }}
-          onBlur={() => lookupAccount(userId.trim(), role)}
-          onKeyDown={(e) => e.key === "Enter" && handleStart()}
-          style={{ ...inputStyle, opacity: role ? 1 : 0.5 }}
-        />
+        {/* 역할 선택 (가입 시만) */}
+        {mode === "signup" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+            {[
+              { key: "chef", label: "셰프", desc: "딜 등록·제안 선택", color: TOKENS.rust, soft: TOKENS.rustSoft },
+              { key: "farmer", label: "농가", desc: "딜 찾기·제안 보내기", color: TOKENS.moss, soft: TOKENS.mossSoft },
+            ].map((r) => (
+              <button key={r.key} type="button" onClick={() => { setRole(r.key); setError(""); }}
+                style={{ padding: "20px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
+                  border: `2px solid ${role === r.key ? r.color : TOKENS.line}`,
+                  background: role === r.key ? r.soft : "#FFFFFF", transition: "all 0.15s" }}>
+                <div style={{ fontSize: 30, marginBottom: 8 }}>{r.key === "chef" ? "🍳" : "🌱"}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink, marginBottom: 3 }}>{r.label}</div>
+                <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{r.desc}</div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <FieldLabel required>이메일</FieldLabel>
+        <input type="email" placeholder="example@email.com" value={email}
+          onChange={(e) => { setEmail(e.target.value); setError(""); }}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          style={inputStyle} />
 
         <FieldLabel required>비밀번호</FieldLabel>
         <div style={{ position: "relative" }}>
-          <input
-            type={showPw ? "text" : "password"}
-            placeholder="비밀번호 입력"
+          <input type={showPw ? "text" : "password"} placeholder={mode === "signup" ? "6자 이상" : "비밀번호 입력"}
             value={password}
-            disabled={!role}
             onChange={(e) => { setPassword(e.target.value); setError(""); }}
-            onKeyDown={(e) => e.key === "Enter" && handleStart()}
-            style={{ ...inputStyle, paddingRight: 44, opacity: role ? 1 : 0.5 }}
-          />
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            style={{ ...inputStyle, paddingRight: 44 }} />
           <button type="button" onClick={() => setShowPw((v) => !v)}
             style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 15 }}>
             {showPw ? "🙈" : "👁"}
           </button>
         </div>
 
-        <FieldLabel required>{role === "chef" ? "레스토랑명" : "농가명"} <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontWeight: 400 }}>(앱에 표시되는 상호명)</span></FieldLabel>
-        {isReturning && (
-          <div style={{ fontSize: 11, color: TOKENS.moss, marginBottom: 4 }}>✓ 기존 계정 — 상호명을 변경할 수 있습니다.</div>
+        {/* 상호명 (가입 시만) */}
+        {mode === "signup" && (
+          <>
+            <FieldLabel required>{role === "chef" ? "레스토랑명" : "농가명"} <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontWeight: 400 }}>(앱에 표시되는 상호명)</span></FieldLabel>
+            <input type="text" placeholder={role === "chef" ? "예: 테이블나인" : "예: 신선팜"}
+              value={displayName}
+              onChange={(e) => { setDisplayName(e.target.value); setError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              style={inputStyle} />
+          </>
         )}
-        <input
-          type="text"
-          placeholder={role === "chef" ? "예: 테이블나인" : "예: 신선팜"}
-          value={displayName}
-          disabled={!role}
-          onChange={(e) => { setDisplayName(e.target.value); setError(""); }}
-          onKeyDown={(e) => e.key === "Enter" && handleStart()}
-          style={{ ...inputStyle, opacity: role ? 1 : 0.5 }}
-        />
-
-        <div style={{ display: "flex", gap: 16, marginTop: 12, marginBottom: 4 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>
-            <input type="checkbox" checked={saveId}
-              onChange={(e) => { setSaveId(e.target.checked); if (!e.target.checked) setAutoLogin(false); }}
-              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }} />
-            아이디 저장
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>
-            <input type="checkbox" checked={autoLogin}
-              onChange={(e) => { setAutoLogin(e.target.checked); if (e.target.checked) setSaveId(true); }}
-              style={{ accentColor: TOKENS.ink, width: 15, height: 15 }} />
-            자동 로그인
-          </label>
-        </div>
 
         {error && <ErrorText text={error} />}
 
-        <button onClick={handleStart} disabled={loading}
+        <button onClick={handleSubmit} disabled={loading}
           style={{ marginTop: 14, width: "100%", padding: "13px 0", background: loading ? TOKENS.line : TOKENS.ink, color: loading ? TOKENS.inkSoft : TOKENS.bg, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: loading ? "default" : "pointer" }}>
-          {loading ? "확인 중…" : isReturning ? "로그인" : "가입 후 시작하기"}
+          {loading ? "처리 중…" : mode === "login" ? "로그인" : "가입하기"}
         </button>
-        {!isReturning && (
-          <p style={{ fontSize: 11, color: TOKENS.inkSoft, textAlign: "center", marginTop: 10 }}>
-            처음 로그인 시 입력한 정보로 계정이 자동 생성됩니다.
-          </p>
-        )}
+
+        <p style={{ fontSize: 12, color: TOKENS.inkSoft, textAlign: "center", marginTop: 12 }}>
+          로그인 상태는 자동으로 유지됩니다.
+        </p>
       </div>
     </div>
   );
@@ -2708,6 +2656,7 @@ function LoginScreen({ onLogin }) {
 
 export default function FarmToTableApp() {
   const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [tab, setTab] = useState("create");
   const [deals, setDeals] = useState([]);
   const [farm, setFarm] = useState(null);
@@ -2722,39 +2671,38 @@ export default function FarmToTableApp() {
   const [seenSelections, setSeenSelections] = useState(() => { try { return JSON.parse(localStorage.getItem("seen-selections") || "[]"); } catch { return []; } });
   const isMobile = useIsMobile();
 
+  // Firebase Auth 상태 감지
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
+          if (profileResult?.value) {
+            const { role, displayName } = JSON.parse(profileResult.value);
+            const userData = { uid: firebaseUser.uid, email: firebaseUser.email, role, name: displayName };
+            setUser(userData);
+            setTab(role === "farmer" ? "browse" : "create");
+          } else {
+            await signOut(auth);
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setAuthChecked(true);
+    });
+    return () => unsub();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 공유 데이터 로드 (auth 확인 후)
+  useEffect(() => {
+    if (!authChecked) return;
     let cancelled = false;
     (async () => {
       try {
-        const userResult = await storage.get(USER_KEY);
-        if (!cancelled && userResult && userResult.value) {
-          const savedUser = JSON.parse(userResult.value);
-          setUser(savedUser);
-          setTab(savedUser.role === "farmer" ? "browse" : "create");
-        } else {
-          // 자동 로그인 확인
-          const savedLoginResult = await storage.get(SAVED_LOGIN_KEY);
-          if (!cancelled && savedLoginResult?.value) {
-            try {
-              const saved = JSON.parse(savedLoginResult.value);
-              const savedId = saved.userId || saved.name || "";
-              if (saved.password && savedId && saved.role) {
-                const accountsResult = await storage.get(ACCOUNTS_KEY);
-                const accounts = accountsResult?.value ? JSON.parse(accountsResult.value) : {};
-                const key = `${savedId}_${saved.role}`;
-                const acc = accounts[key];
-                const storedPw = typeof acc === "object" ? acc?.password : acc;
-                if (storedPw === saved.password) {
-                  const displayName = typeof acc === "object" ? acc.displayName : savedId;
-                  const userData = { role: saved.role, userId: savedId, name: displayName };
-                  setUser(userData);
-                  setTab(saved.role === "farmer" ? "browse" : "create");
-                  await storage.set(USER_KEY, JSON.stringify(userData));
-                }
-              }
-            } catch {}
-          }
-        }
         const result = await storage.get(DEALS_KEY, true);
         if (cancelled) return;
         if (result && result.value) {
@@ -2764,31 +2712,25 @@ export default function FarmToTableApp() {
           await storage.set(DEALS_KEY, JSON.stringify(SAMPLE_DEALS), true);
         }
         const farmResult = await storage.get(FARM_KEY);
-        if (!cancelled && farmResult && farmResult.value) {
-          setFarm(JSON.parse(farmResult.value));
-        }
+        if (!cancelled && farmResult && farmResult.value) setFarm(JSON.parse(farmResult.value));
         const chefResult = await storage.get(CHEF_PROFILE_KEY);
-        if (!cancelled && chefResult && chefResult.value) {
-          setChefProfile(JSON.parse(chefResult.value));
-        }
+        if (!cancelled && chefResult && chefResult.value) setChefProfile(JSON.parse(chefResult.value));
         const chatsResult = await storage.get(CHATS_KEY);
-        if (!cancelled && chatsResult && chatsResult.value) {
-          setChats(JSON.parse(chatsResult.value));
-        }
-        setLoadState("ready");
-      } catch (err) {
+        if (!cancelled && chatsResult && chatsResult.value) setChats(JSON.parse(chatsResult.value));
+        if (!cancelled) setLoadState("ready");
+      } catch {
         if (cancelled) return;
         try {
           setDeals(SAMPLE_DEALS);
           await storage.set(DEALS_KEY, JSON.stringify(SAMPLE_DEALS), true);
           setLoadState("ready");
-        } catch (err2) {
+        } catch {
           setLoadState("error");
         }
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [authChecked]);
 
   // 납품일 지난 모집중 딜 자동 마감
   useEffect(() => {
@@ -2831,16 +2773,17 @@ export default function FarmToTableApp() {
     }
   };
 
-  const handleLogin = async (userData) => {
+  const handleLogin = (userData) => {
     setUser(userData);
     setTab(userData.role === "farmer" ? "browse" : "create");
-    await storage.set(USER_KEY, JSON.stringify(userData));
   };
 
   const handleLogout = async () => {
+    await signOut(auth);
     setUser(null);
     setTab("create");
-    await storage.set(USER_KEY, "");
+    setFarm(null);
+    setChefProfile(null);
   };
 
   const handleSaveFarm = async (farmData) => {
@@ -2859,7 +2802,7 @@ export default function FarmToTableApp() {
   };
 
   const handleCreateDeal = (deal) => {
-    persist([{ ...deal, createdBy: user.userId || user.name }, ...deals]);
+    persist([{ ...deal, createdBy: user.uid || user.name }, ...deals]);
     setTab("mydeals");
   };
 
@@ -2924,7 +2867,7 @@ export default function FarmToTableApp() {
     ));
   };
 
-  if (loadState === "loading") {
+  if (!authChecked || loadState === "loading") {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
         불러오는 중…
@@ -2945,7 +2888,7 @@ export default function FarmToTableApp() {
   const openCount = deals.filter((d) => d.status === "open").length;
   const myDeals = isChef
     ? deals.filter((d) =>
-        d.createdBy === (user.userId || user.name) || d.chefName === user.name
+        d.createdBy === (user.uid || user.name) || d.chefName === user.name
       )
     : [];
 
