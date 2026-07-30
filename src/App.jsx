@@ -93,6 +93,7 @@ const SAMPLE_DEALS = [
   {
     id: "d1",
     chefName: "테이블나인",
+    chefRegion: "서울 용산",
     crop: "토마토",
     sizeCondition: "지름 5cm 이상",
     ripeness: "라이트레드",
@@ -110,6 +111,7 @@ const SAMPLE_DEALS = [
   {
     id: "d2",
     chefName: "그린테이블",
+    chefRegion: "서울 마포",
     crop: "바질",
     sizeCondition: "잎 길이 4cm 이상",
     ripeness: "어린잎",
@@ -140,6 +142,7 @@ const SAMPLE_DEALS = [
   {
     id: "d3",
     chefName: "오마카세 료",
+    chefRegion: "서울 강남",
     crop: "딸기",
     sizeCondition: "25g 이상 균일",
     ripeness: "완숙(레드 100%)",
@@ -182,6 +185,7 @@ const SAMPLE_DEALS = [
   {
     id: "d4",
     chefName: "비스트로 봄",
+    chefRegion: "경기 성남",
     crop: "로메인",
     sizeCondition: "결구 길이 25cm 이상",
     ripeness: "완전결구",
@@ -199,6 +203,7 @@ const SAMPLE_DEALS = [
   {
     id: "d5",
     chefName: "파인다이닝 숲",
+    chefRegion: "서울 서초",
     crop: "블루베리",
     sizeCondition: "지름 14mm 이상",
     ripeness: "완숙 블루",
@@ -229,6 +234,7 @@ const SAMPLE_DEALS = [
   {
     id: "d6",
     chefName: "라틴키친",
+    chefRegion: "서울 이태원",
     crop: "고수",
     sizeCondition: "줄기 포함 15cm 이상",
     ripeness: "어린잎",
@@ -246,6 +252,7 @@ const SAMPLE_DEALS = [
   {
     id: "d7",
     chefName: "이탈리안노트",
+    chefRegion: "서울 종로",
     crop: "애호박",
     sizeCondition: "꽃 달린 미니 애호박, 길이 12cm 이하",
     ripeness: "미니(꽃달림)",
@@ -263,6 +270,7 @@ const SAMPLE_DEALS = [
   {
     id: "d8",
     chefName: "테이블나인",
+    chefRegion: "서울 용산",
     crop: "로즈마리",
     sizeCondition: "가지 길이 20cm 이상",
     ripeness: "성숙순",
@@ -293,6 +301,7 @@ const SAMPLE_DEALS = [
   {
     id: "d9",
     chefName: "모던한식 연",
+    chefRegion: "서울 강북",
     crop: "토마토",
     sizeCondition: "지름 3cm 이하 방울토마토",
     ripeness: "레드(완숙)",
@@ -310,6 +319,7 @@ const SAMPLE_DEALS = [
   {
     id: "d10",
     chefName: "카페 아르떼",
+    chefRegion: "경기 수원",
     crop: "민트",
     sizeCondition: "줄기 포함 10cm 이상",
     ripeness: "어린순",
@@ -327,6 +337,7 @@ const SAMPLE_DEALS = [
   {
     id: "d11",
     chefName: "파인다이닝 숲",
+    chefRegion: "서울 서초",
     crop: "케일",
     sizeCondition: "잎 길이 8cm 이하 베이비잎",
     ripeness: "베이비잎",
@@ -344,6 +355,7 @@ const SAMPLE_DEALS = [
   {
     id: "d12",
     chefName: "비스트로 봄",
+    chefRegion: "경기 성남",
     crop: "루꼴라",
     sizeCondition: "잎 길이 6cm 이하",
     ripeness: "베이비잎",
@@ -374,6 +386,7 @@ const SAMPLE_DEALS = [
   {
     id: "d13",
     chefName: "모던한식 연",
+    chefRegion: "서울 강북",
     crop: "표고버섯",
     sizeCondition: "갓 지름 6cm 이상",
     ripeness: "반개",
@@ -391,6 +404,7 @@ const SAMPLE_DEALS = [
   {
     id: "d14",
     chefName: "이탈리안노트",
+    chefRegion: "서울 종로",
     crop: "파프리카",
     sizeCondition: "개당 200g 이상",
     ripeness: "레드(완숙)",
@@ -408,6 +422,7 @@ const SAMPLE_DEALS = [
   {
     id: "d15",
     chefName: "오마카세 료",
+    chefRegion: "서울 강남",
     crop: "무화과",
     sizeCondition: "개당 60g 이상",
     ripeness: "완숙",
@@ -438,6 +453,7 @@ const SAMPLE_DEALS = [
   {
     id: "d16",
     chefName: "그린테이블",
+    chefRegion: "서울 마포",
     crop: "비트",
     sizeCondition: "지름 6~8cm 균일",
     ripeness: "완숙",
@@ -868,11 +884,11 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate, defaultChefName = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null }) {
+function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null }) {
   const isEditing = !!editingDeal;
   const isCloning = !!cloningFrom;
   const blank = {
-    chefName: defaultChefName, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
+    chefName: defaultChefName, chefRegion: defaultChefRegion, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
     grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "",
   };
   const [step, setStep] = useState(1);
@@ -1076,6 +1092,9 @@ function DealCreateScreen({ onCreate, defaultChefName = "", editingDeal = null, 
           <FieldLabel required>레스토랑명</FieldLabel>
           <input type="text" placeholder="예: 테이블나인" value={data.chefName} onChange={(e) => update("chefName", e.target.value)} style={inputStyle} />
           {errors.chefName && <ErrorText text={errors.chefName} />}
+
+          <FieldLabel>납품 지역</FieldLabel>
+          <input type="text" placeholder="예: 서울 강남" value={data.chefRegion || ""} onChange={(e) => update("chefRegion", e.target.value)} style={inputStyle} />
 
           <FieldLabel required>품목</FieldLabel>
           <select value={data.crop} onChange={(e) => handleCropChange(e.target.value)} style={inputStyle}>
@@ -1430,6 +1449,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
   const hasSpecialty = (farmProfile?.specialty?.length ?? 0) > 0;
   const [sortBy, setSortBy] = useState(hasSpecialty ? "smart" : "latest");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [regionFilter, setRegionFilter] = useState("전체");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [qtyMin, setQtyMin] = useState("");
@@ -1440,11 +1460,13 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
 
   const specialty = new Set(farmProfile?.specialty ?? []);
   const openDeals = deals.filter((d) => d.status === "open");
+  const regionOptions = ["전체", ...Array.from(new Set(openDeals.map((d) => d.chefRegion).filter(Boolean))).sort()];
 
   const filtered = openDeals
     .filter((d) => {
       if (cropFilter !== "전체" && d.crop !== cropFilter) return false;
       if (gradeFilter !== "전체" && d.grade !== gradeFilter) return false;
+      if (regionFilter !== "전체" && d.chefRegion !== regionFilter) return false;
       if (dateFrom && d.deliveryDate < dateFrom) return false;
       if (dateTo && d.deliveryDate > dateTo) return false;
       if (qtyMin && d.quantity < Number(qtyMin)) return false;
@@ -1476,9 +1498,9 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
     });
 
   const hasAdvanced = dateFrom || dateTo || qtyMin || qtyMax || priceMin || priceMax;
-  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
+  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || regionFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
   const resetFilters = () => {
-    setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
+    setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
     setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax("");
   };
 
@@ -1525,6 +1547,22 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
             </button>
           ))}
         </div>
+
+        {regionOptions.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>지역</span>
+            {regionOptions.map((r) => (
+              <button key={r} onClick={() => setRegionFilter(r)} style={{
+                padding: "4px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                border: `1px solid ${regionFilter === r ? TOKENS.rust : TOKENS.line}`,
+                background: regionFilter === r ? TOKENS.rustSoft : "#FFFFFF",
+                color: regionFilter === r ? TOKENS.rust : TOKENS.inkSoft,
+              }}>
+                {r}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", rowGap: 6 }}>
           <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>등급</span>
@@ -1629,7 +1667,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
                 <StatusBadge status={deal.status} />
               </div>
               <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 2 }}>
-                {deal.chefName} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
+                {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
               </div>
               <DealSummaryRow deal={deal} />
               {deal.note && <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10 }}>"{deal.note}"</p>}
