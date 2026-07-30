@@ -35,10 +35,12 @@ npm run dev
 3. **내 거래** — 셰프가 들어온 제안들을 가격순으로 비교하고 하나를 선택 → 진행중 상태로 전환
 4. 진행중 상태에서 정산 내역(선급금 30% / 잔금 70% / 플랫폼 수수료 10%, 모두 예시값)을 확인하고, 납품 확인 후 완료 처리하면 거래 타임라인이 마무리됩니다.
 
-## 백엔드 (Firebase Firestore)
+## 백엔드 (Firebase)
 
-- 모든 공유 데이터(딜 목록, 채팅, 계정 등)는 **Firebase Firestore**에 저장됩니다.
-- 세션별 데이터(`current-user`, `saved-login`)만 localStorage에 저장됩니다.
+- 모든 공유 데이터(딜 목록, 채팅 등)는 **Firebase Firestore**에 저장됩니다.
+- 인증은 **Firebase Authentication** (이메일/비밀번호) 을 사용합니다.
+- 사용자 프로필(역할·상호명)은 Firestore `user-profile-{uid}` 키에 저장됩니다.
+- 세션 데이터(`current-user`)만 localStorage에 저장되며, 로그인 상태는 Firebase Auth가 자동 유지합니다.
 - `onSnapshot` 실시간 동기화로 딜 목록과 채팅이 즉시 반영됩니다.
 - AI 자동 입력은 **Groq API (Llama 3.3 70B)** 를 사용하며, 실패 시 규칙 기반 한국어 파서로 폴백합니다.
 
@@ -68,7 +70,7 @@ allow write: if request.resource.data.keys().hasAll(['value'])
 ### 농가
 | 기능 | 설명 |
 |---|---|
-| 딜 찾기 | 품목·등급·납품일·수량·단가 범위 필터 |
+| 딜 찾기 | 품목·등급·지역·납품일·수량·단가 범위 필터 |
 | 스마트 정렬 | 내 전문 품목 딜을 상단 노출 + "내 전문 품목" 뱃지 |
 | 제안 보내기 | 가격·수량·납품일·인증 입력 후 제안 제출 |
 | 제안 취소 | 모집중 딜에 한해 제안 취소 |
@@ -120,9 +122,9 @@ allow write: if request.resource.data.keys().hasAll(['value'])
 | v0.8 | 농가 평점/리뷰 시스템 |
 | v0.9 | Firebase Firestore 백엔드 연동, 보안 규칙 설정 |
 | v1.0 | 품목 8종→20종 확대, 딜 복제, 스마트 정렬, 자동 마감, 알림 뱃지, 상세 필터, 셰프 프로필 |
+| v1.1 | 딜 찾기 지역 필터, 샘플 딜 16건 지역 정보 추가, Firebase Auth 교체 (이메일/비밀번호 인증) |
 
 ## 향후 과제
 
-- Firebase Auth 교체 (현재는 자체 계정 시스템)
 - FCM 푸시 알림
 - AI 기반 매칭 점수화
