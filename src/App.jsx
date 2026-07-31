@@ -1411,7 +1411,7 @@ const SORT_OPTIONS = [
   { value: "proposals", label: "제안 많은순" },
 ];
 
-function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal }) {
+function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const myItems = [];
@@ -1522,6 +1522,11 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal }) {
                 style={{ width: "100%", padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
               >
                 💬 {deal.chefName}과 채팅
+                {(chatUnreads[deal.id] || 0) > 0 && (
+                  <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                    {chatUnreads[deal.id]}
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -2080,7 +2085,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, chatUnreads = {} }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -2296,9 +2301,14 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
                         onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: selectedProposal.farmName })}
-                        style={{ flex: 1, padding: "10px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                        style={{ flex: 1, padding: "10px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", position: "relative" }}
                       >
                         💬 {selectedProposal.farmName}과 채팅
+                        {(chatUnreads[deal.id] || 0) > 0 && (
+                          <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                            {chatUnreads[deal.id]}
+                          </span>
+                        )}
                       </button>
                       {deal.status === "matched" && (
                         <button
@@ -2851,6 +2861,7 @@ export default function FarmToTableApp() {
   const [cloningDeal, setCloningDeal] = useState(null);
   const [lastMyDealsVisit, setLastMyDealsVisit] = useState(() => Number(localStorage.getItem("last-mydeals-visit") || 0));
   const [seenSelections, setSeenSelections] = useState(() => { try { return JSON.parse(localStorage.getItem("seen-selections") || "[]"); } catch { return []; } });
+  const [lastChatRead, setLastChatRead] = useState(() => { try { return JSON.parse(localStorage.getItem("last-chat-read") || "{}"); } catch { return {}; } });
   const isMobile = useIsMobile();
 
   // Firebase Auth 상태 감지
@@ -3016,7 +3027,12 @@ export default function FarmToTableApp() {
     await storage.set(CHATS_KEY, JSON.stringify(updated));
   };
 
-  const handleOpenChat = (target) => { setChatTarget(target); };
+  const handleOpenChat = (target) => {
+    setChatTarget(target);
+    const updated = { ...lastChatRead, [target.dealId]: Date.now() };
+    setLastChatRead(updated);
+    localStorage.setItem("last-chat-read", JSON.stringify(updated));
+  };
 
   const handleEditDeal = (deal) => { setEditingDeal(deal); setCloningDeal(null); setTab("create"); };
   const handleCancelEdit = () => { setEditingDeal(null); setTab("mydeals"); };
@@ -3084,6 +3100,15 @@ export default function FarmToTableApp() {
       }).length
     : 0;
 
+  const chatUnreads = Object.fromEntries(
+    Object.entries(chats).map(([dealId, msgs]) => {
+      const lastRead = lastChatRead[dealId] || 0;
+      const count = msgs.filter((m) => m.ts > lastRead && m.senderName !== user.name).length;
+      return [dealId, count];
+    })
+  );
+  const totalUnreadChats = Object.values(chatUnreads).reduce((s, n) => s + n, 0);
+
   const handleTabClick = (key) => {
     if (key !== "create") setEditingDeal(null);
     if (key === "mydeals" && isChef) {
@@ -3103,8 +3128,8 @@ export default function FarmToTableApp() {
   };
 
   const TABS = isChef
-    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount }, { key: "chefprofile", label: "내 레스토랑" }]
-    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount }, { key: "farm", label: "내 농가" }];
+    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount + totalUnreadChats }, { key: "chefprofile", label: "내 레스토랑" }]
+    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount + totalUnreadChats }, { key: "farm", label: "내 농가" }];
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
@@ -3157,12 +3182,12 @@ export default function FarmToTableApp() {
               {t.key === "mydeals" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{myDeals.length}</span>}
               {t.badge > 0 && (
                 <span style={{
-                  position: "absolute", top: 6, right: isMobile ? 0 : 4,
+                  marginLeft: 6,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
                   minWidth: 16, height: 16, borderRadius: 999,
                   background: TOKENS.rust, color: "#fff",
-                  fontSize: 10, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  padding: "0 4px", lineHeight: 1,
+                  fontSize: 10, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace",
+                  padding: "0 5px", lineHeight: 1, verticalAlign: "middle",
                 }}>
                   {t.badge > 99 ? "99+" : t.badge}
                 </span>
@@ -3197,8 +3222,8 @@ export default function FarmToTableApp() {
           <>
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
-            {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} />}
+            {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} chatUnreads={chatUnreads} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} chatUnreads={chatUnreads} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} />}
           </>
