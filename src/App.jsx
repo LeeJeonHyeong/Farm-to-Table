@@ -838,6 +838,97 @@ JSON 형식:
   }
 }
 
+/* ---------- AI 매칭 점수 ---------- */
+
+function calcMatchScore(deal, proposal) {
+  const breakdown = {};
+
+  const pricePct = deal.targetPrice > 0 ? proposal.price / deal.targetPrice : 1;
+  if (pricePct <= 1.0) breakdown.price = 35;
+  else if (pricePct <= 1.05) breakdown.price = 28;
+  else if (pricePct <= 1.10) breakdown.price = 20;
+  else if (pricePct <= 1.20) breakdown.price = 12;
+  else if (pricePct <= 1.30) breakdown.price = 6;
+  else breakdown.price = 0;
+
+  breakdown.date = 0;
+  if (proposal.availableDate && deal.deliveryDate) {
+    const diffDays = Math.ceil(
+      (new Date(proposal.availableDate) - new Date(deal.deliveryDate)) / 86400000
+    );
+    if (diffDays <= 0) breakdown.date = 25;
+    else if (diffDays <= 1) breakdown.date = 20;
+    else if (diffDays <= 3) breakdown.date = 13;
+    else if (diffDays <= 7) breakdown.date = 6;
+  }
+
+  const qtyRatio = deal.quantity > 0 ? proposal.availableQty / deal.quantity : 0;
+  if (qtyRatio >= 1.0) breakdown.qty = 20;
+  else if (qtyRatio >= 0.8) breakdown.qty = 15;
+  else if (qtyRatio >= 0.6) breakdown.qty = 10;
+  else if (qtyRatio >= 0.4) breakdown.qty = 5;
+  else breakdown.qty = 0;
+
+  const cert = (proposal.cert || "").trim();
+  if (cert === "유기농" || cert === "무농약") breakdown.cert = 10;
+  else if (cert === "친환경") breakdown.cert = 8;
+  else if (cert === "GAP") breakdown.cert = 7;
+  else if (cert === "일반") breakdown.cert = 5;
+  else breakdown.cert = 3;
+
+  const r = proposal.rating || 0;
+  if (r >= 4.5) breakdown.rating = 10;
+  else if (r >= 4.0) breakdown.rating = 8;
+  else if (r >= 3.5) breakdown.rating = 6;
+  else if (r >= 3.0) breakdown.rating = 4;
+  else breakdown.rating = 2;
+
+  const total = breakdown.price + breakdown.date + breakdown.qty + breakdown.cert + breakdown.rating;
+  const color = total >= 70 ? TOKENS.moss : total >= 50 ? "#7A5C20" : TOKENS.rust;
+  const bg = total >= 70 ? TOKENS.mossSoft : total >= 50 ? TOKENS.goldSoft : TOKENS.rustSoft;
+  const label = total >= 85 ? "최상" : total >= 70 ? "우수" : total >= 50 ? "보통" : "낮음";
+  return { total, breakdown, label, color, bg };
+}
+
+function fallbackMatchComment(deal, proposal, score) {
+  const { breakdown, total } = score;
+  const strong = [];
+  const weak = [];
+  if (breakdown.price >= 28) strong.push("가격 적합");
+  else if (breakdown.price <= 6) weak.push("가격 초과");
+  if (breakdown.date === 25) strong.push("납품일 정시 가능");
+  else if (breakdown.date === 0) weak.push("납품일 불일치");
+  if (breakdown.qty === 20) strong.push("수량 충족");
+  else if (breakdown.qty <= 5) weak.push("수량 부족");
+  if (breakdown.cert >= 10) strong.push("고급 인증 보유");
+  if (total >= 85) return `전 항목 우수 — ${strong.slice(0, 2).join("·")}이 강점입니다.`;
+  if (weak.length > 0) return `${weak[0]}이 아쉽지만${strong.length > 0 ? ", " + strong[0] + "은 강점입니다" : " 검토가 필요합니다"}.`;
+  return `매칭 점수 ${total}점 — ${strong.length > 0 ? strong[0] + "이 강점입니다" : "세부 조건을 확인하세요"}.`;
+}
+
+async function getAIMatchComment(deal, proposal, score) {
+  const system = "당신은 농산물 직거래 플랫폼의 매칭 분석 AI입니다. 셰프의 구매 요청과 농가 제안을 비교해 한 문장으로 핵심 매칭 이유를 한국어로 설명하세요. JSON 형식으로 응답: {\"comment\": \"...\"}";
+  const user = `딜: ${deal.crop} ${deal.quantity}kg, 희망단가 ${deal.targetPrice}원/kg, 납품일 ${deal.deliveryDate}\n제안: ${proposal.farmName}(${proposal.region}), ${proposal.price}원/kg, 납품가능일 ${proposal.availableDate}, ${proposal.availableQty}kg, ${proposal.cert}, 평점 ${proposal.rating}\n점수: ${score.total}/100 (가격 ${score.breakdown.price}/35, 날짜 ${score.breakdown.date}/25, 수량 ${score.breakdown.qty}/20, 인증 ${score.breakdown.cert}/10, 평점 ${score.breakdown.rating}/10)`;
+  try {
+    const res = await fetch("/api/groq/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        temperature: 0.3, max_tokens: 120,
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) return fallbackMatchComment(deal, proposal, score);
+    const data = await res.json();
+    const parsed = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+    return parsed.comment || fallbackMatchComment(deal, proposal, score);
+  } catch {
+    return fallbackMatchComment(deal, proposal, score);
+  }
+}
+
 /* ---------- 1. 딜 만들기 (셰프) ---------- */
 
 const DEAL_FIELD_REQUIRED = {
@@ -1719,8 +1810,32 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
 
 /* ---------- 3. 내 거래 (셰프가 제안 비교 후 선택) ---------- */
 
-function ProposalCard({ proposal, deal, onSelect, isSelected, selectable }) {
+const SCORE_BREAKDOWN_LABELS = [
+  { key: "price", label: "가격", max: 35 },
+  { key: "date", label: "납품일", max: 25 },
+  { key: "qty", label: "수량", max: 20 },
+  { key: "cert", label: "인증", max: 10 },
+  { key: "rating", label: "평점", max: 10 },
+];
+
+function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score }) {
   const priceDiff = proposal.price - deal.targetPrice;
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [aiComment, setAiComment] = useState(null);
+  const [commentLoading, setCommentLoading] = useState(false);
+
+  const handleToggleBreakdown = () => {
+    const next = !showBreakdown;
+    setShowBreakdown(next);
+    if (next && aiComment === null && !commentLoading && score) {
+      setCommentLoading(true);
+      getAIMatchComment(deal, proposal, score).then((c) => {
+        setAiComment(c);
+        setCommentLoading(false);
+      });
+    }
+  };
+
   return (
     <div
       style={{
@@ -1730,9 +1845,24 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable }) {
         padding: 14,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, color: TOKENS.ink }}>{proposal.farmName}</span>
-        <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{proposal.region}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{proposal.region}</span>
+          {score && (
+            <button
+              onClick={handleToggleBreakdown}
+              style={{
+                padding: "2px 8px", borderRadius: 999, fontSize: 11,
+                fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600,
+                background: score.bg, color: score.color,
+                border: `1px solid ${score.color}44`, cursor: "pointer",
+              }}
+            >
+              {score.total}점 {showBreakdown ? "▾" : "▸"}
+            </button>
+          )}
+        </div>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "6px 0 8px" }}>
         <span style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>
@@ -1748,6 +1878,31 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable }) {
           <span style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>★ {proposal.rating.toFixed(1)}</span>
         )}
       </div>
+      {showBreakdown && score && (
+        <div style={{ background: TOKENS.bg, border: `1px solid ${TOKENS.line}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            {SCORE_BREAKDOWN_LABELS.map(({ key, label, max }) => {
+              const val = score.breakdown[key];
+              const pct = val / max;
+              const barColor = pct >= 0.8 ? TOKENS.moss : pct >= 0.5 ? TOKENS.gold : TOKENS.rust;
+              return (
+                <div key={key} style={{ flex: "1 1 60px", minWidth: 55 }}>
+                  <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 3 }}>{label}</div>
+                  <div style={{ height: 4, background: TOKENS.line, borderRadius: 2, position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct * 100}%`, background: barColor, borderRadius: 2 }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 2, fontFamily: "'IBM Plex Mono', monospace" }}>{val}/{max}</div>
+                </div>
+              );
+            })}
+          </div>
+          {commentLoading ? (
+            <p style={{ fontSize: 11, color: TOKENS.inkSoft, margin: 0, fontStyle: "italic" }}>AI 분석 중...</p>
+          ) : aiComment ? (
+            <p style={{ fontSize: 11, color: TOKENS.ink, margin: 0, lineHeight: 1.5 }}>✦ {aiComment}</p>
+          ) : null}
+        </div>
+      )}
       {proposal.message && (
         <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10, lineHeight: 1.5 }}>"{proposal.message}"</p>
       )}
@@ -1930,6 +2085,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState("전체");
+  const [proposalSort, setProposalSort] = useState("score");
 
   if (deals.length === 0) {
     return (
@@ -1980,7 +2136,10 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
       )}
       {filtered.map((deal) => {
         const expanded = expandedId === deal.id;
-        const sortedProposals = [...deal.proposals].sort((a, b) => a.price - b.price);
+        const scoredProposals = deal.proposals.map((p) => ({ ...p, _score: calcMatchScore(deal, p) }));
+        const sortedProposals = [...scoredProposals].sort((a, b) =>
+          proposalSort === "score" ? b._score.total - a._score.total : a.price - b.price
+        );
         const selectedProposal = deal.proposals.find((p) => p.id === deal.selectedProposalId);
         return (
           <div key={deal.id} style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 18 }}>
@@ -2096,23 +2255,43 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                         아직 들어온 농가 제안이 없습니다. "딜 찾기" 화면에서 농가가 제안을 보내면 여기 표시됩니다.
                       </div>
                     ) : (
-                      sortedProposals.map((p) => (
-                        <ProposalCard
-                          key={p.id}
-                          proposal={p}
-                          deal={deal}
-                          isSelected={false}
-                          selectable
-                          onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
-                        />
-                      ))
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>정렬</span>
+                          {["score", "price"].map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => setProposalSort(s)}
+                              style={{
+                                padding: "3px 10px", borderRadius: 999, fontSize: 11, cursor: "pointer",
+                                border: `1px solid ${proposalSort === s ? TOKENS.moss : TOKENS.line}`,
+                                background: proposalSort === s ? TOKENS.mossSoft : "#fff",
+                                color: proposalSort === s ? TOKENS.moss : TOKENS.inkSoft,
+                              }}
+                            >
+                              {s === "score" ? "매칭 점수순" : "가격순"}
+                            </button>
+                          ))}
+                        </div>
+                        {sortedProposals.map((p) => (
+                          <ProposalCard
+                            key={p.id}
+                            proposal={p}
+                            deal={deal}
+                            isSelected={false}
+                            selectable
+                            score={p._score}
+                            onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
+                          />
+                        ))}
+                      </>
                     )}
                   </div>
                 )}
 
                 {(deal.status === "matched" || deal.status === "done") && selectedProposal && (
                   <>
-                    <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} />
+                    <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} score={calcMatchScore(deal, selectedProposal)} />
                     <SettlementCard deal={deal} proposal={selectedProposal} />
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
@@ -2508,8 +2687,10 @@ const AUTH_ERRORS = {
   "auth/invalid-credential": "이메일 또는 비밀번호가 올바르지 않습니다.",
   "auth/email-already-in-use": "이미 가입된 이메일입니다. 로그인 탭을 이용하세요.",
   "auth/weak-password": "비밀번호는 6자 이상이어야 합니다.",
+  "auth/password-does-not-meet-requirements": "비밀번호는 6자 이상이어야 합니다.",
   "auth/too-many-requests": "잠시 후 다시 시도해주세요.",
   "auth/network-request-failed": "네트워크 오류가 발생했습니다.",
+  "auth/operation-not-allowed": "이메일/비밀번호 가입이 비활성화되어 있습니다.",
 };
 
 function LoginScreen({ onLogin }) {
@@ -2529,6 +2710,7 @@ function LoginScreen({ onLogin }) {
       if (!role) { setError("역할을 선택해주세요."); return; }
       if (!email.trim()) { setError("이메일을 입력해주세요."); return; }
       if (!password) { setError("비밀번호를 입력해주세요."); return; }
+      if (password.length < 6) { setError("비밀번호는 6자 이상이어야 합니다."); return; }
       if (!displayName.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
     } else {
       if (!email.trim()) { setError("이메일을 입력해주세요."); return; }
@@ -2887,9 +3069,7 @@ export default function FarmToTableApp() {
   const isChef = user.role === "chef";
   const openCount = deals.filter((d) => d.status === "open").length;
   const myDeals = isChef
-    ? deals.filter((d) =>
-        d.createdBy === (user.uid || user.name) || d.chefName === user.name
-      )
+    ? deals.filter((d) => d.createdBy === user.uid)
     : [];
 
   const newProposalCount = isChef
