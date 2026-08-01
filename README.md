@@ -22,6 +22,8 @@ npm run dev
 ├── vite.config.js
 ├── firebase.json
 ├── firestore.rules
+├── public
+│   └── sw.js           # Service Worker (웹 푸시 알림)
 └── src
     ├── main.jsx        # React 엔트리포인트
     ├── firebase.js     # Firebase 초기화 및 storage 어댑터
@@ -37,20 +39,26 @@ npm run dev
 
 ## 백엔드 (Firebase)
 
-- 모든 공유 데이터(딜 목록, 채팅 등)는 **Firebase Firestore**에 저장됩니다.
+- **딜** 데이터는 Firestore `deals/{dealId}` 컬렉션에 딜마다 개별 문서로 저장됩니다.
+- **채팅**은 `storage/chats-data`, **사용자 프로필**은 `storage/user-profile-{uid}` 키에 저장됩니다.
 - 인증은 **Firebase Authentication** (이메일/비밀번호) 을 사용합니다.
-- 사용자 프로필(역할·상호명)은 Firestore `user-profile-{uid}` 키에 저장됩니다.
 - 세션 데이터(`current-user`)만 localStorage에 저장되며, 로그인 상태는 Firebase Auth가 자동 유지합니다.
 - `onSnapshot` 실시간 동기화로 딜 목록과 채팅이 즉시 반영됩니다.
 - AI 자동 입력은 **Groq API (Llama 3.3 70B)** 를 사용하며, 실패 시 규칙 기반 한국어 파서로 폴백합니다.
+- **웹 푸시 알림**은 Web Notification API + Service Worker로 구현됩니다 (Firebase Functions 불필요).
 
 ### Firestore 보안 규칙
 
 ```
+# storage 컬렉션 (채팅·프로필): value 필드 문자열 구조만 허용
 allow read: if true;
 allow write: if request.resource.data.keys().hasAll(['value'])
              && request.resource.data.value is string
              && request.resource.data.value.size() < 1048576;
+
+# deals 컬렉션: 읽기 전체 허용, 쓰기는 인증된 유저만
+allow read: if true;
+allow write: if request.auth != null;
 ```
 
 ## 주요 기능
@@ -82,6 +90,7 @@ allow write: if request.resource.data.keys().hasAll(['value'])
 | 기능 | 설명 |
 |---|---|
 | 실시간 채팅 | 매칭 후 셰프↔농가 채팅 + 미확인 메시지 뱃지 |
+| 웹 푸시 알림 | 새 제안 도착·제안 선택·새 채팅 메시지 시 브라우저 푸시 알림 (Service Worker) |
 | 납품일 자동 마감 | 납품일이 지난 모집중 딜 자동 마감 처리 + "납품일 만료" 뱃지 |
 | 회원가입 / 로그인 | Firebase Auth 이메일/비밀번호 인증, 역할(셰프·농가) 선택 |
 
@@ -126,7 +135,8 @@ allow write: if request.resource.data.keys().hasAll(['value'])
 | v1.0 | 품목 8종→20종 확대, 딜 복제, 스마트 정렬, 자동 마감, 알림 뱃지, 상세 필터, 셰프 프로필 |
 | v1.1 | 딜 찾기 지역 필터, 샘플 딜 16건 지역 정보 추가, Firebase Auth 교체 (이메일/비밀번호 인증) |
 | v1.2 | AI 기반 매칭 점수화 (가격·납품일·수량·인증·평점 100점), 채팅 알림 뱃지, 회원가입 오류 수정, 내 거래 필터 uid 기반 수정 |
+| v1.3 | UI 고급화 (카드 hover elevation·액센트 보더·StatusBadge dot), 웹 푸시 알림 (Service Worker, 3가지 시나리오), 딜 데이터 격리 (deals 컬렉션 분리·샘플 자동 시딩 제거·Firestore 보안 규칙 강화) |
 
 ## 향후 과제
 
-- FCM 푸시 알림
+- PWA 앱화 (manifest.json 추가, 모바일 홈화면 설치)
