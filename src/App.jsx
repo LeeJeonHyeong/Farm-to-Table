@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { storage, db, auth } from "./firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 function useIsMobile() {
@@ -12,8 +12,6 @@ function useIsMobile() {
   }, []);
   return isMobile;
 }
-
-const DEALS_KEY = "deals-list";
 
 const TOKENS = {
   bg: "#F3F1E7",
@@ -2896,30 +2894,18 @@ export default function FarmToTableApp() {
     let cancelled = false;
     (async () => {
       try {
-        const result = await storage.get(DEALS_KEY, true);
+        const snapshot = await getDocs(collection(db, "deals"));
         if (cancelled) return;
-        if (result && result.value) {
-          setDeals(JSON.parse(result.value));
-        } else {
-          setDeals(SAMPLE_DEALS);
-          await storage.set(DEALS_KEY, JSON.stringify(SAMPLE_DEALS), true);
-        }
+        setDeals(snapshot.docs.map((d) => d.data()));
         const farmResult = await storage.get(FARM_KEY);
-        if (!cancelled && farmResult && farmResult.value) setFarm(JSON.parse(farmResult.value));
+        if (!cancelled && farmResult?.value) setFarm(JSON.parse(farmResult.value));
         const chefResult = await storage.get(CHEF_PROFILE_KEY);
-        if (!cancelled && chefResult && chefResult.value) setChefProfile(JSON.parse(chefResult.value));
+        if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
         const chatsResult = await storage.get(CHATS_KEY);
-        if (!cancelled && chatsResult && chatsResult.value) setChats(JSON.parse(chatsResult.value));
+        if (!cancelled && chatsResult?.value) setChats(JSON.parse(chatsResult.value));
         if (!cancelled) setLoadState("ready");
       } catch {
-        if (cancelled) return;
-        try {
-          setDeals(SAMPLE_DEALS);
-          await storage.set(DEALS_KEY, JSON.stringify(SAMPLE_DEALS), true);
-          setLoadState("ready");
-        } catch {
-          setLoadState("error");
-        }
+        if (!cancelled) setLoadState("error");
       }
     })();
     return () => { cancelled = true; };
@@ -2930,22 +2916,19 @@ export default function FarmToTableApp() {
     if (loadState !== "ready" || deals.length === 0) return;
     const today = new Date().toISOString().split("T")[0];
     const expired = deals.filter((d) => d.status === "open" && d.deliveryDate && d.deliveryDate < today);
-    if (expired.length > 0) {
-      persist(deals.map((d) =>
-        d.status === "open" && d.deliveryDate && d.deliveryDate < today
-          ? { ...d, status: "closed", closedAt: Date.now(), closeReason: "expired" }
-          : d
-      ));
-    }
+    if (expired.length === 0) return;
+    const closedDeals = expired.map((d) => ({ ...d, status: "closed", closedAt: Date.now(), closeReason: "expired" }));
+    setDeals((prev) => prev.map((d) => { const c = closedDeals.find((x) => x.id === d.id); return c || d; }));
+    const batch = writeBatch(db);
+    closedDeals.forEach((d) => batch.set(doc(db, "deals", d.id), d));
+    batch.commit().catch(() => {});
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 딜·채팅 실시간 동기화
   useEffect(() => {
     if (loadState !== "ready") return;
-    const unsubDeals = onSnapshot(doc(db, "storage", DEALS_KEY), (snap) => {
-      if (snap.exists()) {
-        try { setDeals(JSON.parse(snap.data().value)); } catch {}
-      }
+    const unsubDeals = onSnapshot(collection(db, "deals"), (snapshot) => {
+      setDeals(snapshot.docs.map((d) => d.data()));
     });
     const unsubChats = onSnapshot(doc(db, "storage", CHATS_KEY), (snap) => {
       if (snap.exists()) {
@@ -2955,13 +2938,22 @@ export default function FarmToTableApp() {
     return () => { unsubDeals(); unsubChats(); };
   }, [loadState]);
 
-  const persist = async (next) => {
-    setDeals(next);
+  const persistDeal = async (deal) => {
     setSaveState("saving");
     try {
-      const result = await storage.set(DEALS_KEY, JSON.stringify(next), true);
-      setSaveState(result ? "saved" : "error");
-    } catch (err) {
+      await setDoc(doc(db, "deals", deal.id), deal);
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
+  };
+
+  const deleteDealDoc = async (dealId) => {
+    setSaveState("saving");
+    try {
+      await deleteDoc(doc(db, "deals", dealId));
+      setSaveState("saved");
+    } catch {
       setSaveState("error");
     }
   };
@@ -2990,34 +2982,42 @@ export default function FarmToTableApp() {
   };
 
   const handleResetData = async () => {
-    await storage.set(DEALS_KEY, JSON.stringify(SAMPLE_DEALS));
+    const batch = writeBatch(db);
+    deals.forEach((d) => batch.delete(doc(db, "deals", d.id)));
+    SAMPLE_DEALS.forEach((d) => batch.set(doc(db, "deals", d.id), d));
+    await batch.commit();
     setDeals(SAMPLE_DEALS);
   };
 
   const handleCreateDeal = (deal) => {
-    persist([{ ...deal, createdBy: user.uid || user.name }, ...deals]);
+    const newDeal = { ...deal, createdBy: user.uid || user.name };
+    setDeals((prev) => [newDeal, ...prev]);
+    persistDeal(newDeal);
     setTab("mydeals");
   };
 
   const handleSubmitProposal = (dealId, proposal) => {
-    const next = deals.map((d) =>
-      d.id === dealId ? { ...d, proposals: [...d.proposals, proposal] } : d
-    );
-    persist(next);
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, proposals: [...deal.proposals, proposal] };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
   };
 
   const handleSelectProposal = (dealId, proposalId) => {
-    const next = deals.map((d) =>
-      d.id === dealId ? { ...d, selectedProposalId: proposalId, status: "matched", selectedAt: Date.now() } : d
-    );
-    persist(next);
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, selectedProposalId: proposalId, status: "matched", selectedAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
   };
 
   const handleCompleteDeal = (dealId) => {
-    const next = deals.map((d) =>
-      d.id === dealId ? { ...d, status: "done", completedAt: Date.now() } : d
-    );
-    persist(next);
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, status: "done", completedAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
   };
 
   const handleSendMessage = async (dealId, text) => {
@@ -3039,30 +3039,38 @@ export default function FarmToTableApp() {
   const handleCloneDeal = (deal) => { setCloningDeal(deal); setEditingDeal(null); setTab("create"); };
   const handleCancelClone = () => { setCloningDeal(null); setTab("mydeals"); };
   const handleUpdateDeal = (updated) => {
-    persist(deals.map((d) => d.id === updated.id ? updated : d));
+    setDeals((prev) => prev.map((d) => d.id === updated.id ? updated : d));
+    persistDeal(updated);
     setEditingDeal(null);
     setTab("mydeals");
   };
   const handleDeleteDeal = (dealId) => {
-    persist(deals.filter((d) => d.id !== dealId));
+    setDeals((prev) => prev.filter((d) => d.id !== dealId));
+    deleteDealDoc(dealId);
   };
 
   const handleCloseDeal = (dealId) => {
-    persist(deals.map((d) => d.id === dealId ? { ...d, status: "closed", closedAt: Date.now() } : d));
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, status: "closed", closedAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
   };
 
   const handleCancelProposal = (dealId, proposalId) => {
-    persist(deals.map((d) =>
-      d.id === dealId ? { ...d, proposals: d.proposals.filter((p) => p.id !== proposalId) } : d
-    ));
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, proposals: deal.proposals.filter((p) => p.id !== proposalId) };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
   };
 
   const handleRateProposal = (dealId, proposalId, rating, review) => {
-    persist(deals.map((d) =>
-      d.id === dealId
-        ? { ...d, proposals: d.proposals.map((p) => p.id === proposalId ? { ...p, rating, review, ratedAt: Date.now() } : p) }
-        : d
-    ));
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, proposals: deal.proposals.map((p) => p.id === proposalId ? { ...p, rating, review, ratedAt: Date.now() } : p) };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
   };
 
   if (!authChecked || loadState === "loading") {
