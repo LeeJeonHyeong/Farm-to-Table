@@ -842,6 +842,24 @@ JSON 형식:
   }
 }
 
+/* ---------- 푸시 알림 ---------- */
+
+function showPushNotification(title, body) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const options = { body, icon: "/vite.svg", badge: "/vite.svg" };
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.ready.then((reg) => reg.showNotification(title, options)).catch(() => new Notification(title, options));
+  } else {
+    new Notification(title, options);
+  }
+}
+
+function registerSW() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+}
+
 /* ---------- AI 매칭 점수 ---------- */
 
 function calcMatchScore(deal, proposal) {
@@ -2872,6 +2890,10 @@ export default function FarmToTableApp() {
   const [lastMyDealsVisit, setLastMyDealsVisit] = useState(() => Number(localStorage.getItem("last-mydeals-visit") || 0));
   const [seenSelections, setSeenSelections] = useState(() => { try { return JSON.parse(localStorage.getItem("seen-selections") || "[]"); } catch { return []; } });
   const [lastChatRead, setLastChatRead] = useState(() => { try { return JSON.parse(localStorage.getItem("last-chat-read") || "{}"); } catch { return {}; } });
+  const userRef = useRef(null);
+  const prevDealsRef = useRef(null);
+  const prevChatsRef = useRef(null);
+  useEffect(() => { userRef.current = user; }, [user]);
   const isMobile = useIsMobile();
 
   // Firebase Auth 상태 감지
@@ -2953,14 +2975,64 @@ export default function FarmToTableApp() {
   useEffect(() => {
     if (loadState !== "ready") return;
     const unsubDeals = onSnapshot(doc(db, "storage", DEALS_KEY), (snap) => {
-      if (snap.exists()) {
-        try { setDeals(JSON.parse(snap.data().value)); } catch {}
-      }
+      if (!snap.exists()) return;
+      try {
+        const newDeals = JSON.parse(snap.data().value);
+        const prev = prevDealsRef.current;
+        const cu = userRef.current;
+        if (prev && cu) {
+          if (cu.role === "chef") {
+            newDeals.forEach((deal) => {
+              if (deal.createdBy !== cu.uid) return;
+              const old = prev.find((d) => d.id === deal.id);
+              if (old && deal.proposals.length > old.proposals.length) {
+                const p = deal.proposals[deal.proposals.length - 1];
+                showPushNotification(
+                  `새 제안 도착 — ${deal.crop}`,
+                  `${p.farmName}에서 ${p.price.toLocaleString()}원/kg으로 제안했습니다.`
+                );
+              }
+            });
+          } else {
+            newDeals.forEach((deal) => {
+              const old = prev.find((d) => d.id === deal.id);
+              if (!old || !deal.selectedProposalId || deal.selectedProposalId === old.selectedProposalId) return;
+              const mine = deal.proposals.find((p) => p.farmerName === cu.name && p.id === deal.selectedProposalId);
+              if (mine) {
+                showPushNotification(
+                  "🎉 제안이 선택됐습니다!",
+                  `${deal.chefName}의 ${deal.crop} 딜에서 내 제안이 선택됐습니다.`
+                );
+              }
+            });
+          }
+        }
+        prevDealsRef.current = newDeals;
+        setDeals(newDeals);
+      } catch {}
     });
     const unsubChats = onSnapshot(doc(db, "storage", CHATS_KEY), (snap) => {
-      if (snap.exists()) {
-        try { setChats(JSON.parse(snap.data().value)); } catch {}
-      }
+      if (!snap.exists()) return;
+      try {
+        const newChats = JSON.parse(snap.data().value);
+        const prev = prevChatsRef.current;
+        const cu = userRef.current;
+        if (prev && cu) {
+          Object.entries(newChats).forEach(([dealId, msgs]) => {
+            const prevMsgs = prev[dealId] || [];
+            msgs.slice(prevMsgs.length).forEach((msg) => {
+              if (msg.senderName !== cu.name) {
+                showPushNotification(
+                  `새 메시지 — ${msg.senderName}`,
+                  msg.text.length > 60 ? msg.text.slice(0, 60) + "…" : msg.text
+                );
+              }
+            });
+          });
+        }
+        prevChatsRef.current = newChats;
+        setChats(newChats);
+      } catch {}
     });
     return () => { unsubDeals(); unsubChats(); };
   }, [loadState]);
@@ -2979,6 +3051,10 @@ export default function FarmToTableApp() {
   const handleLogin = (userData) => {
     setUser(userData);
     setTab(userData.role === "farmer" ? "browse" : "create");
+    registerSW();
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   };
 
   const handleLogout = async () => {
