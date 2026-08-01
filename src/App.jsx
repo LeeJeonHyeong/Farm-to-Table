@@ -472,11 +472,13 @@ const SAMPLE_DEALS = [
 function chipBadge(bg, color) {
   return {
     fontSize: 11,
-    padding: "2px 8px",
+    padding: "3px 9px",
     borderRadius: 999,
     background: bg,
     color,
     fontFamily: "'IBM Plex Mono', monospace",
+    border: `1px solid ${color}30`,
+    letterSpacing: "0.02em",
   };
 }
 
@@ -603,8 +605,10 @@ function RatingPanel({ farmName, onSubmit }) {
 }
 
 function StatusBadge({ status }) {
+  const color = DEAL_STATUS_COLOR[status];
   return (
-    <span style={chipBadge(`${DEAL_STATUS_COLOR[status]}22`, DEAL_STATUS_COLOR[status])}>
+    <span style={{ ...chipBadge(`${color}18`, color), display: "inline-flex", alignItems: "center", gap: 5 }}>
+      <span style={{ width: 5, height: 5, borderRadius: 999, background: color, flexShrink: 0 }} />
       {DEAL_STATUS_LABEL[status]}
     </span>
   );
@@ -1749,7 +1753,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
           {filtered.map((deal) => {
             const isMySpecialty = specialty.has(deal.crop);
             return (
-            <div key={deal.id} style={{ background: TOKENS.card, border: `1px solid ${isMySpecialty ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18 }}>
+            <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${isMySpecialty ? TOKENS.moss + "66" : TOKENS.line}`, borderLeft: `4px solid ${isMySpecialty ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
@@ -1843,11 +1847,16 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score 
 
   return (
     <div
+      className="ftt-card"
       style={{
         background: "#FFFFFF",
-        border: `1px solid ${isSelected ? TOKENS.moss : TOKENS.line}`,
+        border: `1px solid ${isSelected ? TOKENS.moss + "88" : TOKENS.line}`,
+        borderLeft: `4px solid ${isSelected ? TOKENS.moss : TOKENS.line}`,
         borderRadius: 10,
         padding: 14,
+        boxShadow: isSelected
+          ? "0 2px 12px rgba(91,117,83,0.12), 0 1px 4px rgba(91,117,83,0.08)"
+          : "0 1px 3px rgba(32,40,31,0.05), 0 2px 8px rgba(32,40,31,0.03)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2146,8 +2155,9 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
           proposalSort === "score" ? b._score.total - a._score.total : a.price - b.price
         );
         const selectedProposal = deal.proposals.find((p) => p.id === deal.selectedProposalId);
+        const statusAccent = deal.status === "open" ? TOKENS.gold : deal.status === "matched" ? TOKENS.moss : deal.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
         return (
-          <div key={deal.id} style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 18 }}>
+          <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
             <div
               style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", cursor: "pointer" }}
               onClick={() => setExpandedId(expanded ? null : deal.id)}
@@ -3133,18 +3143,21 @@ export default function FarmToTableApp() {
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"
-      />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+      <style>{`
+        .ftt-card { transition: box-shadow 0.18s ease, transform 0.18s ease; }
+        .ftt-card:hover { box-shadow: 0 6px 24px rgba(32,40,31,0.09), 0 2px 8px rgba(32,40,31,0.05) !important; transform: translateY(-2px); }
+        .ftt-tab { transition: color 0.15s ease, border-bottom-color 0.15s ease; }
+        .ftt-tab:hover { color: ${TOKENS.ink} !important; }
+      `}</style>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
         {/* 헤더 */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${TOKENS.line}`, gap: 12 }}>
           <div>
-            <span style={{ fontSize: 11, letterSpacing: "0.08em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
+            <span style={{ fontSize: 10, letterSpacing: "0.12em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
               역경매 방식 선주문 플랫폼
             </span>
-            <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 20 : 28, margin: "6px 0 0" }}>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 22 : 30, margin: "4px 0 0", letterSpacing: "-0.01em" }}>
               Farm-to-Table
             </h1>
           </div>
@@ -3167,14 +3180,15 @@ export default function FarmToTableApp() {
           {TABS.map((t) => (
             <button
               key={t.key}
+              className="ftt-tab"
               onClick={() => handleTabClick(t.key)}
               style={{
-                padding: isMobile ? "10px 12px" : "10px 18px", background: "transparent", border: "none",
+                padding: isMobile ? "10px 12px" : "10px 20px", background: "transparent", border: "none",
                 borderBottom: `2px solid ${tab === t.key ? TOKENS.rust : "transparent"}`,
                 color: tab === t.key ? TOKENS.ink : TOKENS.inkSoft,
-                fontSize: isMobile ? 13 : 14, fontWeight: tab === t.key ? 500 : 400,
+                fontSize: isMobile ? 13 : 14, fontWeight: tab === t.key ? 600 : 400,
                 cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap", flexShrink: 0,
-                position: "relative",
+                position: "relative", letterSpacing: tab === t.key ? "-0.01em" : "normal",
               }}
             >
               {t.label}
