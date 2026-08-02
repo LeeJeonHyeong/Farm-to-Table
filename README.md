@@ -23,11 +23,16 @@ npm run dev
 ├── firebase.json
 ├── firestore.rules
 ├── public
-│   └── sw.js           # Service Worker (웹 푸시 알림)
+│   ├── sw.js               # Service Worker (웹 푸시 알림, 오프라인 캐싱)
+│   ├── manifest.json       # PWA 매니페스트
+│   ├── icon.svg            # 앱 아이콘 (SVG)
+│   ├── icon-192.png        # PWA 아이콘 192px
+│   ├── icon-512.png        # PWA 아이콘 512px
+│   └── generate-icons.html # PNG 아이콘 생성 도구 (브라우저에서 실행)
 └── src
-    ├── main.jsx        # React 엔트리포인트
-    ├── firebase.js     # Firebase 초기화 및 storage 어댑터
-    └── App.jsx         # 전체 앱 (단일 파일 컴포넌트)
+    ├── main.jsx            # React 엔트리포인트
+    ├── firebase.js         # Firebase 초기화 및 storage 어댑터
+    └── App.jsx             # 전체 앱 (단일 파일 컴포넌트)
 ```
 
 ## 핵심 흐름 (역경매 구조)
@@ -50,15 +55,25 @@ npm run dev
 ### Firestore 보안 규칙
 
 ```
-# storage 컬렉션 (채팅·프로필): value 필드 문자열 구조만 허용
+# storage 컬렉션 (채팅·프로필): value 필드 문자열 구조만 허용, user-profile은 본인만 쓰기
 allow read: if true;
-allow write: if request.resource.data.keys().hasAll(['value'])
+allow write: if request.auth != null
+             && request.resource.data.keys().hasAll(['value'])
              && request.resource.data.value is string
-             && request.resource.data.value.size() < 1048576;
+             && request.resource.data.value.size() < 1048576
+             && (!key.matches('user-profile-.*') ||
+                 key == 'user-profile-' + request.auth.uid);
 
-# deals 컬렉션: 읽기 전체 허용, 쓰기는 인증된 유저만
+# deals 컬렉션: 읽기 전체 허용
 allow read: if true;
-allow write: if request.auth != null;
+# 생성: createdBy 필드가 반드시 본인 uid
+allow create: if request.auth != null
+              && request.resource.data.createdBy == request.auth.uid;
+# 수정: 인증된 유저 (셰프 딜 수정 + 농가 제안 추가 모두 허용)
+allow update: if request.auth != null;
+# 삭제: 딜 생성자(셰프)만 가능
+allow delete: if request.auth != null
+              && resource.data.createdBy == request.auth.uid;
 ```
 
 ## 주요 기능
@@ -91,6 +106,8 @@ allow write: if request.auth != null;
 |---|---|
 | 실시간 채팅 | 매칭 후 셰프↔농가 채팅 + 미확인 메시지 뱃지 |
 | 웹 푸시 알림 | 새 제안 도착·제안 선택·새 채팅 메시지 시 브라우저 푸시 알림 (Service Worker) |
+| 계약서 자동 생성 | 매칭된 딜에서 표준 농산물 거래 계약서 자동 생성 + 인쇄/PDF 저장 |
+| PWA 설치 | manifest.json + 오프라인 캐싱으로 홈화면에 앱 설치 가능 |
 | 납품일 자동 마감 | 납품일이 지난 모집중 딜 자동 마감 처리 + "납품일 만료" 뱃지 |
 | 회원가입 / 로그인 | Firebase Auth 이메일/비밀번호 인증, 역할(셰프·농가) 선택 |
 
@@ -136,7 +153,10 @@ allow write: if request.auth != null;
 | v1.1 | 딜 찾기 지역 필터, 샘플 딜 16건 지역 정보 추가, Firebase Auth 교체 (이메일/비밀번호 인증) |
 | v1.2 | AI 기반 매칭 점수화 (가격·납품일·수량·인증·평점 100점), 채팅 알림 뱃지, 회원가입 오류 수정, 내 거래 필터 uid 기반 수정 |
 | v1.3 | UI 고급화 (카드 hover elevation·액센트 보더·StatusBadge dot), 웹 푸시 알림 (Service Worker, 3가지 시나리오), 딜 데이터 격리 (deals 컬렉션 분리·샘플 자동 시딩 제거·Firestore 보안 규칙 강화) |
+| v1.4 | PWA 앱화 (manifest.json·오프라인 캐싱·홈화면 설치 버튼), Firestore 보안 규칙 세분화 (user-profile 본인 제한·딜 생성자 삭제 권한), 계약서 자동 생성 (표준 농산물 거래 계약서·인쇄/PDF 저장) |
 
 ## 향후 과제
 
-- PWA 앱화 (manifest.json 추가, 모바일 홈화면 설치)
+- farm-profile / chef-profile 공유 키 버그 수정 (다중 사용자 프로필 덮어쓰기 방지)
+- chats-data 단일 JSON 블롭 → 채팅 컬렉션 분리 (deals와 동일한 경쟁 조건 이슈)
+- 앱스토어 등록 (PWA → Capacitor/Cordova 래핑 또는 TWA)
