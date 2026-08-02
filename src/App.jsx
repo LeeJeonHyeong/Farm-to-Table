@@ -1431,7 +1431,7 @@ const SORT_OPTIONS = [
   { value: "proposals", label: "제안 많은순" },
 ];
 
-function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, chatUnreads = {} }) {
+function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const myItems = [];
@@ -1537,17 +1537,25 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, chat
               </div>
             )}
             {isSelected && (
-              <button
-                onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
-                style={{ width: "100%", padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-              >
-                💬 {deal.chefName}과 채팅
-                {(chatUnreads[deal.id] || 0) > 0 && (
-                  <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                    {chatUnreads[deal.id]}
-                  </span>
-                )}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
+                  style={{ flex: 1, padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  💬 {deal.chefName}과 채팅
+                  {(chatUnreads[deal.id] || 0) > 0 && (
+                    <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                      {chatUnreads[deal.id]}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => onViewContract(deal, proposal)}
+                  style={{ padding: "9px 16px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  계약서
+                </button>
+              </div>
             )}
           </div>
         );
@@ -2110,7 +2118,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, chatUnreads = {} }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, chatUnreads = {} }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -2324,10 +2332,10 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                   <>
                     <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} score={calcMatchScore(deal, selectedProposal)} />
                     <SettlementCard deal={deal} proposal={selectedProposal} />
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: selectedProposal.farmName })}
-                        style={{ flex: 1, padding: "10px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", position: "relative" }}
+                        style={{ flex: 1, minWidth: 120, padding: "10px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", position: "relative" }}
                       >
                         💬 {selectedProposal.farmName}과 채팅
                         {(chatUnreads[deal.id] || 0) > 0 && (
@@ -2336,10 +2344,16 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                           </span>
                         )}
                       </button>
+                      <button
+                        onClick={() => onViewContract(deal, selectedProposal)}
+                        style={{ padding: "10px 16px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                      >
+                        계약서
+                      </button>
                       {deal.status === "matched" && (
                         <button
                           onClick={() => onCompleteDeal(deal.id)}
-                          style={{ flex: 1, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                          style={{ flex: 1, minWidth: 120, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
                         >
                           납품 확인 후 정산 완료 처리
                         </button>
@@ -2870,6 +2884,173 @@ function LoginScreen({ onLogin }) {
   );
 }
 
+/* ---------- 계약서 ---------- */
+
+function ContractModal({ deal, proposal, onClose }) {
+  const contractNo = `FTT-${deal.id.slice(-6).toUpperCase()}-${new Date(deal.selectedAt || Date.now()).toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const today = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+  const totalAmt = proposal.price * deal.quantity;
+  const deposit = Math.round(totalAmt * DEPOSIT_RATE);
+  const balance = Math.round(totalAmt * (1 - DEPOSIT_RATE));
+  const fee = Math.round(totalAmt * FEE_RATE);
+
+  const handlePrint = () => {
+    const content = document.getElementById("ftt-contract-body").innerHTML;
+    const win = window.open("", "_blank", "width=820,height=1000");
+    win.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+      <title>계약서 ${contractNo}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Fraunces:wght@700&display=swap" rel="stylesheet">
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'IBM Plex Sans KR',sans-serif;color:#1A1A1A;padding:40px 48px;max-width:720px;margin:0 auto}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        td{padding:8px 12px;border-bottom:1px solid #F0F0F0}
+        td:first-child{background:#FAFAFA;width:36%;color:#555;font-weight:500}
+        @media print{@page{margin:15mm}body{padding:0}}
+      </style></head><body>${content}</body></html>`);
+    win.document.close();
+    setTimeout(() => win.print(), 600);
+  };
+
+  const row = (k, v, bold) => (
+    <tr key={k}>
+      <td style={{ padding: "8px 12px", background: "#FAFAFA", width: "36%", color: "#555", fontWeight: 500, borderBottom: "1px solid #F0F0F0" }}>{k}</td>
+      <td style={{ padding: "8px 12px", borderBottom: "1px solid #F0F0F0", fontWeight: bold ? 700 : 400 }}>{v}</td>
+    </tr>
+  );
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.75)", zIndex: 1000, overflowY: "auto", padding: "32px 16px" }}>
+      <div style={{ background: "#fff", maxWidth: 720, margin: "0 auto", borderRadius: 14, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
+
+        {/* 상단 액션바 */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", background: TOKENS.card, borderBottom: `1px solid ${TOKENS.line}` }}>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: TOKENS.inkSoft }}>{contractNo}</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handlePrint} style={{ padding: "7px 18px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              인쇄 / PDF 저장
+            </button>
+            <button onClick={onClose} style={{ padding: "7px 14px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, cursor: "pointer", color: TOKENS.inkSoft }}>
+              닫기
+            </button>
+          </div>
+        </div>
+
+        {/* 계약서 본문 */}
+        <div id="ftt-contract-body" style={{ padding: "40px 48px", fontFamily: "'IBM Plex Sans', sans-serif", color: "#1A1A1A" }}>
+
+          {/* 헤더 */}
+          <div style={{ textAlign: "center", marginBottom: 32, paddingBottom: 24, borderBottom: "2px solid #1A1A1A" }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.18em", color: "#888", marginBottom: 8 }}>FARM-TO-TABLE PLATFORM</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>식자재 공급 계약서</div>
+            <div style={{ fontSize: 11, color: "#888" }}>Agricultural Supply Contract</div>
+          </div>
+
+          {/* 계약 정보 */}
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 28, fontSize: 12, color: "#666" }}>
+            <span><b style={{ color: "#1A1A1A" }}>계약번호</b>&nbsp; {contractNo}</span>
+            <span><b style={{ color: "#1A1A1A" }}>작성일</b>&nbsp; {today}</span>
+          </div>
+
+          {/* 계약 당사자 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 28 }}>
+            {[
+              { role: "갑 (매수인 / BUYER)", name: deal.chefName, sub1: `지역: ${deal.chefRegion || "미입력"}`, sub2: "역할: 레스토랑" },
+              { role: "을 (매도인 / SELLER)", name: proposal.farmName, sub1: `담당: ${proposal.farmerName || proposal.farmName}`, sub2: `인증: ${proposal.cert || "인증 없음"}` },
+            ].map(({ role, name, sub1, sub2 }) => (
+              <div key={role} style={{ border: "1px solid #E0E0E0", borderRadius: 8, padding: 16 }}>
+                <div style={{ fontSize: 10, letterSpacing: "0.1em", color: "#888", marginBottom: 8 }}>{role}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{name}</div>
+                <div style={{ fontSize: 12, color: "#555" }}>{sub1}</div>
+                <div style={{ fontSize: 12, color: "#555" }}>{sub2}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* 제1조 품목 */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, borderLeft: `3px solid ${TOKENS.moss}`, paddingLeft: 10, marginBottom: 10 }}>제1조 공급 품목 및 규격</div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {row("품목", deal.crop)}
+                {row("등급", deal.grade)}
+                {row("규격 조건", deal.sizeCondition)}
+                {row("수확 단계", deal.ripeness || "협의")}
+                {row("인증", proposal.cert || "인증 없음")}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 제2조 수량·단가 */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, borderLeft: `3px solid ${TOKENS.moss}`, paddingLeft: 10, marginBottom: 10 }}>제2조 수량 및 대금</div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {row("공급 수량", `${deal.quantity.toLocaleString()} kg`)}
+                {row("계약 단가", `${proposal.price.toLocaleString()} 원/kg`)}
+                {row("총 계약금액", `${totalAmt.toLocaleString()} 원`, true)}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 제3조 납품 */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, borderLeft: `3px solid ${TOKENS.moss}`, paddingLeft: 10, marginBottom: 10 }}>제3조 납품 조건</div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {row("납품 예정일", proposal.availableDate || deal.deliveryDate)}
+                {row("납품 주기", deal.cycle || "단발성(1회)")}
+                {row("납품 장소", deal.chefRegion || "별도 협의")}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 제4조 결제 */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, borderLeft: `3px solid ${TOKENS.moss}`, paddingLeft: 10, marginBottom: 10 }}>제4조 결제 조건</div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {row("선급금 (계약금 30%)", `${deposit.toLocaleString()} 원`)}
+                {row("잔금 (납품 완료 후 70%)", `${balance.toLocaleString()} 원`)}
+                {row("플랫폼 수수료 10% (을 부담)", `${fee.toLocaleString()} 원`)}
+                {row("실수령액 (을)", `${(totalAmt - fee).toLocaleString()} 원`, true)}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 특이사항 */}
+          {deal.note && (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, borderLeft: `3px solid ${TOKENS.moss}`, paddingLeft: 10, marginBottom: 8 }}>특이사항</div>
+              <div style={{ background: "#FAFAFA", border: "1px solid #E8E8E8", borderRadius: 6, padding: "10px 14px", fontSize: 13, color: "#555", lineHeight: 1.6 }}>{deal.note}</div>
+            </div>
+          )}
+
+          {/* 서명란 */}
+          <div style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid #E0E0E0" }}>
+            <div style={{ textAlign: "center", fontSize: 12, color: "#666", marginBottom: 28 }}>위 내용에 합의하며 본 계약서를 작성합니다.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
+              {[{ label: "갑 (매수인)", name: deal.chefName }, { label: "을 (매도인)", name: proposal.farmName }].map(({ label, name }) => (
+                <div key={label} style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 28 }}>{name}</div>
+                  <div style={{ borderTop: "1px solid #1A1A1A", paddingTop: 6, fontSize: 10, color: "#aaa" }}>서명 / Signature</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 푸터 */}
+          <div style={{ marginTop: 28, textAlign: "center", fontSize: 10, color: "#bbb", borderTop: "1px solid #F0F0F0", paddingTop: 14 }}>
+            본 계약서는 Farm-to-Table 역경매 플랫폼에서 자동 생성되었습니다. · {contractNo}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- App shell ---------- */
 
 export default function FarmToTableApp() {
@@ -2889,6 +3070,7 @@ export default function FarmToTableApp() {
   const [seenSelections, setSeenSelections] = useState(() => { try { return JSON.parse(localStorage.getItem("seen-selections") || "[]"); } catch { return []; } });
   const [lastChatRead, setLastChatRead] = useState(() => { try { return JSON.parse(localStorage.getItem("last-chat-read") || "{}"); } catch { return {}; } });
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [contractTarget, setContractTarget] = useState(null);
   const userRef = useRef(null);
   const prevDealsRef = useRef(null);
   const prevChatsRef = useRef(null);
@@ -3326,6 +3508,14 @@ export default function FarmToTableApp() {
           )}
         </div>
 
+        {contractTarget && (
+          <ContractModal
+            deal={contractTarget.deal}
+            proposal={contractTarget.proposal}
+            onClose={() => setContractTarget(null)}
+          />
+        )}
+
         {chatTarget ? (
           <ChatScreen
             dealInfo={chatTarget}
@@ -3339,8 +3529,8 @@ export default function FarmToTableApp() {
           <>
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
-            {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} chatUnreads={chatUnreads} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} chatUnreads={chatUnreads} />}
+            {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} chatUnreads={chatUnreads} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} chatUnreads={chatUnreads} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} />}
           </>
