@@ -1,18 +1,34 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // storage 컬렉션 (채팅, 프로필 등)
     match /storage/{key} {
       allow read: if true;
-      allow write: if request.resource.data.keys().hasAll(['value'])
+      // 인증된 유저만 쓰기 + value 구조 검증 + user-profile은 본인만
+      allow write: if request.auth != null
+                   && request.resource.data.keys().hasAll(['value'])
                    && request.resource.data.value is string
-                   && request.resource.data.value.size() < 1048576;
+                   && request.resource.data.value.size() < 1048576
+                   && (!key.matches('user-profile-.*') ||
+                       key == 'user-profile-' + request.auth.uid);
     }
 
+    // 딜 컬렉션
     match /deals/{dealId} {
-      // 농가가 딜 목록을 검색할 수 있어야 하므로 읽기는 전체 허용
+      // 읽기: 전체 허용 (농가가 딜 목록 검색)
       allow read: if true;
-      // 쓰기(생성/수정/제안 추가)는 로그인한 유저만
-      allow write: if request.auth != null;
+
+      // 생성: 인증된 유저 + createdBy 필드는 반드시 본인 uid
+      allow create: if request.auth != null
+                    && request.resource.data.createdBy == request.auth.uid;
+
+      // 수정: 인증된 유저 (셰프 딜 수정 + 농가 제안 추가 모두 허용)
+      allow update: if request.auth != null;
+
+      // 삭제: 딜 생성자(셰프)만 가능
+      allow delete: if request.auth != null
+                    && resource.data.createdBy == request.auth.uid;
     }
   }
 }
