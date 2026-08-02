@@ -2888,10 +2888,25 @@ export default function FarmToTableApp() {
   const [lastMyDealsVisit, setLastMyDealsVisit] = useState(() => Number(localStorage.getItem("last-mydeals-visit") || 0));
   const [seenSelections, setSeenSelections] = useState(() => { try { return JSON.parse(localStorage.getItem("seen-selections") || "[]"); } catch { return []; } });
   const [lastChatRead, setLastChatRead] = useState(() => { try { return JSON.parse(localStorage.getItem("last-chat-read") || "{}"); } catch { return {}; } });
+  const [installPrompt, setInstallPrompt] = useState(null);
   const userRef = useRef(null);
   const prevDealsRef = useRef(null);
   const prevChatsRef = useRef(null);
   useEffect(() => { userRef.current = user; }, [user]);
+
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") setInstallPrompt(null);
+  };
+
   const isMobile = useIsMobile();
 
   // Firebase Auth 상태 감지
@@ -3292,6 +3307,11 @@ export default function FarmToTableApp() {
             </button>
           ))}
           <div style={{ flex: 1 }} />
+          {installPrompt && (
+            <button onClick={handleInstall} style={{ fontSize: 11, color: TOKENS.moss, background: `${TOKENS.moss}12`, border: `1px solid ${TOKENS.moss}40`, borderRadius: 6, padding: "3px 10px", cursor: "pointer", marginBottom: 10, flexShrink: 0, fontWeight: 600 }}>
+              앱 설치
+            </button>
+          )}
           {!isMobile && (
             <button onClick={handleResetData} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", marginBottom: 10, flexShrink: 0 }}>
               샘플 초기화
