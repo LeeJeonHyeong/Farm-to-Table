@@ -1094,8 +1094,8 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
       onUpdate({ ...editingDeal, ...data, quantity: Number(data.quantity), targetPrice: Number(data.targetPrice) });
     } else {
       onCreate({
-        id: `d${Date.now()}`,
         ...data,
+        id: `d${Date.now()}`,
         quantity: Number(data.quantity),
         targetPrice: Number(data.targetPrice),
         status: "open",
