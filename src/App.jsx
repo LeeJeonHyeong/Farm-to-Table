@@ -80,8 +80,8 @@ const DEAL_STATUS_LABEL = { open: "모집중", matched: "진행중", done: "완�
 const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKENS.inkSoft, closed: TOKENS.rust };
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
-const FARM_KEY = "farm-profile";
-const CHEF_PROFILE_KEY = "chef-profile";
+const farmProfileKey = (uid) => `farm-profile-${uid}`;
+const chefProfileKey = (uid) => `chef-profile-${uid}`;
 const USER_KEY = "current-user";
 const CHATS_KEY = "chats-data";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
@@ -3126,9 +3126,9 @@ export default function FarmToTableApp() {
         const snapshot = await getDocs(collection(db, "deals"));
         if (cancelled) return;
         setDeals(snapshot.docs.map((d) => d.data()));
-        const farmResult = await storage.get(FARM_KEY);
+        const farmResult = user?.uid ? await storage.get(farmProfileKey(user.uid)) : null;
         if (!cancelled && farmResult?.value) setFarm(JSON.parse(farmResult.value));
-        const chefResult = await storage.get(CHEF_PROFILE_KEY);
+        const chefResult = user?.uid ? await storage.get(chefProfileKey(user.uid)) : null;
         if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
         const chatsResult = await storage.get(CHATS_KEY);
         if (!cancelled && chatsResult?.value) setChats(JSON.parse(chatsResult.value));
@@ -3255,12 +3255,12 @@ export default function FarmToTableApp() {
 
   const handleSaveFarm = async (farmData) => {
     setFarm(farmData);
-    await storage.set(FARM_KEY, JSON.stringify(farmData));
+    await storage.set(farmProfileKey(user.uid), JSON.stringify(farmData));
   };
 
   const handleSaveChefProfile = async (profileData) => {
     setChefProfile(profileData);
-    await storage.set(CHEF_PROFILE_KEY, JSON.stringify(profileData));
+    await storage.set(chefProfileKey(user.uid), JSON.stringify(profileData));
   };
 
   const handleResetData = async () => {
