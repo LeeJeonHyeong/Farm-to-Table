@@ -45,7 +45,8 @@ npm run dev
 ## 백엔드 (Firebase)
 
 - **딜** 데이터는 Firestore `deals/{dealId}` 컬렉션에 딜마다 개별 문서로 저장됩니다.
-- **채팅**은 `storage/chats-data`, **사용자 프로필**은 `storage/user-profile-{uid}` 키에 저장됩니다.
+- **채팅**은 Firestore `chats/{dealId}` 컬렉션에 딜마다 개별 문서로 저장됩니다.
+- **사용자 프로필**은 `storage/user-profile-{uid}`, **농가 프로필**은 `storage/farm-profile-{uid}`, **셰프 프로필**은 `storage/chef-profile-{uid}` 키에 사용자별로 격리 저장됩니다.
 - 인증은 **Firebase Authentication** (이메일/비밀번호) 을 사용합니다.
 - 세션 데이터(`current-user`)만 localStorage에 저장되며, 로그인 상태는 Firebase Auth가 자동 유지합니다.
 - `onSnapshot` 실시간 동기화로 딜 목록과 채팅이 즉시 반영됩니다.
@@ -55,7 +56,7 @@ npm run dev
 ### Firestore 보안 규칙
 
 ```
-# storage 컬렉션 (채팅·프로필): value 필드 문자열 구조만 허용, user-profile은 본인만 쓰기
+# storage 컬렉션 (프로필 등): value 필드 문자열 구조만 허용, user-profile은 본인만 쓰기
 allow read: if true;
 allow write: if request.auth != null
              && request.resource.data.keys().hasAll(['value'])
@@ -63,6 +64,9 @@ allow write: if request.auth != null
              && request.resource.data.value.size() < 1048576
              && (!key.matches('user-profile-.*') ||
                  key == 'user-profile-' + request.auth.uid);
+
+# chats 컬렉션: 인증된 유저만 읽기/쓰기
+allow read, write: if request.auth != null;
 
 # deals 컬렉션: 읽기 전체 허용
 allow read: if true;
@@ -154,9 +158,9 @@ allow delete: if request.auth != null
 | v1.2 | AI 기반 매칭 점수화 (가격·납품일·수량·인증·평점 100점), 채팅 알림 뱃지, 회원가입 오류 수정, 내 거래 필터 uid 기반 수정 |
 | v1.3 | UI 고급화 (카드 hover elevation·액센트 보더·StatusBadge dot), 웹 푸시 알림 (Service Worker, 3가지 시나리오), 딜 데이터 격리 (deals 컬렉션 분리·샘플 자동 시딩 제거·Firestore 보안 규칙 강화) |
 | v1.4 | PWA 앱화 (manifest.json·오프라인 캐싱·홈화면 설치 버튼), Firestore 보안 규칙 세분화 (user-profile 본인 제한·딜 생성자 삭제 권한), 계약서 자동 생성 (표준 농산물 거래 계약서·인쇄/PDF 저장) |
+| v1.5 | 버그 수정 3건 (딜 복제 시 원본 덮어쓰기·프로필 공유 키 충돌·채팅 경쟁 조건), 데이터 격리 완성 (farm/chef-profile uid 기반 분리·chats 컬렉션 분리) |
 
 ## 향후 과제
 
-- farm-profile / chef-profile 공유 키 버그 수정 (다중 사용자 프로필 덮어쓰기 방지)
-- chats-data 단일 JSON 블롭 → 채팅 컬렉션 분리 (deals와 동일한 경쟁 조건 이슈)
 - 앱스토어 등록 (PWA → Capacitor/Cordova 래핑 또는 TWA)
+- 최종 발표 준비 및 비즈니스 모델 고도화 (10월)
