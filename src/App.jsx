@@ -83,7 +83,6 @@ const FEE_RATE = 0.1;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
 const USER_KEY = "current-user";
-const CHATS_KEY = "chats-data";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
 const SAMPLE_DEALS = [
@@ -3130,8 +3129,12 @@ export default function FarmToTableApp() {
         if (!cancelled && farmResult?.value) setFarm(JSON.parse(farmResult.value));
         const chefResult = user?.uid ? await storage.get(chefProfileKey(user.uid)) : null;
         if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
-        const chatsResult = await storage.get(CHATS_KEY);
-        if (!cancelled && chatsResult?.value) setChats(JSON.parse(chatsResult.value));
+        const chatsSnap = await getDocs(collection(db, "chats"));
+        if (!cancelled) {
+          const loaded = {};
+          chatsSnap.forEach((d) => { loaded[d.id] = d.data().messages || []; });
+          setChats(loaded);
+        }
         if (!cancelled) setLoadState("ready");
       } catch {
         if (!cancelled) setLoadState("error");
@@ -3190,28 +3193,26 @@ export default function FarmToTableApp() {
       prevDealsRef.current = newDeals;
       setDeals(newDeals);
     });
-    const unsubChats = onSnapshot(doc(db, "storage", CHATS_KEY), (snap) => {
-      if (!snap.exists()) return;
-      try {
-        const newChats = JSON.parse(snap.data().value);
-        const prev = prevChatsRef.current;
-        const cu = userRef.current;
-        if (prev && cu) {
-          Object.entries(newChats).forEach(([dealId, msgs]) => {
-            const prevMsgs = prev[dealId] || [];
-            msgs.slice(prevMsgs.length).forEach((msg) => {
-              if (msg.senderName !== cu.name) {
-                showPushNotification(
-                  `새 메시지 — ${msg.senderName}`,
-                  msg.text.length > 60 ? msg.text.slice(0, 60) + "…" : msg.text
-                );
-              }
-            });
+    const unsubChats = onSnapshot(collection(db, "chats"), (snapshot) => {
+      const newChats = {};
+      snapshot.forEach((d) => { newChats[d.id] = d.data().messages || []; });
+      const prev = prevChatsRef.current;
+      const cu = userRef.current;
+      if (prev && cu) {
+        Object.entries(newChats).forEach(([dealId, msgs]) => {
+          const prevMsgs = prev[dealId] || [];
+          msgs.slice(prevMsgs.length).forEach((msg) => {
+            if (msg.senderName !== cu.name) {
+              showPushNotification(
+                `새 메시지 — ${msg.senderName}`,
+                msg.text.length > 60 ? msg.text.slice(0, 60) + "…" : msg.text
+              );
+            }
           });
-        }
-        prevChatsRef.current = newChats;
-        setChats(newChats);
-      } catch {}
+        });
+      }
+      prevChatsRef.current = newChats;
+      setChats(newChats);
     });
     return () => { unsubDeals(); unsubChats(); };
   }, [loadState]);
@@ -3304,9 +3305,9 @@ export default function FarmToTableApp() {
 
   const handleSendMessage = async (dealId, text) => {
     const newMsg = { id: `m${Date.now()}`, senderName: user.name, senderRole: user.role, text, ts: Date.now() };
-    const updated = { ...chats, [dealId]: [...(chats[dealId] || []), newMsg] };
-    setChats(updated);
-    await storage.set(CHATS_KEY, JSON.stringify(updated));
+    const updatedMsgs = [...(chats[dealId] || []), newMsg];
+    setChats((prev) => ({ ...prev, [dealId]: updatedMsgs }));
+    await setDoc(doc(db, "chats", dealId), { messages: updatedMsgs });
   };
 
   const handleOpenChat = (target) => {
