@@ -3149,11 +3149,13 @@ export default function FarmToTableApp() {
         if (!cancelled && farmResult?.value) setFarm(JSON.parse(farmResult.value));
         const chefResult = user?.uid ? await storage.get(chefProfileKey(user.uid)) : null;
         if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
-        const chatsSnap = await getDocs(collection(db, "chats"));
-        if (!cancelled) {
-          const loaded = {};
-          chatsSnap.forEach((d) => { loaded[d.id] = d.data().messages || []; });
-          setChats(loaded);
+        if (user?.uid) {
+          const chatsSnap = await getDocs(collection(db, "chats"));
+          if (!cancelled) {
+            const loaded = {};
+            chatsSnap.forEach((d) => { loaded[d.id] = d.data().messages || []; });
+            setChats(loaded);
+          }
         }
         if (!cancelled) setLoadState("ready");
       } catch {
