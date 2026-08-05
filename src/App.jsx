@@ -1085,7 +1085,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   const goNext = () => {
     if (validateStep(step)) setStep((s) => Math.min(5, s + 1));
   };
-  const goBack = () => setStep((s) => Math.max(1, s - 1));
+  const goBack = () => { setStep((s) => Math.max(1, s - 1)); setErrors({}); };
 
   const handleSubmit = () => {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
@@ -1250,7 +1250,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
             <div>
               <FieldLabel required>희망 납품일</FieldLabel>
-              <input type="date" value={data.deliveryDate} onChange={(e) => update("deliveryDate", e.target.value)} style={inputStyle} />
+              <input type="date" min={new Date().toISOString().split("T")[0]} value={data.deliveryDate} onChange={(e) => update("deliveryDate", e.target.value)} style={inputStyle} />
               {errors.deliveryDate && <ErrorText text={errors.deliveryDate} />}
             </div>
             <div>
@@ -1769,7 +1769,14 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
       {/* 딜 목록 */}
       {filtered.length === 0 ? (
         <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 32, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
-          {openDeals.length === 0 ? "현재 모집 중인 딜이 없습니다." : "검색 조건에 맞는 딜이 없습니다."}
+          <div style={{ marginBottom: openDeals.length > 0 ? 10 : 0 }}>
+            {openDeals.length === 0 ? "현재 모집 중인 딜이 없습니다." : "검색 조건에 맞는 딜이 없습니다."}
+          </div>
+          {openDeals.length > 0 && (
+            <button onClick={() => { setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax(""); }} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
+              필터 초기화
+            </button>
+          )}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -2117,17 +2124,21 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, chatUnreads = {} }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
+  const [confirmComplete, setConfirmComplete] = useState(null);
   const [statusFilter, setStatusFilter] = useState("전체");
   const [proposalSort, setProposalSort] = useState("score");
 
   if (deals.length === 0) {
     return (
       <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 32, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
-        아직 등록한 딜이 없습니다. "딜 만들기" 탭에서 첫 요청서를 작성해보세요.
+        <div style={{ marginBottom: 12 }}>아직 등록한 딜이 없습니다.</div>
+        <button onClick={() => onTabChange?.("create")} style={{ padding: "8px 20px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+          첫 딜 만들기
+        </button>
       </div>
     );
   }
@@ -2168,7 +2179,10 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
 
       {filtered.length === 0 && (
         <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 24, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
-          {STATUS_FILTERS.find((f) => f.key === statusFilter)?.label} 딜이 없습니다.
+          <div style={{ marginBottom: 10 }}>{STATUS_FILTERS.find((f) => f.key === statusFilter)?.label} 딜이 없습니다.</div>
+          <button onClick={() => setStatusFilter("전체")} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
+            전체 보기
+          </button>
         </div>
       )}
       {filtered.map((deal) => {
@@ -2190,6 +2204,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                 <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{deal.chefName}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13, color: TOKENS.inkSoft }}>{expanded ? "▲" : "▼"}</span>
                 {deal.closeReason === "expired" && (
                   <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px" }}>
                     납품일 만료
@@ -2350,12 +2365,16 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                         계약서
                       </button>
                       {deal.status === "matched" && (
-                        <button
-                          onClick={() => onCompleteDeal(deal.id)}
-                          style={{ flex: 1, minWidth: 120, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-                        >
-                          납품 확인 후 정산 완료 처리
-                        </button>
+                        confirmComplete === deal.id ? (
+                          <div style={{ display: "flex", gap: 8, flex: 1 }}>
+                            <button onClick={() => { onCompleteDeal(deal.id); setConfirmComplete(null); }} style={{ flex: 1, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>확인 — 정산 완료</button>
+                            <button onClick={() => setConfirmComplete(null)} style={{ padding: "10px 14px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>취소</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmComplete(deal.id)} style={{ flex: 1, minWidth: 120, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                            납품 확인 후 정산 완료 처리
+                          </button>
+                        )
                       )}
                     </div>
                     {deal.status === "done" && (
@@ -2676,6 +2695,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
       </div>
 
       <FieldLabel>기본 납품 리드타임 (일)</FieldLabel>
+      <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 6 }}>주문 후 납품까지 소요되는 일수 (예: 2일 후 납품 가능하면 2 입력)</div>
       <input
         type="number" min={0} placeholder="예: 2"
         value={data.leadTimeDays} onChange={(e) => update("leadTimeDays", e.target.value)}
@@ -3366,7 +3386,10 @@ export default function FarmToTableApp() {
   if (loadState === "error") {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100%", padding: "60px 24px", textAlign: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.rust, fontSize: 14 }}>
-        데이터를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.
+        <div style={{ marginBottom: 16 }}>데이터를 불러오지 못했습니다.</div>
+        <button onClick={() => window.location.reload()} style={{ padding: "10px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          다시 시도
+        </button>
       </div>
     );
   }
@@ -3500,13 +3523,11 @@ export default function FarmToTableApp() {
               샘플 초기화
             </button>
           )}
-          {!isMobile && (
-            <span style={{ fontSize: 11, color: saveState === "error" ? TOKENS.rust : TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", paddingBottom: 10, flexShrink: 0 }}>
-              {saveState === "saving" && "저장 중…"}
-              {saveState === "saved" && "저장됨"}
-              {saveState === "error" && "저장 실패"}
-            </span>
-          )}
+          <span style={{ fontSize: 11, color: saveState === "error" ? TOKENS.rust : TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", paddingBottom: 10, flexShrink: 0, display: (!isMobile || saveState === "error") ? "inline" : "none" }}>
+            {saveState === "saving" && "저장 중…"}
+            {saveState === "saved" && (!isMobile ? "저장됨" : "")}
+            {saveState === "error" && "⚠ 저장 실패 — 네트워크를 확인해주세요"}
+          </span>
         </div>
 
         {contractTarget && (
@@ -3531,7 +3552,7 @@ export default function FarmToTableApp() {
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} chatUnreads={chatUnreads} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} chatUnreads={chatUnreads} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} />}
           </>
