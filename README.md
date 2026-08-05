@@ -159,6 +159,35 @@ allow delete: if request.auth != null
 | v1.3 | UI 고급화 (카드 hover elevation·액센트 보더·StatusBadge dot), 웹 푸시 알림 (Service Worker, 3가지 시나리오), 딜 데이터 격리 (deals 컬렉션 분리·샘플 자동 시딩 제거·Firestore 보안 규칙 강화) |
 | v1.4 | PWA 앱화 (manifest.json·오프라인 캐싱·홈화면 설치 버튼), Firestore 보안 규칙 세분화 (user-profile 본인 제한·딜 생성자 삭제 권한), 계약서 자동 생성 (표준 농산물 거래 계약서·인쇄/PDF 저장) |
 | v1.5 | 버그 수정 3건 (딜 복제 시 원본 덮어쓰기·프로필 공유 키 충돌·채팅 경쟁 조건), 데이터 격리 완성 (farm/chef-profile uid 기반 분리·chats 컬렉션 분리) |
+| v1.6 | UX 개선 11건 (빈 상태 CTA·정산 완료 2단계 확인·납품일 과거 선택 방지·오류 화면 재시도 버튼 등), 전체 화면 UI 폴리싱 (로그인·위저드·채팅·프로필), 비로그인 chats permission-denied 버그 수정, Firestore 규칙 배포 자동화 |
+
+### v1.6 상세 내역
+
+**UX 개선**
+- 뒤로 가기 시 입력 오류 메시지 자동 초기화
+- 납품일 입력 시 오늘 이전 날짜 선택 방지 (`min` 속성)
+- 딜 카드 펼침/접힘 ▼/▲ 인디케이터
+- 내 거래 빈 상태 → "첫 딜 만들기" CTA 버튼 (탭 이동)
+- 상태 필터 빈 결과 → "전체 보기" 버튼
+- 딜 찾기 필터 빈 결과 → "필터 초기화" 버튼
+- 정산 완료 2단계 확인 (실수 방지)
+- 오류 화면 "다시 시도" 버튼 (`window.location.reload`)
+- 모바일 저장 실패 시 피드백 메시지 개선
+- 리드타임 필드 설명 문구 추가
+
+**UI 폴리싱**
+- 상단 고정 Rust→Gold→Moss 3색 그라데이션 액센트 바
+- 로그인 화면: 배경 라디얼 그라데이션, 흰색 카드+그림자, 데스크톱 브랜드 패널
+- 딜 만들기 위저드: StepIndicator 컬러 프로그레스 (완료=녹색 ✓ / 현재=붉은색 glow)
+- 채팅: 말풍선 shadow·라운드 개선, 빈 상태 아이콘, 전송 버튼 hover 효과
+- 내 레스토랑·내 농가: 아이콘+그라데이션 헤더 패널, 저장 버튼 shadow 개선
+- 섹션 타이틀 좌측 Rust accent bar 추가 (전 화면 공통)
+- 전역 CSS: input focus ring, select 커스텀 화살표, 커스텀 스크롤바, 버튼 hover 효과
+
+**버그 수정**
+- 비로그인 상태에서 `chats` 컬렉션 읽기 시도 → permission-denied 오류 수정 (`user?.uid` 조건 추가)
+- `React.Fragment` 미임포트로 인한 런타임 오류 수정 (`Fragment` named import 추가)
+- Firestore 보안 규칙 Firebase 미배포 문제 수정 (규칙 배포 완료)
 
 ## 향후 과제
 
