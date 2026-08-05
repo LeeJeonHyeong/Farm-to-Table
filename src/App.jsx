@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { storage, db, auth } from "./firebase";
 import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -980,7 +980,7 @@ function StepIndicator({ step }) {
           const dotBg = done ? TOKENS.moss : current ? TOKENS.rust : TOKENS.line;
           const dotColor = done || current ? "#FFF" : TOKENS.inkSoft;
           return (
-            <React.Fragment key={s.key}>
+            <Fragment key={s.key}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, minWidth: isMobile ? 38 : 58 }}>
                 <div style={{
                   width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: "50%",
@@ -1014,7 +1014,7 @@ function StepIndicator({ step }) {
                   transition: "background 0.35s ease",
                 }} />
               )}
-            </React.Fragment>
+            </Fragment>
           );
         })}
       </div>
@@ -3272,7 +3272,8 @@ export default function FarmToTableApp() {
           }
         }
         if (!cancelled) setLoadState("ready");
-      } catch {
+      } catch (err) {
+        console.error("[로드 오류]", err?.code, err?.message, err);
         if (!cancelled) setLoadState("error");
       }
     })();
