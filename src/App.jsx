@@ -481,14 +481,15 @@ function chipBadge(bg, color) {
 
 const inputStyle = {
   width: "100%",
-  padding: "9px 11px",
-  borderRadius: 8,
-  border: `1px solid ${TOKENS.line}`,
+  padding: "10px 13px",
+  borderRadius: 9,
+  border: `1.5px solid ${TOKENS.line}`,
   fontSize: 14,
   fontFamily: "'IBM Plex Sans', sans-serif",
   background: "#FFFFFF",
   color: TOKENS.ink,
   boxSizing: "border-box",
+  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
 };
 
 const labelStyle = {
@@ -504,8 +505,9 @@ const labelStyle = {
 
 function Section({ title, children }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, margin: "0 0 12px", color: TOKENS.ink }}>
+    <div style={{ marginBottom: 26 }}>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, margin: "0 0 13px", color: TOKENS.ink, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ display: "inline-block", width: 3, height: 14, background: TOKENS.rust, borderRadius: 2, flexShrink: 0 }} />
         {title}
       </h2>
       {children}
@@ -970,25 +972,52 @@ const DEAL_STEPS = [
 function StepIndicator({ step }) {
   const isMobile = useIsMobile();
   return (
-    <div style={{ display: "flex", gap: isMobile ? 4 : 6, marginBottom: 20, overflowX: "auto" }}>
-      {DEAL_STEPS.map((s) => (
-        <div key={s.key} style={{ display: "flex", alignItems: "center", gap: isMobile ? 3 : 6, flexShrink: 0 }}>
-          <div
-            style={{
-              width: isMobile ? 22 : 26, height: isMobile ? 22 : 26, borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11, fontFamily: "'IBM Plex Mono', monospace",
-              background: s.key <= step ? TOKENS.ink : TOKENS.line,
-              color: s.key <= step ? TOKENS.bg : TOKENS.inkSoft,
-            }}
-          >
-            {s.key}
-          </div>
-          {!isMobile && <span style={{ fontSize: 12, color: s.key === step ? TOKENS.ink : TOKENS.inkSoft }}>{s.label}</span>}
-          {isMobile && s.key === step && <span style={{ fontSize: 11, color: TOKENS.ink }}>{s.label}</span>}
-          {s.key !== DEAL_STEPS.length && <div style={{ width: isMobile ? 10 : 16, height: 1, background: TOKENS.line }} />}
-        </div>
-      ))}
+    <div style={{ marginBottom: 22, paddingBottom: 18, borderBottom: `1px solid ${TOKENS.line}` }}>
+      <div style={{ display: "flex", alignItems: "flex-start" }}>
+        {DEAL_STEPS.map((s, i) => {
+          const done = s.key < step;
+          const current = s.key === step;
+          const dotBg = done ? TOKENS.moss : current ? TOKENS.rust : TOKENS.line;
+          const dotColor = done || current ? "#FFF" : TOKENS.inkSoft;
+          return (
+            <React.Fragment key={s.key}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, minWidth: isMobile ? 38 : 58 }}>
+                <div style={{
+                  width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: "50%",
+                  background: dotBg, color: dotColor,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: isMobile ? 11 : 12, fontWeight: 700,
+                  boxShadow: current ? `0 0 0 4px ${TOKENS.rust}22` : done ? `0 0 0 3px ${TOKENS.moss}18` : "none",
+                  transition: "all 0.25s ease",
+                }}>
+                  {done ? "✓" : s.key}
+                </div>
+                {!isMobile && (
+                  <span style={{
+                    fontSize: 9, textAlign: "center", whiteSpace: "nowrap",
+                    fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.03em",
+                    color: current ? TOKENS.ink : done ? TOKENS.moss : TOKENS.inkSoft,
+                    fontWeight: current ? 600 : 400,
+                  }}>
+                    {s.label}
+                  </span>
+                )}
+                {isMobile && current && (
+                  <span style={{ fontSize: 9, color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", whiteSpace: "nowrap" }}>{s.label}</span>
+                )}
+              </div>
+              {i < DEAL_STEPS.length - 1 && (
+                <div style={{
+                  flex: 1, height: 2, borderRadius: 1,
+                  background: done ? TOKENS.moss : TOKENS.line,
+                  marginTop: isMobile ? 12 : 14,
+                  transition: "background 0.35s ease",
+                }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1290,23 +1319,23 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
         </Section>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         {step > 1 && (
-          <button onClick={goBack} style={{ padding: "12px 20px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, color: TOKENS.ink, fontSize: 14, cursor: "pointer" }}>
-            이전
+          <button onClick={goBack} className="ftt-btn-secondary" style={{ padding: "12px 20px" }}>
+            ← 이전
           </button>
         )}
         {isEditing && step === 1 && (
-          <button onClick={onCancelEdit} style={{ padding: "12px 16px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, color: TOKENS.inkSoft, fontSize: 14, cursor: "pointer" }}>
+          <button onClick={onCancelEdit} className="ftt-btn-secondary" style={{ padding: "12px 16px", color: TOKENS.inkSoft }}>
             취소
           </button>
         )}
         {step < 5 ? (
-          <button onClick={goNext} style={{ flex: 1, padding: "12px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-            다음
+          <button onClick={goNext} className="ftt-btn-primary" style={{ flex: 1, padding: "12px 0" }}>
+            다음 단계 →
           </button>
         ) : (
-          <button onClick={handleSubmit} style={{ flex: 1, padding: "12px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          <button onClick={handleSubmit} className="ftt-btn-primary" style={{ flex: 1, padding: "12px 0" }}>
             {isEditing ? "딜 수정하기" : "딜 등록하고 농가 제안 받기"}
           </button>
         )}
@@ -2428,41 +2457,32 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", height: "calc(100vh - 180px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <button onClick={onBack}
-          style={{ background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer", color: TOKENS.inkSoft }}>
+        <button onClick={onBack} className="ftt-btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
           ← 뒤로
         </button>
         <div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink }}>{dealInfo.crop} 딜 채팅</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, fontWeight: 600 }}>{dealInfo.crop} 딜 채팅</div>
           <div style={{ fontSize: 12, color: TOKENS.inkSoft }}>{partnerName}와의 대화</div>
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, padding: isMobile ? "12px 10px" : "16px", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, marginBottom: 12 }}>
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, padding: isMobile ? "14px 12px" : "18px 20px", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, marginBottom: 12, boxShadow: "inset 0 1px 4px rgba(32,40,31,0.04)" }}>
         {messages.length === 0 && (
-          <div style={{ textAlign: "center", color: TOKENS.inkSoft, fontSize: 13, padding: "40px 0" }}>
-            매칭이 완료되었습니다!<br />
-            <span style={{ fontSize: 12, marginTop: 4, display: "block" }}>납품 세부사항을 조율해보세요.</span>
+          <div style={{ textAlign: "center", color: TOKENS.inkSoft, fontSize: 13, padding: "48px 0" }}>
+            <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.5 }}>💬</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6 }}>매칭이 완료됐습니다!</div>
+            <div style={{ fontSize: 12 }}>납품 세부사항을 조율해보세요.</div>
           </div>
         )}
         {messages.map((m) => {
           const isMe = m.senderName === userName;
           return (
             <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
-              {!isMe && <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 3 }}>{m.senderName}</div>}
-              <div style={{
-                maxWidth: isMobile ? "85%" : "65%",
-                padding: "9px 14px",
-                borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                background: isMe ? TOKENS.ink : "#FFFFFF",
-                color: isMe ? TOKENS.bg : TOKENS.ink,
-                fontSize: 14,
-                lineHeight: 1.5,
-                border: isMe ? "none" : `1px solid ${TOKENS.line}`,
-              }}>
+              {!isMe && <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 4, fontWeight: 500 }}>{m.senderName}</div>}
+              <div className={isMe ? "ftt-bubble-mine" : "ftt-bubble-other"} style={{ maxWidth: isMobile ? "85%" : "65%" }}>
                 {m.text}
               </div>
-              <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 3 }}>
+              <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 4, fontFamily: "'IBM Plex Mono', monospace" }}>
                 {new Date(m.ts).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
@@ -2483,9 +2503,10 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
         <button
           onClick={handleSend}
           disabled={!text.trim()}
-          style={{ padding: "10px 18px", background: text.trim() ? TOKENS.ink : TOKENS.line, color: text.trim() ? TOKENS.bg : TOKENS.inkSoft, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: text.trim() ? "pointer" : "default", whiteSpace: "nowrap" }}
+          className={text.trim() ? "ftt-btn-primary" : ""}
+          style={{ padding: "10px 20px", fontSize: 13, borderRadius: 10, whiteSpace: "nowrap", background: text.trim() ? undefined : TOKENS.line, color: text.trim() ? undefined : TOKENS.inkSoft, border: "none", cursor: text.trim() ? "pointer" : "default" }}
         >
-          전송
+          전송 ↑
         </button>
       </div>
     </div>
@@ -2520,13 +2541,17 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 14 : 24 }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 4px" }}>
-        내 레스토랑 정보
-      </h2>
-      <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "0 0 20px", lineHeight: 1.6 }}>
-        저장하면 농가에게 레스토랑 정보가 표시되고, 딜 작성 시 자동으로 불러옵니다.
-      </p>
+    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(32,40,31,0.07)" }}>
+      <div style={{ background: `linear-gradient(135deg, ${TOKENS.rustSoft}70, transparent)`, borderBottom: `1px solid ${TOKENS.line}`, padding: isMobile ? "16px 14px 14px" : "20px 24px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(145deg, ${TOKENS.rust}, #8B2E18)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 4px 12px ${TOKENS.rust}35` }}>
+          <span style={{ fontSize: 22 }}>🍳</span>
+        </div>
+        <div>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 2px" }}>내 레스토랑 정보</h2>
+          <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.5 }}>저장하면 농가에게 레스토랑 정보가 표시되고, 딜 작성 시 자동으로 불러옵니다.</p>
+        </div>
+      </div>
+      <div style={{ padding: isMobile ? "14px 14px 20px" : "20px 24px 28px" }}>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
         <div>
@@ -2572,15 +2597,15 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
       />
 
       <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14 }}>
-        <button onClick={handleSave} style={{ padding: "11px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+        <button onClick={handleSave} style={{ padding: "12px 28px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 10px rgba(32,40,31,0.18)", letterSpacing: "-0.01em" }}>
           저장하기
         </button>
-        {saved && <span style={{ fontSize: 13, color: TOKENS.moss }}>✓ 저장됐습니다</span>}
+        {saved && <span style={{ fontSize: 13, color: TOKENS.moss, fontWeight: 500 }}>✓ 저장됐습니다</span>}
       </div>
 
       {(data.restaurantName || data.preferCrops.length > 0) && (
-        <div style={{ marginTop: 20, background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: 14 }}>
-          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+        <div style={{ marginTop: 24, background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16, boxShadow: "0 1px 6px rgba(32,40,31,0.05)" }}>
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
             미리보기
           </div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6 }}>
@@ -2595,6 +2620,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
           {data.description && <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.6 }}>"{data.description}"</p>}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -2638,13 +2664,17 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 14 : 24 }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 4px" }}>
-        내 농가 정보
-      </h2>
-      <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "0 0 16px", lineHeight: 1.6 }}>
-        저장해두면 제안서 작성 시 자동으로 불러올 수 있습니다.
-      </p>
+    <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(32,40,31,0.07)" }}>
+      <div style={{ background: `linear-gradient(135deg, ${TOKENS.mossSoft}80, transparent)`, borderBottom: `1px solid ${TOKENS.line}`, padding: isMobile ? "16px 14px 14px" : "20px 24px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(145deg, ${TOKENS.moss}, #3D5437)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 4px 12px ${TOKENS.moss}35` }}>
+          <span style={{ fontSize: 22 }}>🌱</span>
+        </div>
+        <div>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 2px" }}>내 농가 정보</h2>
+          <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.5 }}>저장해두면 제안서 작성 시 자동으로 불러올 수 있습니다.</p>
+        </div>
+      </div>
+      <div style={{ padding: isMobile ? "14px 14px 20px" : "20px 24px 28px" }}>
 
       {avgRating !== null ? (
         <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 14 }}>
@@ -2712,18 +2742,15 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
       />
 
       <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14 }}>
-        <button
-          onClick={handleSave}
-          style={{ padding: "11px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}
-        >
+        <button onClick={handleSave} style={{ padding: "12px 28px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 10px rgba(32,40,31,0.18)", letterSpacing: "-0.01em" }}>
           저장하기
         </button>
-        {saved && <span style={{ fontSize: 13, color: TOKENS.moss }}>✓ 저장됐습니다</span>}
+        {saved && <span style={{ fontSize: 13, color: TOKENS.moss, fontWeight: 500 }}>✓ 저장됐습니다</span>}
       </div>
 
       {(data.farmName || data.specialty.length > 0) && (
-        <div style={{ marginTop: 20, background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: 14 }}>
-          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+        <div style={{ marginTop: 24, background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16, boxShadow: "0 1px 6px rgba(32,40,31,0.05)" }}>
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
             미리보기
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
@@ -2743,6 +2770,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
           {data.description && <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.6 }}>"{data.description}"</p>}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -2811,93 +2839,179 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: TOKENS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+    <div style={{
+      minHeight: "100vh",
+      background: TOKENS.bg,
+      backgroundImage: `radial-gradient(ellipse at 15% 60%, ${TOKENS.mossSoft} 0%, transparent 52%), radial-gradient(ellipse at 85% 10%, ${TOKENS.goldSoft} 0%, transparent 45%)`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: isMobile ? "24px 16px" : 48,
+      fontFamily: "'IBM Plex Sans', sans-serif",
+      gap: 52,
+    }}>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
-      <div style={{ maxWidth: 400, width: "100%" }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <span style={{ fontSize: 11, letterSpacing: "0.08em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
-            역경매 방식 선주문 플랫폼
-          </span>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 26 : 32, margin: "8px 0 6px", color: TOKENS.ink }}>
+      <style>{`
+        .ftt-login-card { animation: loginFadeIn 0.32s ease; }
+        @keyframes loginFadeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        .ftt-role-btn { transition: all 0.15s ease !important; }
+        .ftt-role-btn:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 20px rgba(32,40,31,0.10) !important; }
+        .ftt-login-card input:not([type="checkbox"]):focus, .ftt-login-card select:focus, .ftt-login-card textarea:focus {
+          outline: none !important; border-color: ${TOKENS.rust} !important; box-shadow: 0 0 0 3px rgba(187,74,46,0.12) !important;
+        }
+        .ftt-login-card input::placeholder, .ftt-login-card textarea::placeholder { color: rgba(91,99,88,0.50); }
+        .ftt-mode-tab { transition: all 0.15s ease; }
+      `}</style>
+
+      {/* 왼쪽 브랜드 패널 (데스크톱) */}
+      {!isMobile && (
+        <div style={{ flex: "0 0 auto", maxWidth: 300, textAlign: "center" }}>
+          <div style={{
+            width: 76, height: 76, borderRadius: 22,
+            background: `linear-gradient(145deg, ${TOKENS.moss}, #2E4A28)`,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 20,
+            boxShadow: `0 8px 32px ${TOKENS.moss}50`,
+          }}>
+            <span style={{ fontSize: 38, lineHeight: 1 }}>🌿</span>
+          </div>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 34, margin: "0 0 10px", color: TOKENS.ink, letterSpacing: "-0.02em" }}>
             Farm-to-Table
           </h1>
-          <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0 }}>
-            {mode === "login" ? "이메일로 로그인하세요" : "역할을 선택하고 가입하세요"}
+          <p style={{ fontSize: 14, color: TOKENS.inkSoft, margin: "0 0 28px", lineHeight: 1.7 }}>
+            셰프가 원하는 식자재를 공고하면<br />농가가 가격과 조건을 제안하는<br />역경매 방식 선주문 플랫폼
           </p>
-        </div>
-
-        {/* 탭 전환 */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginBottom: 24, border: `1px solid ${TOKENS.line}`, borderRadius: 8, overflow: "hidden" }}>
-          {[{ key: "login", label: "로그인" }, { key: "signup", label: "신규 가입" }].map((m) => (
-            <button key={m.key} type="button" onClick={() => { setMode(m.key); setError(""); }}
-              style={{ padding: "10px 0", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 500,
-                background: mode === m.key ? TOKENS.ink : "#FFFFFF",
-                color: mode === m.key ? TOKENS.bg : TOKENS.inkSoft }}>
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 역할 선택 (가입 시만) */}
-        {mode === "signup" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 10 }}>
             {[
-              { key: "chef", label: "셰프", desc: "딜 등록·제안 선택", color: TOKENS.rust, soft: TOKENS.rustSoft },
-              { key: "farmer", label: "농가", desc: "딜 찾기·제안 보내기", color: TOKENS.moss, soft: TOKENS.mossSoft },
+              { icon: "🍳", label: "셰프", desc: "딜 등록·제안 선택" },
+              { icon: "🌱", label: "농가", desc: "딜 찾기·제안 보내기" },
             ].map((r) => (
-              <button key={r.key} type="button" onClick={() => { setRole(r.key); setError(""); }}
-                style={{ padding: "20px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
-                  border: `2px solid ${role === r.key ? r.color : TOKENS.line}`,
-                  background: role === r.key ? r.soft : "#FFFFFF", transition: "all 0.15s" }}>
-                <div style={{ fontSize: 30, marginBottom: 8 }}>{r.key === "chef" ? "🍳" : "🌱"}</div>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink, marginBottom: 3 }}>{r.label}</div>
-                <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{r.desc}</div>
-              </button>
+              <div key={r.label} style={{
+                background: "rgba(255,255,255,0.65)", backdropFilter: "blur(8px)",
+                border: `1px solid ${TOKENS.line}`, borderRadius: 12,
+                padding: "14px 10px", textAlign: "center", flex: 1,
+              }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>{r.icon}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: TOKENS.ink, marginBottom: 2 }}>{r.label}</div>
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft }}>{r.desc}</div>
+              </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 폼 카드 */}
+      <div style={{ maxWidth: 400, width: "100%" }}>
+        {isMobile && (
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: `linear-gradient(145deg, ${TOKENS.moss}, #2E4A28)`,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 12, boxShadow: `0 6px 20px ${TOKENS.moss}40`,
+            }}>
+              <span style={{ fontSize: 28 }}>🌿</span>
+            </div>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 26, margin: "0 0 4px", color: TOKENS.ink }}>Farm-to-Table</h1>
+            <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0 }}>역경매 방식 선주문 플랫폼</p>
           </div>
         )}
 
-        <FieldLabel required>이메일</FieldLabel>
-        <input type="email" placeholder="example@email.com" value={email}
-          onChange={(e) => { setEmail(e.target.value); setError(""); }}
-          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          style={inputStyle} />
+        <div className="ftt-login-card" style={{
+          background: "#FFFFFF",
+          borderRadius: 20,
+          padding: isMobile ? "28px 24px" : "40px",
+          boxShadow: "0 2px 4px rgba(32,40,31,0.03), 0 24px 64px rgba(32,40,31,0.12)",
+          border: `1px solid ${TOKENS.line}`,
+        }}>
+          {/* 탭 전환 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 24, background: `${TOKENS.line}60`, borderRadius: 10, padding: 4 }}>
+            {[{ key: "login", label: "로그인" }, { key: "signup", label: "신규 가입" }].map((m) => (
+              <button key={m.key} className="ftt-mode-tab" type="button" onClick={() => { setMode(m.key); setError(""); }}
+                style={{
+                  padding: "9px 0", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 500,
+                  borderRadius: 7,
+                  background: mode === m.key ? "#FFFFFF" : "transparent",
+                  color: mode === m.key ? TOKENS.ink : TOKENS.inkSoft,
+                  boxShadow: mode === m.key ? "0 1px 4px rgba(32,40,31,0.10)" : "none",
+                }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
 
-        <FieldLabel required>비밀번호</FieldLabel>
-        <div style={{ position: "relative" }}>
-          <input type={showPw ? "text" : "password"} placeholder={mode === "signup" ? "6자 이상" : "비밀번호 입력"}
-            value={password}
-            onChange={(e) => { setPassword(e.target.value); setError(""); }}
+          {/* 역할 선택 (가입 시만) */}
+          {mode === "signup" && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+              {[
+                { key: "chef", label: "셰프", desc: "딜 등록·제안 선택", color: TOKENS.rust, soft: TOKENS.rustSoft, icon: "🍳" },
+                { key: "farmer", label: "농가", desc: "딜 찾기·제안 보내기", color: TOKENS.moss, soft: TOKENS.mossSoft, icon: "🌱" },
+              ].map((r) => (
+                <button key={r.key} className="ftt-role-btn" type="button" onClick={() => { setRole(r.key); setError(""); }}
+                  style={{
+                    padding: "18px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
+                    border: `2px solid ${role === r.key ? r.color : TOKENS.line}`,
+                    background: role === r.key ? r.soft : `${TOKENS.bg}80`,
+                  }}>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>{r.icon}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, color: TOKENS.ink, marginBottom: 2 }}>{r.label}</div>
+                  <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{r.desc}</div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <FieldLabel required>이메일</FieldLabel>
+          <input type="email" placeholder="example@email.com" value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(""); }}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            style={{ ...inputStyle, paddingRight: 44 }} />
-          <button type="button" onClick={() => setShowPw((v) => !v)}
-            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 15 }}>
-            {showPw ? "🙈" : "👁"}
-          </button>
-        </div>
+            style={inputStyle} />
 
-        {/* 상호명 (가입 시만) */}
-        {mode === "signup" && (
-          <>
-            <FieldLabel required>{role === "chef" ? "레스토랑명" : "농가명"} <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontWeight: 400 }}>(앱에 표시되는 상호명)</span></FieldLabel>
-            <input type="text" placeholder={role === "chef" ? "예: 테이블나인" : "예: 신선팜"}
-              value={displayName}
-              onChange={(e) => { setDisplayName(e.target.value); setError(""); }}
+          <FieldLabel required>비밀번호</FieldLabel>
+          <div style={{ position: "relative" }}>
+            <input type={showPw ? "text" : "password"} placeholder={mode === "signup" ? "6자 이상" : "비밀번호 입력"}
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(""); }}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              style={inputStyle} />
-          </>
-        )}
+              style={{ ...inputStyle, paddingRight: 44 }} />
+            <button type="button" onClick={() => setShowPw((v) => !v)}
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 15 }}>
+              {showPw ? "🙈" : "👁"}
+            </button>
+          </div>
 
-        {error && <ErrorText text={error} />}
+          {/* 상호명 (가입 시만) */}
+          {mode === "signup" && (
+            <>
+              <FieldLabel required>{role === "chef" ? "레스토랑명" : "농가명"} <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontWeight: 400 }}>(앱에 표시되는 상호명)</span></FieldLabel>
+              <input type="text" placeholder={role === "chef" ? "예: 테이블나인" : "예: 신선팜"}
+                value={displayName}
+                onChange={(e) => { setDisplayName(e.target.value); setError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                style={inputStyle} />
+            </>
+          )}
 
-        <button onClick={handleSubmit} disabled={loading}
-          style={{ marginTop: 14, width: "100%", padding: "13px 0", background: loading ? TOKENS.line : TOKENS.ink, color: loading ? TOKENS.inkSoft : TOKENS.bg, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: loading ? "default" : "pointer" }}>
-          {loading ? "처리 중…" : mode === "login" ? "로그인" : "가입하기"}
-        </button>
+          {error && <ErrorText text={error} />}
 
-        <p style={{ fontSize: 12, color: TOKENS.inkSoft, textAlign: "center", marginTop: 12 }}>
-          로그인 상태는 자동으로 유지됩니다.
-        </p>
+          <button onClick={handleSubmit} disabled={loading}
+            style={{
+              marginTop: 20, width: "100%", padding: "13px 0",
+              background: loading ? TOKENS.line : TOKENS.ink,
+              color: loading ? TOKENS.inkSoft : TOKENS.bg,
+              border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600,
+              cursor: loading ? "default" : "pointer",
+              boxShadow: loading ? "none" : "0 2px 12px rgba(32,40,31,0.18)",
+              transition: "all 0.15s ease",
+              letterSpacing: "-0.01em",
+            }}>
+            {loading ? "처리 중…" : mode === "login" ? "로그인" : "가입하기"}
+          </button>
+
+          <p style={{ fontSize: 12, color: TOKENS.inkSoft, textAlign: "center", marginTop: 16, marginBottom: 0 }}>
+            로그인 상태는 자동으로 유지됩니다.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -3451,12 +3565,127 @@ export default function FarmToTableApp() {
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
       <style>{`
-        .ftt-card { transition: box-shadow 0.18s ease, transform 0.18s ease; }
-        .ftt-card:hover { box-shadow: 0 6px 24px rgba(32,40,31,0.09), 0 2px 8px rgba(32,40,31,0.05) !important; transform: translateY(-2px); }
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${TOKENS.line}; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #b0aa98; }
+
+        /* ===== FOCUS ===== */
+        button:focus-visible, a:focus-visible { outline: 2px solid ${TOKENS.rust}; outline-offset: 2px; border-radius: 4px; }
+        input:not([type="checkbox"]):not([type="radio"]):focus,
+        select:focus, textarea:focus {
+          outline: none !important;
+          border-color: ${TOKENS.rust} !important;
+          box-shadow: 0 0 0 3px rgba(187,74,46,0.12) !important;
+        }
+        input::placeholder, textarea::placeholder { color: rgba(91,99,88,0.50); }
+
+        /* ===== CARDS ===== */
+        .ftt-card { transition: box-shadow 0.2s ease, transform 0.2s ease; will-change: transform; }
+        .ftt-card:hover {
+          box-shadow: 0 8px 32px rgba(32,40,31,0.11), 0 2px 8px rgba(32,40,31,0.04) !important;
+          transform: translateY(-2px);
+        }
+
+        /* ===== TABS ===== */
         .ftt-tab { transition: color 0.15s ease, border-bottom-color 0.15s ease; }
-        .ftt-tab:hover { color: ${TOKENS.ink} !important; }
+        .ftt-tab:hover { color: ${TOKENS.ink} !important; background: rgba(32,40,31,0.03) !important; border-radius: 6px 6px 0 0; }
+
+        /* ===== SELECT 커스텀 화살표 ===== */
+        select {
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B6358' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          padding-right: 32px !important;
+          appearance: none !important;
+          -webkit-appearance: none !important;
+          cursor: pointer;
+        }
+
+        /* ===== 화면 전환 애니메이션 ===== */
+        @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .ftt-screen-enter { animation: fadeSlideIn 0.25s ease; }
+
+        /* ===== 선택된 제안 하이라이트 ===== */
+        .ftt-proposal-selected {
+          background: linear-gradient(135deg, rgba(91,117,83,0.08), rgba(201,154,62,0.06)) !important;
+          border-color: ${TOKENS.moss} !important;
+        }
+
+        /* ===== 로그인 카드 ===== */
+        .ftt-login-card { animation: fadeSlideIn 0.3s ease; }
+        .ftt-role-btn { transition: all 0.15s ease !important; }
+        .ftt-role-btn:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 20px rgba(32,40,31,0.10) !important; }
+        .ftt-login-card input:focus, .ftt-login-card select:focus, .ftt-login-card textarea:focus {
+          outline: none !important;
+          border-color: ${TOKENS.rust} !important;
+          box-shadow: 0 0 0 3px rgba(187,74,46,0.12) !important;
+        }
+
+        /* ===== PRIMARY BUTTON ===== */
+        .ftt-btn-primary {
+          background: ${TOKENS.ink}; color: ${TOKENS.bg}; border: none;
+          border-radius: 10px; font-size: 14px; font-weight: 600;
+          font-family: 'IBM Plex Sans', sans-serif; cursor: pointer; letter-spacing: -0.01em;
+          transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+          box-shadow: 0 2px 8px rgba(32,40,31,0.18), 0 1px 2px rgba(32,40,31,0.10);
+        }
+        .ftt-btn-primary:hover:not(:disabled) {
+          background: #2C3829;
+          box-shadow: 0 4px 16px rgba(32,40,31,0.22), 0 2px 4px rgba(32,40,31,0.10);
+          transform: translateY(-1px);
+        }
+        .ftt-btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: 0 1px 4px rgba(32,40,31,0.15); }
+        .ftt-btn-primary:disabled { background: ${TOKENS.line} !important; color: ${TOKENS.inkSoft} !important; box-shadow: none !important; transform: none !important; cursor: not-allowed; }
+
+        /* ===== SECONDARY BUTTON ===== */
+        .ftt-btn-secondary {
+          background: transparent; border: 1.5px solid ${TOKENS.line};
+          border-radius: 10px; color: ${TOKENS.ink}; font-size: 14px; font-weight: 500;
+          font-family: 'IBM Plex Sans', sans-serif; cursor: pointer;
+          transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .ftt-btn-secondary:hover { border-color: ${TOKENS.inkSoft}; background: rgba(32,40,31,0.04); }
+
+        /* ===== SECTION TITLE ===== */
+        .ftt-section-title {
+          font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600;
+          color: ${TOKENS.ink}; margin: 0 0 14px;
+          display: flex; align-items: center; gap: 8px;
+        }
+        .ftt-section-title::before {
+          content: ''; display: inline-block; width: 3px; height: 14px;
+          background: ${TOKENS.rust}; border-radius: 2px; flex-shrink: 0;
+        }
+
+        /* ===== CHAT BUBBLES ===== */
+        .ftt-bubble-mine {
+          padding: 10px 15px; border-radius: 18px 18px 4px 18px;
+          background: ${TOKENS.ink}; color: ${TOKENS.bg};
+          font-size: 14px; line-height: 1.55;
+          box-shadow: 0 1px 4px rgba(32,40,31,0.18);
+        }
+        .ftt-bubble-other {
+          padding: 10px 15px; border-radius: 18px 18px 18px 4px;
+          background: #FFFFFF; color: ${TOKENS.ink};
+          border: 1px solid ${TOKENS.line}; font-size: 14px; line-height: 1.55;
+          box-shadow: 0 1px 3px rgba(32,40,31,0.06);
+        }
+
+        /* ===== NOTICE BOXES ===== */
+        .ftt-notice-gold { background: linear-gradient(135deg, ${TOKENS.goldSoft}, #FFFBF0); border: 1px solid ${TOKENS.gold}55; border-radius: 12px; padding: 14px 18px; box-shadow: 0 1px 6px rgba(201,154,62,0.10); }
+        .ftt-notice-moss { background: ${TOKENS.mossSoft}; border: 1px solid ${TOKENS.moss}44; border-radius: 12px; padding: 12px 16px; }
+
+        /* ===== EMPTY STATE ===== */
+        .ftt-empty { background: ${TOKENS.card}; border: 1.5px dashed ${TOKENS.line}; border-radius: 14px; padding: 48px 24px; text-align: center; color: ${TOKENS.inkSoft}; }
+        .ftt-empty-icon { font-size: 40px; margin-bottom: 12px; display: block; opacity: 0.55; }
+        .ftt-empty-title { font-family: 'Fraunces', serif; font-size: 18px; color: ${TOKENS.ink}; margin: 0 0 6px; font-weight: 600; }
+        .ftt-empty-desc { font-size: 13px; color: ${TOKENS.inkSoft}; margin: 0 0 20px; line-height: 1.6; }
       `}</style>
-      <div style={{ maxWidth: 980, margin: "0 auto" }}>
+      {/* 상단 액센트 바 */}
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${TOKENS.rust} 0%, ${TOKENS.gold} 50%, ${TOKENS.moss} 100%)`, zIndex: 9999 }} />
+      <div style={{ maxWidth: 980, margin: "0 auto", paddingTop: 3 }}>
         {/* 헤더 */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${TOKENS.line}`, gap: 12 }}>
           <div>
