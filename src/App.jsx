@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, Fragment } from "react";
-import { storage, db, auth } from "./firebase";
+import { storage, db, auth, firebaseStorage } from "./firebase";
 import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -11,6 +12,94 @@ function useIsMobile() {
     return () => window.removeEventListener("resize", handler);
   }, []);
   return isMobile;
+}
+
+function ImageUpload({ value, onChange, storagePath, label = "사진 추가", shape = "square", size = 96 }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState(null);
+  const [hovered, setHovered] = useState(false);
+  const fileRef = useRef(null);
+
+  const compress = (file) => new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 900;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("blob")), "image/jpeg", 0.82);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+
+  const handleFile = async (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    setUploading(true);
+    setUploadErr(null);
+    try {
+      const blob = await compress(file);
+      const sRef = storageRef(firebaseStorage, storagePath);
+      await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
+      const url = await getDownloadURL(sRef);
+      onChange(url);
+    } catch {
+      setUploadErr("업로드에 실패했습니다.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const bRadius = shape === "circle" ? "50%" : 12;
+  return (
+    <div style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+      <input type="file" accept="image/*" ref={fileRef} style={{ display: "none" }}
+        onChange={(e) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
+      <div
+        onClick={() => !uploading && fileRef.current.click()}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          width: size, height: size, borderRadius: bRadius, overflow: "hidden",
+          cursor: uploading ? "wait" : "pointer",
+          border: `2px ${value ? "solid" : "dashed"} ${TOKENS.line}`,
+          background: value ? "transparent" : TOKENS.card,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative",
+          boxShadow: value ? "0 2px 10px rgba(32,40,31,0.12)" : "none",
+          transition: "border-color 0.15s ease",
+        }}
+      >
+        {value
+          ? <img src={value} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : (
+            <div style={{ textAlign: "center", padding: 8, color: TOKENS.inkSoft, pointerEvents: "none" }}>
+              <div style={{ fontSize: 20, marginBottom: 2 }}>📷</div>
+              <div style={{ fontSize: 10, lineHeight: 1.3, fontFamily: "'IBM Plex Mono', monospace" }}>{label}</div>
+            </div>
+          )
+        }
+        {uploading && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(243,241,231,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 11, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace" }}>업로드 중…</span>
+          </div>
+        )}
+        {value && !uploading && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(32,40,31,0.45)", opacity: hovered ? 1 : 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.15s ease" }}>
+            <span style={{ color: "#fff", fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 500 }}>변경 ✎</span>
+          </div>
+        )}
+      </div>
+      {uploadErr && <div style={{ fontSize: 11, color: TOKENS.rust }}>{uploadErr}</div>}
+    </div>
+  );
 }
 
 const TOKENS = {
@@ -1022,19 +1111,20 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null }) {
+function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null, userId = "" }) {
   const isEditing = !!editingDeal;
   const isCloning = !!cloningFrom;
   const blank = {
     chefName: defaultChefName, chefRegion: defaultChefRegion, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
-    grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "",
+    grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "", photoURL: "",
   };
+  const [dealId] = useState(() => isEditing ? editingDeal.id : `d${Date.now()}`);
   const [step, setStep] = useState(1);
   const [data, setData] = useState(
     isEditing
       ? { ...editingDeal, quantity: String(editingDeal.quantity), targetPrice: String(editingDeal.targetPrice) }
       : isCloning
-      ? { ...cloningFrom, quantity: String(cloningFrom.quantity), targetPrice: String(cloningFrom.targetPrice) }
+      ? { ...cloningFrom, quantity: String(cloningFrom.quantity), targetPrice: String(cloningFrom.targetPrice), photoURL: "" }
       : blank
   );
   const [errors, setErrors] = useState({});
@@ -1123,7 +1213,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     } else {
       onCreate({
         ...data,
-        id: `d${Date.now()}`,
+        id: dealId,
         quantity: Number(data.quantity),
         targetPrice: Number(data.targetPrice),
         status: "open",
@@ -1294,12 +1384,38 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
             value={data.note} onChange={(e) => update("note", e.target.value)}
             style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
           />
+
+          <div style={{ marginTop: 16 }}>
+            <FieldLabel>딜 사진 (선택)</FieldLabel>
+            <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 8 }}>식자재 샘플·규격 사진을 첨부하면 농가에게 더 명확하게 전달됩니다.</div>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <ImageUpload
+                value={data.photoURL || ""}
+                onChange={(url) => update("photoURL", url)}
+                storagePath={`images/deal/${dealId}.jpg`}
+                label="딜 사진"
+                shape="square"
+                size={100}
+              />
+              {data.photoURL && (
+                <button
+                  onClick={() => update("photoURL", "")}
+                  style={{ fontSize: 11, color: TOKENS.rust, background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginTop: 4 }}
+                >
+                  ✕ 삭제
+                </button>
+              )}
+            </div>
+          </div>
         </Section>
       )}
 
       {step === 5 && (
         <Section title={isEditing ? "5. 수정 내용 확인" : "5. 등록 전 확인"}>
           <div style={{ background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16 }}>
+            {data.photoURL && (
+              <img src={data.photoURL} alt="" style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8, marginBottom: 12, display: "block" }} />
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{data.crop}</span>
               <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{data.chefName}</span>
@@ -1813,6 +1929,11 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
             const isMySpecialty = specialty.has(deal.crop);
             return (
             <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${isMySpecialty ? TOKENS.moss + "66" : TOKENS.line}`, borderLeft: `4px solid ${isMySpecialty ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
+              {deal.photoURL && (
+                <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
+                  <img src={deal.photoURL} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
@@ -2224,6 +2345,11 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
         const statusAccent = deal.status === "open" ? TOKENS.gold : deal.status === "matched" ? TOKENS.moss : deal.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
         return (
           <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
+            {deal.photoURL && (
+              <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
+                <img src={deal.photoURL} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
+              </div>
+            )}
             <div
               style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", cursor: "pointer" }}
               onClick={() => setExpandedId(expanded ? null : deal.id)}
@@ -2515,8 +2641,8 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
 
 /* ---------- 4-0. 내 레스토랑 (셰프) ---------- */
 
-function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
-  const blank = { restaurantName: defaultRestaurantName, region: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체" };
+function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "" }) {
+  const blank = { restaurantName: defaultRestaurantName, region: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체", photoURL: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
@@ -2543,8 +2669,11 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(32,40,31,0.07)" }}>
       <div style={{ background: `linear-gradient(135deg, ${TOKENS.rustSoft}70, transparent)`, borderBottom: `1px solid ${TOKENS.line}`, padding: isMobile ? "16px 14px 14px" : "20px 24px 16px", display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(145deg, ${TOKENS.rust}, #8B2E18)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 4px 12px ${TOKENS.rust}35` }}>
-          <span style={{ fontSize: 22 }}>🍳</span>
+        <div style={{ width: 44, height: 44, borderRadius: 12, overflow: "hidden", flexShrink: 0, ...(data.photoURL ? { boxShadow: "0 4px 12px rgba(32,40,31,0.18)" } : { background: `linear-gradient(145deg, ${TOKENS.rust}, #8B2E18)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${TOKENS.rust}35` }) }}>
+          {data.photoURL
+            ? <img src={data.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <span style={{ fontSize: 22 }}>🍳</span>
+          }
         </div>
         <div>
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 2px" }}>내 레스토랑 정보</h2>
@@ -2552,6 +2681,22 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
         </div>
       </div>
       <div style={{ padding: isMobile ? "14px 14px 20px" : "20px 24px 28px" }}>
+
+      {/* 프로필 사진 업로드 */}
+      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+        <ImageUpload
+          value={data.photoURL || ""}
+          onChange={(url) => update("photoURL", url)}
+          storagePath={`images/chef-profile/${userId}.jpg`}
+          label="로고·사진"
+          shape="circle"
+          size={76}
+        />
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>레스토랑 사진</div>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 3, lineHeight: 1.5 }}>클릭하여 로고나 대표 사진을 업로드하세요.<br />농가에게 표시됩니다.</div>
+        </div>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
         <div>
@@ -2608,9 +2753,12 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
           <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
             미리보기
           </div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6 }}>
-            {data.restaurantName || "—"}
-            {data.region && <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{data.region}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+            {data.photoURL && <img src={data.photoURL} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />}
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink }}>
+              {data.restaurantName || "—"}
+              {data.region && <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{data.region}</span>}
+            </div>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: data.description ? 8 : 0 }}>
             {data.preferGrade !== "전체" && <span style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>{data.preferGrade}등급 선호</span>}
@@ -2627,8 +2775,8 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "" }) {
 
 /* ---------- 4. 내 농가 등록 ---------- */
 
-function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "" }) {
-  const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "" };
+function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "" }) {
+  const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
@@ -2666,8 +2814,11 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(32,40,31,0.07)" }}>
       <div style={{ background: `linear-gradient(135deg, ${TOKENS.mossSoft}80, transparent)`, borderBottom: `1px solid ${TOKENS.line}`, padding: isMobile ? "16px 14px 14px" : "20px 24px 16px", display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(145deg, ${TOKENS.moss}, #3D5437)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 4px 12px ${TOKENS.moss}35` }}>
-          <span style={{ fontSize: 22 }}>🌱</span>
+        <div style={{ width: 44, height: 44, borderRadius: 12, overflow: "hidden", flexShrink: 0, ...(data.photoURL ? { boxShadow: "0 4px 12px rgba(32,40,31,0.18)" } : { background: `linear-gradient(145deg, ${TOKENS.moss}, #3D5437)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${TOKENS.moss}35` }) }}>
+          {data.photoURL
+            ? <img src={data.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <span style={{ fontSize: 22 }}>🌱</span>
+          }
         </div>
         <div>
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 2px" }}>내 농가 정보</h2>
@@ -2675,6 +2826,22 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
         </div>
       </div>
       <div style={{ padding: isMobile ? "14px 14px 20px" : "20px 24px 28px" }}>
+
+      {/* 프로필 사진 업로드 */}
+      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+        <ImageUpload
+          value={data.photoURL || ""}
+          onChange={(url) => update("photoURL", url)}
+          storagePath={`images/farm-profile/${userId}.jpg`}
+          label="농가·사진"
+          shape="circle"
+          size={76}
+        />
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>농가 사진</div>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 3, lineHeight: 1.5 }}>클릭하여 농가 대표 사진을 업로드하세요.<br />셰프에게 표시됩니다.</div>
+        </div>
+      </div>
 
       {avgRating !== null ? (
         <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 14 }}>
@@ -2753,14 +2920,17 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
           <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
             미리보기
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink }}>
-              {data.farmName || "—"}
-            </span>
-            <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft }}>{data.region}</span>
-            {avgRating !== null && (
-              <span style={{ fontSize: 12, color: "#7A5C20", marginLeft: "auto" }}>★ {avgRating.toFixed(1)} ({ratedProposals.length}건)</span>
-            )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            {data.photoURL && <img src={data.photoURL} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flex: 1 }}>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink }}>
+                {data.farmName || "—"}
+              </span>
+              <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft }}>{data.region}</span>
+              {avgRating !== null && (
+                <span style={{ fontSize: 12, color: "#7A5C20", marginLeft: "auto" }}>★ {avgRating.toFixed(1)} ({ratedProposals.length}건)</span>
+              )}
+            </div>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: data.description ? 8 : 0 }}>
             {data.cert && data.cert !== "인증 없음" && <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{data.cert}</span>}
@@ -3781,12 +3951,12 @@ export default function FarmToTableApp() {
           />
         ) : (
           <>
-            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} />}
+            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} chatUnreads={chatUnreads} />}
             {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
-            {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} />}
-            {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} />}
+            {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} />}
+            {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} />}
           </>
         )}
       </div>
