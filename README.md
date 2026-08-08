@@ -160,6 +160,7 @@ allow delete: if request.auth != null
 | v1.4 | PWA 앱화 (manifest.json·오프라인 캐싱·홈화면 설치 버튼), Firestore 보안 규칙 세분화 (user-profile 본인 제한·딜 생성자 삭제 권한), 계약서 자동 생성 (표준 농산물 거래 계약서·인쇄/PDF 저장) |
 | v1.5 | 버그 수정 3건 (딜 복제 시 원본 덮어쓰기·프로필 공유 키 충돌·채팅 경쟁 조건), 데이터 격리 완성 (farm/chef-profile uid 기반 분리·chats 컬렉션 분리) |
 | v1.6 | UX 개선 11건 (빈 상태 CTA·정산 완료 2단계 확인·납품일 과거 선택 방지·오류 화면 재시도 버튼 등), 전체 화면 UI 폴리싱 (로그인·위저드·채팅·프로필), 비로그인 chats permission-denied 버그 수정, Firestore 규칙 배포 자동화 |
+| v1.7 | 프로필·딜 이미지 업로드 기능 추가 (Canvas 클라이언트 압축 → Firestore base64 저장, 무료 플랜 지원) |
 
 ### v1.6 상세 내역
 
@@ -188,6 +189,27 @@ allow delete: if request.auth != null
 - 비로그인 상태에서 `chats` 컬렉션 읽기 시도 → permission-denied 오류 수정 (`user?.uid` 조건 추가)
 - `React.Fragment` 미임포트로 인한 런타임 오류 수정 (`Fragment` named import 추가)
 - Firestore 보안 규칙 Firebase 미배포 문제 수정 (규칙 배포 완료)
+
+### v1.7 상세 내역
+
+**이미지 업로드 기능**
+- `ImageUpload` 공용 컴포넌트 추가 — 파일 선택·드래그 없이 클릭 한 번으로 업로드
+- Canvas API로 클라이언트 사이드 압축 (최대 900px, JPEG quality 0.82) → 압축 후 약 150~200KB
+- 압축된 이미지를 base64 data URL로 변환 → 기존 Firestore 컬렉션에 인라인 저장 (Firebase Storage 불필요, 무료 플랜 유지)
+- Firestore 문서 1MB 한도 내 안전하게 수용
+
+**적용 화면**
+- 셰프 프로필 (`내 레스토랑`): 원형 업로드 위젯 (76px), 레스토랑 로고·대표사진 등록 → 농가에게 표시
+- 농가 프로필 (`내 농가`): 원형 업로드 위젯 (76px), 농가 대표사진 등록 → 셰프에게 표시
+- 딜 만들기 스텝 4: 정사각 업로드 위젯 (100px) + 선택 사진 삭제 버튼
+- 딜 만들기 스텝 5 (확인): 딜 사진 140px 배너 미리보기
+- 딜 찾기·내 거래 카드: 사진이 있는 딜은 우측 상단에 64px 썸네일 표시
+
+**기술 세부**
+- `canvas.toDataURL("image/jpeg", 0.82)` → base64 문자열 → Firestore `deals/{dealId}.photoURL` 또는 `storage/chef-profile-{uid}`, `storage/farm-profile-{uid}` 에 저장
+- 딜 ID 사전 생성 (`useState(() => \`d${Date.now()}\`)`) — 생성·수정 시 동일 ID 보장
+- 편집 중 UI: 압축 중 "압축 중…" 오버레이, hover 시 "변경 ✎" 오버레이
+- Playwright E2E 테스트 7개 전부 통과 (회원가입→프로필 사진 업로드→딜 사진 업로드 전 과정 검증)
 
 ## 향후 과제
 
