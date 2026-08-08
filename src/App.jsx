@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from "react";
-import { storage, db, auth, firebaseStorage } from "./firebase";
+import { storage, db, auth } from "./firebase";
 import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -14,13 +13,14 @@ function useIsMobile() {
   return isMobile;
 }
 
-function ImageUpload({ value, onChange, storagePath, label = "사진 추가", shape = "square", size = 96 }) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadErr, setUploadErr] = useState(null);
+function ImageUpload({ value, onChange, label = "사진 추가", shape = "square", size = 96 }) {
+  const [compressing, setCompressing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const fileRef = useRef(null);
 
-  const compress = (file) => new Promise((resolve, reject) => {
+  const handleFile = (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    setCompressing(true);
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -34,27 +34,11 @@ function ImageUpload({ value, onChange, storagePath, label = "사진 추가", sh
       canvas.width = width; canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("blob")), "image/jpeg", 0.82);
+      onChange(canvas.toDataURL("image/jpeg", 0.82));
+      setCompressing(false);
     };
-    img.onerror = reject;
+    img.onerror = () => setCompressing(false);
     img.src = url;
-  });
-
-  const handleFile = async (file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    setUploading(true);
-    setUploadErr(null);
-    try {
-      const blob = await compress(file);
-      const sRef = storageRef(firebaseStorage, storagePath);
-      await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
-      const url = await getDownloadURL(sRef);
-      onChange(url);
-    } catch {
-      setUploadErr("업로드에 실패했습니다.");
-    } finally {
-      setUploading(false);
-    }
   };
 
   const bRadius = shape === "circle" ? "50%" : 12;
@@ -63,12 +47,12 @@ function ImageUpload({ value, onChange, storagePath, label = "사진 추가", sh
       <input type="file" accept="image/*" ref={fileRef} style={{ display: "none" }}
         onChange={(e) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
       <div
-        onClick={() => !uploading && fileRef.current.click()}
+        onClick={() => !compressing && fileRef.current.click()}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
           width: size, height: size, borderRadius: bRadius, overflow: "hidden",
-          cursor: uploading ? "wait" : "pointer",
+          cursor: compressing ? "wait" : "pointer",
           border: `2px ${value ? "solid" : "dashed"} ${TOKENS.line}`,
           background: value ? "transparent" : TOKENS.card,
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -86,18 +70,17 @@ function ImageUpload({ value, onChange, storagePath, label = "사진 추가", sh
             </div>
           )
         }
-        {uploading && (
+        {compressing && (
           <div style={{ position: "absolute", inset: 0, background: "rgba(243,241,231,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 11, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace" }}>업로드 중…</span>
+            <span style={{ fontSize: 11, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace" }}>처리 중…</span>
           </div>
         )}
-        {value && !uploading && (
+        {value && !compressing && (
           <div style={{ position: "absolute", inset: 0, background: "rgba(32,40,31,0.45)", opacity: hovered ? 1 : 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.15s ease" }}>
             <span style={{ color: "#fff", fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 500 }}>변경 ✎</span>
           </div>
         )}
       </div>
-      {uploadErr && <div style={{ fontSize: 11, color: TOKENS.rust }}>{uploadErr}</div>}
     </div>
   );
 }
@@ -1392,7 +1375,6 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
               <ImageUpload
                 value={data.photoURL || ""}
                 onChange={(url) => update("photoURL", url)}
-                storagePath={`images/deal/${dealId}.jpg`}
                 label="딜 사진"
                 shape="square"
                 size={100}
@@ -2687,7 +2669,6 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
         <ImageUpload
           value={data.photoURL || ""}
           onChange={(url) => update("photoURL", url)}
-          storagePath={`images/chef-profile/${userId}.jpg`}
           label="로고·사진"
           shape="circle"
           size={76}
@@ -2832,7 +2813,6 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
         <ImageUpload
           value={data.photoURL || ""}
           onChange={(url) => update("photoURL", url)}
-          storagePath={`images/farm-profile/${userId}.jpg`}
           label="농가·사진"
           shape="circle"
           size={76}
