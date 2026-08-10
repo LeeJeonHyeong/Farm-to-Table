@@ -1452,6 +1452,35 @@ const PROPOSAL_FIELD_REQUIRED = {
   availableDate: "납품 가능일",
 };
 
+function FarmProfileMiniCard({ farmProfile }) {
+  if (!farmProfile?.farmName) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: TOKENS.mossSoft, borderRadius: 10, marginBottom: 14, border: `1px solid ${TOKENS.moss}33` }}>
+      <div style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: farmProfile.photoURL ? "transparent" : `linear-gradient(145deg, ${TOKENS.moss}, #3D5437)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {farmProfile.photoURL
+          ? <img src={farmProfile.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : <span style={{ fontSize: 20 }}>🌱</span>
+        }
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, color: TOKENS.ink, fontWeight: 600 }}>{farmProfile.farmName}</span>
+          {farmProfile.region && <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{farmProfile.region}</span>}
+        </div>
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 4 }}>
+          {farmProfile.cert && farmProfile.cert !== "인증 없음" && (
+            <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{farmProfile.cert}</span>
+          )}
+          {(farmProfile.specialty || []).slice(0, 3).map((c) => (
+            <span key={c} style={chipBadge("#E8F0E4", TOKENS.moss)}>{c}</span>
+          ))}
+        </div>
+      </div>
+      <span style={{ fontSize: 11, color: TOKENS.moss, fontWeight: 600, flexShrink: 0 }}>✓ 내 농가</span>
+    </div>
+  );
+}
+
 function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
   const [data, setData] = useState({
     farmName: farmProfile?.farmName || farmerName || "",
@@ -1491,11 +1520,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
 
   return (
     <div style={{ background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
-      {farmProfile?.farmName && (
-        <div style={{ fontSize: 12, color: TOKENS.moss, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <span>✓</span><span>내 농가 정보({farmProfile.farmName})가 자동으로 입력되었습니다.</span>
-        </div>
-      )}
+      <FarmProfileMiniCard farmProfile={farmProfile} />
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
         <div>
           <FieldLabel required>농가명</FieldLabel>
@@ -1690,9 +1715,117 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
   );
 }
 
+function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack }) {
+  const [openForm, setOpenForm] = useState(false);
+  const isMobile = useIsMobile();
+  const myProposal = deal.proposals.find((p) => p.farmerName === userName);
+  const isMySpecialty = (farmProfile?.specialty ?? []).includes(deal.crop);
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto" }} className="ftt-screen-enter">
+      <button
+        onClick={onBack}
+        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: TOKENS.inkSoft, fontSize: 13, padding: "0 0 16px", marginBottom: 4 }}
+      >
+        ← 딜 목록으로
+      </button>
+
+      {deal.photoURL && (
+        <div style={{ width: "100%", height: isMobile ? 180 : 240, borderRadius: 16, overflow: "hidden", marginBottom: 20, boxShadow: "0 4px 20px rgba(32,40,31,0.12)" }}>
+          <img src={deal.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+      )}
+
+      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, padding: isMobile ? 18 : 24, marginBottom: 16, boxShadow: "0 2px 12px rgba(32,40,31,0.05)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: TOKENS.ink }}>{deal.crop}</span>
+              {isMySpecialty && (
+                <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss, background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}44`, borderRadius: 4, padding: "1px 6px", letterSpacing: "0.04em" }}>내 전문 품목</span>
+              )}
+            </div>
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginTop: 4 }}>
+              {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""}
+            </div>
+          </div>
+          <StatusBadge status={deal.status} />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 10, margin: "16px 0" }}>
+          {[
+            { label: "희망 단가", value: `${deal.targetPrice.toLocaleString()}원/kg`, color: "#7A5C20" },
+            { label: "수량", value: `${deal.quantity}kg` },
+            { label: "납품 희망일", value: deal.deliveryDate },
+            { label: "등급", value: `${deal.grade}등급` },
+            { label: "숙성도", value: deal.ripeness || "-" },
+            { label: "납품 주기", value: deal.cycle || "-" },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ background: "#FFFFFF", borderRadius: 10, padding: "10px 14px", border: `1px solid ${TOKENS.line}` }}>
+              <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: color || TOKENS.ink }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {deal.sizeCondition && (
+          <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: 10 }}>
+            <span style={{ fontWeight: 500, color: TOKENS.ink }}>규격 조건</span> · {deal.sizeCondition}
+          </div>
+        )}
+        {deal.note && (
+          <div style={{ background: TOKENS.bg, borderRadius: 10, padding: "12px 16px", border: `1px solid ${TOKENS.line}`, fontSize: 13, color: TOKENS.inkSoft, lineHeight: 1.6 }}>
+            "{deal.note}"
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 14 }}>
+          들어온 제안 {deal.proposals.length}건 · 등록일 {fmtDate(deal.createdAt)}
+        </div>
+      </div>
+
+      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, padding: isMobile ? 18 : 24, boxShadow: "0 2px 12px rgba(32,40,31,0.05)" }}>
+        <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 14 }}>제안하기</div>
+        {myProposal ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: TOKENS.mossSoft, borderRadius: 10, fontSize: 13, border: `1px solid ${TOKENS.moss}33` }}>
+            <span style={{ color: TOKENS.moss, fontWeight: 500 }}>✓ 제안 완료</span>
+            <span style={{ color: TOKENS.inkSoft }}>제안가 {myProposal.price.toLocaleString()}원/kg · {myProposal.availableQty}kg</span>
+            {deal.selectedProposalId === myProposal.id
+              ? <span style={{ marginLeft: "auto", color: TOKENS.moss, fontWeight: 600 }}>🎉 선택됨</span>
+              : deal.selectedProposalId
+              ? <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>미선택</span>
+              : <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>검토 중</span>}
+          </div>
+        ) : openForm ? (
+          <ProposalForm
+            deal={deal}
+            onSubmit={(id, proposal) => { onSubmitProposal(id, proposal); setOpenForm(false); }}
+            onCancel={() => setOpenForm(false)}
+            farmProfile={farmProfile}
+            farmerName={userName}
+          />
+        ) : (
+          <button
+            onClick={() => setOpenForm(true)}
+            style={{ width: "100%", padding: "12px 0", background: TOKENS.moss, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer" }}
+          >
+            이 딜에 제안 보내기
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
-  const [openFormId, setOpenFormId] = useState(null);
+  const [detailDeal, setDetailDeal] = useState(null);
   const [search, setSearch] = useState("");
+  useEffect(() => {
+    if (detailDeal) {
+      const updated = deals.find((d) => d.id === detailDeal.id);
+      if (updated) setDetailDeal(updated);
+    }
+  }, [deals]);
   const [cropFilter, setCropFilter] = useState("전체");
   const [gradeFilter, setGradeFilter] = useState("전체");
   const hasSpecialty = (farmProfile?.specialty?.length ?? 0) > 0;
@@ -1752,6 +1885,18 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
     setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
     setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax("");
   };
+
+  if (detailDeal) {
+    return (
+      <DealDetailView
+        deal={detailDeal}
+        farmProfile={farmProfile}
+        userName={userName}
+        onSubmitProposal={(id, proposal) => { onSubmitProposal(id, proposal); setDetailDeal(null); }}
+        onBack={() => setDetailDeal(null)}
+      />
+    );
+  }
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -1909,8 +2054,14 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {filtered.map((deal) => {
             const isMySpecialty = specialty.has(deal.crop);
+            const myProposal = deal.proposals.find((p) => p.farmerName === userName);
             return (
-            <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${isMySpecialty ? TOKENS.moss + "66" : TOKENS.line}`, borderLeft: `4px solid ${isMySpecialty ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
+            <div
+              key={deal.id}
+              className="ftt-card"
+              onClick={() => setDetailDeal(deal)}
+              style={{ background: TOKENS.card, border: `1px solid ${isMySpecialty ? TOKENS.moss + "66" : TOKENS.line}`, borderLeft: `4px solid ${isMySpecialty ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)", cursor: "pointer" }}
+            >
               {deal.photoURL && (
                 <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
                   <img src={deal.photoURL} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
@@ -1931,45 +2082,20 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
                 {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
               </div>
               <DealSummaryRow deal={deal} />
-              {deal.note && <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10 }}>"{deal.note}"</p>}
-              <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: myProposal ? 10 : 0 }}>
                 희망 납품일 {deal.deliveryDate} · 들어온 제안 {deal.proposals.length}건
               </div>
-              {(() => {
-                const myProposal = deal.proposals.find(p => p.farmerName === userName);
-                if (myProposal) {
-                  return (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: TOKENS.mossSoft, borderRadius: 8, fontSize: 13 }}>
-                      <span style={{ color: TOKENS.moss, fontWeight: 500 }}>✓ 제안 완료</span>
-                      <span style={{ color: TOKENS.inkSoft }}>제안가 {myProposal.price.toLocaleString()}원/kg · {myProposal.availableQty}kg</span>
-                      {deal.selectedProposalId === myProposal.id
-                        ? <span style={{ marginLeft: "auto", color: TOKENS.moss, fontWeight: 600 }}>🎉 선택됨</span>
-                        : deal.selectedProposalId
-                        ? <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>미선택</span>
-                        : <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>검토 중</span>}
-                    </div>
-                  );
-                }
-                if (openFormId === deal.id) {
-                  return (
-                    <ProposalForm
-                      deal={deal}
-                      onSubmit={(id, proposal) => { onSubmitProposal(id, proposal); setOpenFormId(null); }}
-                      onCancel={() => setOpenFormId(null)}
-                      farmProfile={farmProfile}
-                      farmerName={userName}
-                    />
-                  );
-                }
-                return (
-                  <button
-                    onClick={() => setOpenFormId(deal.id)}
-                    style={{ padding: "8px 16px", background: TOKENS.moss, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-                  >
-                    이 딜에 제안 보내기
-                  </button>
-                );
-              })()}
+              {myProposal && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: TOKENS.mossSoft, borderRadius: 8, fontSize: 13 }}>
+                  <span style={{ color: TOKENS.moss, fontWeight: 500 }}>✓ 제안 완료</span>
+                  <span style={{ color: TOKENS.inkSoft }}>제안가 {myProposal.price.toLocaleString()}원/kg · {myProposal.availableQty}kg</span>
+                  {deal.selectedProposalId === myProposal.id
+                    ? <span style={{ marginLeft: "auto", color: TOKENS.moss, fontWeight: 600 }}>🎉 선택됨</span>
+                    : deal.selectedProposalId
+                    ? <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>미선택</span>
+                    : <span style={{ marginLeft: "auto", color: TOKENS.inkSoft }}>검토 중</span>}
+                </div>
+              )}
             </div>
             );
           })}
