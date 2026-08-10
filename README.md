@@ -161,6 +161,7 @@ allow delete: if request.auth != null
 | v1.5 | 버그 수정 3건 (딜 복제 시 원본 덮어쓰기·프로필 공유 키 충돌·채팅 경쟁 조건), 데이터 격리 완성 (farm/chef-profile uid 기반 분리·chats 컬렉션 분리) |
 | v1.6 | UX 개선 11건 (빈 상태 CTA·정산 완료 2단계 확인·납품일 과거 선택 방지·오류 화면 재시도 버튼 등), 전체 화면 UI 폴리싱 (로그인·위저드·채팅·프로필), 비로그인 chats permission-denied 버그 수정, Firestore 규칙 배포 자동화 |
 | v1.7 | 프로필·딜 이미지 업로드 기능 추가 (Canvas 클라이언트 압축 → Firestore base64 저장, 무료 플랜 지원) |
+| v1.8 | 딜 상세 페이지 추가 (카드 클릭 → 풀스크린 정보 그리드·사진 배너), 농가 프로필 카드 표시 (제안 폼 상단에 사진·이름·인증·전문품목 카드) |
 
 ### v1.6 상세 내역
 
@@ -210,6 +211,31 @@ allow delete: if request.auth != null
 - 딜 ID 사전 생성 (`useState(() => \`d${Date.now()}\`)`) — 생성·수정 시 동일 ID 보장
 - 편집 중 UI: 압축 중 "압축 중…" 오버레이, hover 시 "변경 ✎" 오버레이
 - Playwright E2E 테스트 7개 전부 통과 (회원가입→프로필 사진 업로드→딜 사진 업로드 전 과정 검증)
+
+### v1.8 상세 내역
+
+**딜 상세 페이지 (`DealDetailView`)**
+- `DealDetailView` 컴포넌트 신규 추가 — 딜 카드 클릭 시 풀스크린 상세 페이지로 전환
+- 상단 "← 딜 목록으로" 뒤로가기 버튼으로 목록 복귀
+- 사진 배너: 모바일 180px / 데스크톱 240px, 사진 없으면 테마 색 배경 플레이스홀더
+- 6-필드 정보 그리드: 희망 단가·수량·납품 희망일·등급·숙성도·납품 주기
+- 사이즈 조건·메모·제안 수 표시
+- 제안 섹션: 이미 제안한 경우 "✓ 제안 완료" 뱃지, 아니면 "이 딜에 제안 보내기" 버튼 → `ProposalForm` 인라인 표시
+
+**농가 프로필 카드 (`FarmProfileMiniCard`)**
+- `FarmProfileMiniCard` 컴포넌트 신규 추가 — 제안 폼 상단에 농가 정보 카드 표시
+- 44px 원형 농가 사진 (없으면 🌱 이모지 폴백), 농가명, 지역, 인증 뱃지, 전문품목 칩(최대 3개), "✓ 내 농가" 뱃지
+- 배경: `TOKENS.mossSoft`, 테두리: `${TOKENS.moss}33`
+
+**딜 목록 (`DealBrowseScreen`) 변경**
+- 딜 카드에 `onClick={() => setDetailDeal(deal)}` 추가 (cursor: pointer)
+- `openFormId` 상태 → `detailDeal` 상태로 교체 (상세 페이지 제어)
+- `useEffect`로 Firestore 실시간 업데이트 시 `detailDeal` 자동 동기화
+- 제안 제출 완료 시 자동으로 목록 복귀 (`setDetailDeal(null)`)
+- 목록 카드에서 인라인 `ProposalForm` 제거 → 상세 페이지에서만 제안 가능
+
+**테스트**
+- Playwright E2E 15개 전부 통과 (가입→프로필 저장→딜 카드 클릭→상세 페이지 확인→농가 프로필 카드 확인→제안 제출→목록 자동 복귀→뒤로가기 전 과정 검증)
 
 ## 향후 과제
 
