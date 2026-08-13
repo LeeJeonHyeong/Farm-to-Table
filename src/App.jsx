@@ -4387,10 +4387,10 @@ export default function FarmToTableApp() {
           const prevMsgs = prev[dealId] || [];
           msgs.slice(prevMsgs.length).forEach((msg) => {
             if (msg.senderName !== cu.name) {
-              showPushNotification(
-                `새 메시지 — ${msg.senderName}`,
-                msg.text.length > 60 ? msg.text.slice(0, 60) + "…" : msg.text
-              );
+              const notifBody = msg.imageURL
+                ? (msg.text ? `📷 ${msg.text.length > 50 ? msg.text.slice(0, 50) + "…" : msg.text}` : "📷 사진을 보냈습니다")
+                : (msg.text.length > 60 ? msg.text.slice(0, 60) + "…" : msg.text);
+              showPushNotification(`새 메시지 — ${msg.senderName}`, notifBody);
             }
           });
         });
