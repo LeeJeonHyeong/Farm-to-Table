@@ -2061,6 +2061,11 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
   const [qtyMax, setQtyMax] = useState("");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
+  const [cycleFilter, setCycleFilter] = useState("전체");
+  const [searchHistory, setSearchHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("deal-search-history") || "[]"); } catch { return []; }
+  });
+  const [searchFocused, setSearchFocused] = useState(false);
   const isMobile = useIsMobile();
 
   const specialty = new Set(farmProfile?.specialty ?? []);
@@ -2079,6 +2084,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
       if (qtyMax && d.quantity > Number(qtyMax)) return false;
       if (priceMin && d.targetPrice < Number(priceMin)) return false;
       if (priceMax && d.targetPrice > Number(priceMax)) return false;
+      if (cycleFilter !== "전체" && d.cycle !== cycleFilter) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         return (
@@ -2104,11 +2110,35 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
     });
 
   const hasAdvanced = dateFrom || dateTo || qtyMin || qtyMax || priceMin || priceMax;
-  const hasFilters = search || specialtyOnly || cropFilter !== "전체" || gradeFilter !== "전체" || regionFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
+  const hasFilters = search || specialtyOnly || cropFilter !== "전체" || gradeFilter !== "전체" || cycleFilter !== "전체" || regionFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
   const resetFilters = () => {
-    setSearch(""); setSpecialtyOnly(false); setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
+    setSearch(""); setSpecialtyOnly(false); setCropFilter("전체"); setGradeFilter("전체"); setCycleFilter("전체"); setRegionFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
     setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax("");
   };
+
+  const saveSearchHistory = (q) => {
+    if (!q.trim()) return;
+    setSearchHistory((prev) => {
+      const next = [q.trim(), ...prev.filter((h) => h !== q.trim())].slice(0, 5);
+      localStorage.setItem("deal-search-history", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const activeFilterChips = [
+    search && { key: "search", label: `"${search}"`, clear: () => setSearch("") },
+    specialtyOnly && { key: "specialty", label: "🌱 전문품목만", clear: () => setSpecialtyOnly(false) },
+    cropFilter !== "전체" && { key: "crop", label: `품목: ${cropFilter}`, clear: () => setCropFilter("전체") },
+    regionFilter !== "전체" && { key: "region", label: `지역: ${regionFilter}`, clear: () => setRegionFilter("전체") },
+    gradeFilter !== "전체" && { key: "grade", label: `등급: ${gradeFilter}`, clear: () => setGradeFilter("전체") },
+    cycleFilter !== "전체" && { key: "cycle", label: `주기: ${cycleFilter}`, clear: () => setCycleFilter("전체") },
+    dateFrom && { key: "dateFrom", label: `납품일 ${dateFrom}~`, clear: () => setDateFrom("") },
+    dateTo && { key: "dateTo", label: `~${dateTo}`, clear: () => setDateTo("") },
+    qtyMin && { key: "qtyMin", label: `수량 ${qtyMin}kg~`, clear: () => setQtyMin("") },
+    qtyMax && { key: "qtyMax", label: `~${qtyMax}kg`, clear: () => setQtyMax("") },
+    priceMin && { key: "priceMin", label: `단가 ${Number(priceMin).toLocaleString()}원~`, clear: () => setPriceMin("") },
+    priceMax && { key: "priceMax", label: `~${Number(priceMax).toLocaleString()}원`, clear: () => setPriceMax("") },
+  ].filter(Boolean);
 
   if (detailDeal) {
     return (
@@ -2125,7 +2155,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       {/* 검색창 */}
-      <div style={{ position: "relative", marginBottom: 14 }}>
+      <div style={{ position: "relative", marginBottom: 10 }}>
         <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: TOKENS.inkSoft, fontSize: 14, pointerEvents: "none" }}>
           ⌕
         </span>
@@ -2134,6 +2164,9 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
           placeholder="품목, 레스토랑명, 요청사항으로 검색"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => { setSearchFocused(false); saveSearchHistory(search); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { saveSearchHistory(search); e.target.blur(); } }}
           style={{ ...inputStyle, paddingLeft: 34, fontSize: 13 }}
         />
         {search && (
@@ -2145,6 +2178,28 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
           </button>
         )}
       </div>
+
+      {/* 최근 검색어 */}
+      {searchFocused && !search && searchHistory.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          <span style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>최근:</span>
+          {searchHistory.map((h) => (
+            <button
+              key={h}
+              onMouseDown={(e) => { e.preventDefault(); setSearch(h); }}
+              style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, background: TOKENS.card, border: `1px solid ${TOKENS.line}`, color: TOKENS.inkSoft, cursor: "pointer" }}
+            >
+              {h}
+            </button>
+          ))}
+          <button
+            onMouseDown={(e) => { e.preventDefault(); setSearchHistory([]); localStorage.removeItem("deal-search-history"); }}
+            style={{ fontSize: 10, color: TOKENS.rust, background: "none", border: "none", cursor: "pointer", marginLeft: 2 }}
+          >
+            지우기
+          </button>
+        </div>
+      )}
 
       {/* 내 전문품목만 빠른 필터 */}
       {hasSpecialty && (
@@ -2203,6 +2258,20 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
             ))}
           </div>
         )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>주기</span>
+          {["전체", ...CYCLE_OPTIONS].map((c) => (
+            <button key={c} onClick={() => setCycleFilter(c)} style={{
+              padding: "4px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+              border: `1px solid ${cycleFilter === c ? TOKENS.moss : TOKENS.line}`,
+              background: cycleFilter === c ? TOKENS.mossSoft : "#FFFFFF",
+              color: cycleFilter === c ? TOKENS.moss : TOKENS.inkSoft,
+            }}>
+              {c}
+            </button>
+          ))}
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", rowGap: 6 }}>
           <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>등급</span>
@@ -2270,7 +2339,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
       </div>
 
       {/* 결과 수 + 초기화 */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 12, gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: activeFilterChips.length > 0 ? 8 : 12, gap: 10 }}>
         <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           {filtered.length}건 / 전체 {openDeals.length}건
         </span>
@@ -2279,10 +2348,30 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
             onClick={resetFilters}
             style={{ fontSize: 11, color: TOKENS.rust, background: "none", border: `1px solid ${TOKENS.rustSoft}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
           >
-            필터 초기화
+            전체 초기화
           </button>
         )}
       </div>
+
+      {/* 활성 필터 요약 칩 */}
+      {activeFilterChips.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {activeFilterChips.map((chip) => (
+            <span
+              key={chip.key}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 999, fontSize: 11, background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}55`, color: "#7A5C20", fontWeight: 500 }}
+            >
+              {chip.label}
+              <button
+                onClick={chip.clear}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#7A5C20", fontSize: 13, lineHeight: 1, padding: 0, display: "flex", alignItems: "center" }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* 딜 목록 */}
       {filtered.length === 0 ? (
