@@ -1481,6 +1481,44 @@ function FarmProfileMiniCard({ farmProfile }) {
   );
 }
 
+function ChefProfileMiniCard({ chefData, deal }) {
+  const name = deal.chefName;
+  const region = deal.chefRegion;
+  const photo = chefData?.photoURL;
+  const description = chefData?.description;
+  const preferCrops = chefData?.preferCrops || [];
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "14px 16px", background: TOKENS.rustSoft, borderRadius: 12, marginBottom: 16, border: `1px solid ${TOKENS.rust}22` }}>
+      <div style={{ width: 52, height: 52, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: photo ? "transparent" : `linear-gradient(145deg, ${TOKENS.rust}, #8B3A2A)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {photo
+          ? <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : <span style={{ fontSize: 22 }}>🍳</span>
+        }
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, color: TOKENS.ink, fontWeight: 600 }}>{name}</span>
+          {region && <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{region}</span>}
+        </div>
+        {description && (
+          <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: "0 0 6px", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+            {description}
+          </p>
+        )}
+        {preferCrops.length > 0 && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>선호품목</span>
+            {preferCrops.slice(0, 5).map((c) => (
+              <span key={c} style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>{c}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
   const [data, setData] = useState({
     farmName: farmProfile?.farmName || farmerName || "",
@@ -1719,9 +1757,18 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
 
 function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack }) {
   const [openForm, setOpenForm] = useState(false);
+  const [chefData, setChefData] = useState(null);
   const isMobile = useIsMobile();
   const myProposal = deal.proposals.find((p) => p.farmerName === userName);
   const isMySpecialty = (farmProfile?.specialty ?? []).includes(deal.crop);
+
+  useEffect(() => {
+    if (deal.createdBy) {
+      storage.get(chefProfileKey(deal.createdBy)).then((result) => {
+        if (result?.value) setChefData(JSON.parse(result.value));
+      }).catch(() => {});
+    }
+  }, [deal.id]);
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }} className="ftt-screen-enter">
@@ -1786,6 +1833,11 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack 
         </div>
       </div>
 
+      {/* 셰프 프로필 카드 */}
+      {(chefData || deal.chefName) && (
+        <ChefProfileMiniCard chefData={chefData} deal={deal} />
+      )}
+
       <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, padding: isMobile ? 18 : 24, boxShadow: "0 2px 12px rgba(32,40,31,0.05)" }}>
         <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 14 }}>제안하기</div>
         {myProposal ? (
@@ -1831,6 +1883,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
   const [cropFilter, setCropFilter] = useState("전체");
   const [gradeFilter, setGradeFilter] = useState("전체");
   const hasSpecialty = (farmProfile?.specialty?.length ?? 0) > 0;
+  const [specialtyOnly, setSpecialtyOnly] = useState(false);
   const [sortBy, setSortBy] = useState(hasSpecialty ? "smart" : "latest");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [regionFilter, setRegionFilter] = useState("전체");
@@ -1848,6 +1901,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
 
   const filtered = openDeals
     .filter((d) => {
+      if (specialtyOnly && !specialty.has(d.crop)) return false;
       if (cropFilter !== "전체" && d.crop !== cropFilter) return false;
       if (gradeFilter !== "전체" && d.grade !== gradeFilter) return false;
       if (regionFilter !== "전체" && d.chefRegion !== regionFilter) return false;
@@ -1882,9 +1936,9 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
     });
 
   const hasAdvanced = dateFrom || dateTo || qtyMin || qtyMax || priceMin || priceMax;
-  const hasFilters = search || cropFilter !== "전체" || gradeFilter !== "전체" || regionFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
+  const hasFilters = search || specialtyOnly || cropFilter !== "전체" || gradeFilter !== "전체" || regionFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
   const resetFilters = () => {
-    setSearch(""); setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
+    setSearch(""); setSpecialtyOnly(false); setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
     setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax("");
   };
 
@@ -1923,6 +1977,28 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
           </button>
         )}
       </div>
+
+      {/* 내 전문품목만 빠른 필터 */}
+      {hasSpecialty && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => { setSpecialtyOnly((v) => !v); if (!specialtyOnly) setCropFilter("전체"); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
+              border: `1px solid ${specialtyOnly ? TOKENS.moss : TOKENS.line}`,
+              background: specialtyOnly ? TOKENS.moss : "#FFFFFF",
+              color: specialtyOnly ? "#FFFFFF" : TOKENS.inkSoft,
+              transition: "all 0.12s ease",
+            }}
+          >
+            🌱 내 전문품목만
+          </button>
+          {specialtyOnly && (farmProfile.specialty || []).map((c) => (
+            <span key={c} style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{c}</span>
+          ))}
+        </div>
+      )}
 
       {/* 필터 행 */}
       <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: isMobile ? "10px 10px" : "12px 14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
