@@ -3435,7 +3435,7 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
 
 /* ---------- 4-0. 내 레스토랑 (셰프) ---------- */
 
-function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "" }) {
+function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "", onShowOnboarding }) {
   const blank = { restaurantName: defaultRestaurantName, region: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체", photoURL: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
@@ -3534,11 +3534,16 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
         style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
       />
 
-      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <button onClick={handleSave} style={{ padding: "12px 28px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 10px rgba(32,40,31,0.18)", letterSpacing: "-0.01em" }}>
           저장하기
         </button>
         {saved && <span style={{ fontSize: 13, color: TOKENS.moss, fontWeight: 500 }}>✓ 저장됐습니다</span>}
+        {onShowOnboarding && (
+          <button onClick={onShowOnboarding} style={{ marginLeft: "auto", background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 8, padding: "7px 14px", fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
+            ⓘ 앱 사용법 다시 보기
+          </button>
+        )}
       </div>
 
       {(data.restaurantName || data.preferCrops.length > 0) && (
@@ -3568,7 +3573,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
 
 /* ---------- 4. 내 농가 등록 ---------- */
 
-function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "" }) {
+function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "", onShowOnboarding }) {
   const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
@@ -3700,11 +3705,16 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
         style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
       />
 
-      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <button onClick={handleSave} style={{ padding: "12px 28px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 10px rgba(32,40,31,0.18)", letterSpacing: "-0.01em" }}>
           저장하기
         </button>
         {saved && <span style={{ fontSize: 13, color: TOKENS.moss, fontWeight: 500 }}>✓ 저장됐습니다</span>}
+        {onShowOnboarding && (
+          <button onClick={onShowOnboarding} style={{ marginLeft: "auto", background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 8, padding: "7px 14px", fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
+            ⓘ 앱 사용법 다시 보기
+          </button>
+        )}
       </div>
 
       {(data.farmName || data.specialty.length > 0) && (
@@ -4879,8 +4889,8 @@ export default function FarmToTableApp() {
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} chatUnreads={chatUnreads} />}
             {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
-            {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} />}
-            {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} />}
+            {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
+            {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "dashboard" && <DashboardScreen deals={deals} user={user} onTabChange={handleTabClick} />}
           </>
         )}
