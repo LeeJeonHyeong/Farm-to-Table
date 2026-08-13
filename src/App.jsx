@@ -915,7 +915,10 @@ JSON 형식:
 
 /* ---------- 푸시 알림 ---------- */
 
+let _recordNotif = null;
+
 function showPushNotification(title, body) {
+  _recordNotif?.({ id: Date.now(), title, body, ts: Date.now(), read: false });
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const options = { body, icon: "/vite.svg", badge: "/vite.svg" };
   if ("serviceWorker" in navigator) {
@@ -1625,12 +1628,30 @@ const SORT_OPTIONS = [
 function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
+  const [detailItem, setDetailItem] = useState(null);
   const myItems = [];
   for (const deal of deals) {
     const proposal = deal.proposals.find((p) => p.farmerName === userName);
     if (proposal) myItems.push({ deal, proposal });
   }
   myItems.sort((a, b) => b.proposal.createdAt - a.proposal.createdAt);
+
+  if (detailItem) {
+    const live = deals.find((d) => d.id === detailItem.deal.id);
+    const liveDeal = live || detailItem.deal;
+    const liveProposal = liveDeal.proposals.find((p) => p.id === detailItem.proposal.id) || detailItem.proposal;
+    return (
+      <MyProposalDetailView
+        deal={liveDeal}
+        proposal={liveProposal}
+        onBack={() => setDetailItem(null)}
+        onCancel={onCancelProposal}
+        onOpenChat={onOpenChat}
+        onViewContract={onViewContract}
+        chatUnreads={chatUnreads}
+      />
+    );
+  }
 
   if (myItems.length === 0) {
     return (
@@ -1657,7 +1678,7 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
         const statusBg = isSelected ? TOKENS.mossSoft : isRejected ? TOKENS.line : isClosed ? TOKENS.rustSoft : "#FEF3C7";
 
         return (
-          <div key={proposal.id} style={{ background: TOKENS.card, border: `1px solid ${isSelected ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18 }}>
+          <div key={proposal.id} onClick={() => setDetailItem({ deal, proposal })} style={{ background: TOKENS.card, border: `1px solid ${isSelected ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, cursor: "pointer" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <div>
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
@@ -1751,6 +1772,153 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, onViewContract, chatUnreads = {} }) {
+  const isMobile = useIsMobile();
+  const [cancellingId, setCancellingId] = useState(null);
+  const score = calcMatchScore(deal, proposal);
+  const priceDiff = proposal.price - deal.targetPrice;
+  const isSelected = deal.selectedProposalId === proposal.id;
+  const isRejected = deal.selectedProposalId && !isSelected;
+  const isClosed = deal.status === "closed";
+  const isPending = !deal.selectedProposalId && deal.status === "open";
+  const statusLabel = isSelected ? "🎉 선택됨" : isRejected ? "미선택" : isClosed ? "마감됨" : "검토 중";
+  const statusColor = isSelected ? TOKENS.moss : isRejected ? TOKENS.inkSoft : isClosed ? TOKENS.rust : "#B45309";
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <button onClick={onBack} className="ftt-btn-secondary" style={{ marginBottom: 18, padding: "7px 16px", fontSize: 13 }}>
+        ← 내 제안 목록으로
+      </button>
+
+      {deal.photoURL && (
+        <div style={{ width: "100%", height: isMobile ? 160 : 220, borderRadius: 14, overflow: "hidden", marginBottom: 18, boxShadow: "0 4px 20px rgba(32,40,31,0.12)" }}>
+          <img src={deal.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+      )}
+
+      {/* 딜 정보 */}
+      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 16 : 22, marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: TOKENS.ink }}>{deal.crop}</div>
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginTop: 3 }}>{deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""}</div>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 999, background: isSelected ? TOKENS.mossSoft : isRejected ? TOKENS.line : isClosed ? TOKENS.rustSoft : "#FEF3C7", color: statusColor }}>
+            {statusLabel}
+          </span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 10 }}>
+          {[
+            { label: "셰프 희망 단가", value: `${deal.targetPrice.toLocaleString()}원/kg`, color: "#7A5C20" },
+            { label: "수량", value: `${deal.quantity}kg` },
+            { label: "납품 희망일", value: deal.deliveryDate },
+            { label: "등급", value: `${deal.grade}등급` },
+            { label: "숙성도", value: deal.ripeness || "-" },
+            { label: "납품 주기", value: deal.cycle || "-" },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ background: "#FFFFFF", borderRadius: 8, padding: "8px 12px", border: `1px solid ${TOKENS.line}` }}>
+              <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{label}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: color || TOKENS.ink }}>{value}</div>
+            </div>
+          ))}
+        </div>
+        {deal.sizeCondition && <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10 }}><span style={{ fontWeight: 500, color: TOKENS.ink }}>규격 조건</span> · {deal.sizeCondition}</div>}
+        {deal.note && <div style={{ background: TOKENS.bg, borderRadius: 8, padding: "10px 12px", border: `1px solid ${TOKENS.line}`, fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, marginTop: 10 }}>"{deal.note}"</div>}
+      </div>
+
+      {/* 내 제안 내용 */}
+      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.moss}44`, borderLeft: `4px solid ${TOKENS.moss}`, borderRadius: 14, padding: isMobile ? 16 : 22, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>내 제안 내용</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+          {[
+            { label: "제안 단가", value: `${proposal.price.toLocaleString()}원/kg`, sub: priceDiff !== 0 ? `희망가 대비 ${priceDiff > 0 ? "+" : ""}${priceDiff.toLocaleString()}` : "희망가와 동일", subColor: priceDiff > 0 ? TOKENS.rust : priceDiff < 0 ? TOKENS.moss : TOKENS.inkSoft },
+            { label: "납품 가능 수량", value: `${proposal.availableQty}kg` },
+            { label: "납품 가능일", value: proposal.availableDate || "-" },
+            { label: "인증", value: proposal.cert },
+          ].map(({ label, value, sub, subColor }) => (
+            <div key={label} style={{ background: TOKENS.bg, borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{label}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: TOKENS.ink }}>{value}</div>
+              {sub && <div style={{ fontSize: 10, color: subColor || TOKENS.inkSoft, marginTop: 2 }}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+        {proposal.message && (
+          <div style={{ background: TOKENS.bg, borderRadius: 8, padding: "10px 12px", fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, fontStyle: "italic" }}>"{proposal.message}"</div>
+        )}
+        <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginTop: 10, fontFamily: "'IBM Plex Mono', monospace" }}>
+          제안일 {new Date(proposal.createdAt).toLocaleDateString("ko-KR")}
+        </div>
+        {proposal.ratedAt && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: TOKENS.goldSoft, borderRadius: 8, padding: "8px 12px" }}>
+            <span style={{ fontSize: 11, color: "#7A5C20" }}>받은 평점</span>
+            <StarRating value={proposal.rating} size={14} />
+            <span style={{ fontSize: 12, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating.toFixed(1)}</span>
+            {proposal.review && <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>· "{proposal.review}"</span>}
+          </div>
+        )}
+      </div>
+
+      {/* AI 매칭 점수 */}
+      {score && (
+        <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 16 : 22, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em" }}>AI 매칭 점수</div>
+            <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 14, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, background: score.bg, color: score.color, border: `1px solid ${score.color}44` }}>
+              {score.total}점
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {SCORE_BREAKDOWN_LABELS.map(({ key, label, max }) => {
+              const val = score.breakdown[key];
+              const pct = val / max;
+              const barColor = pct >= 0.8 ? TOKENS.moss : pct >= 0.5 ? TOKENS.gold : TOKENS.rust;
+              return (
+                <div key={key} style={{ flex: "1 1 80px", minWidth: 70 }}>
+                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 4 }}>{label}</div>
+                  <div style={{ height: 6, background: TOKENS.line, borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
+                    <div style={{ height: "100%", width: `${pct * 100}%`, background: barColor, borderRadius: 3 }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{val}/{max}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 액션 버튼 */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {isPending && (
+          cancellingId ? (
+            <>
+              <span style={{ fontSize: 13, color: TOKENS.rust, alignSelf: "center" }}>제안을 취소하시겠어요?</span>
+              <button onClick={() => { onCancel(deal.id, proposal.id); setCancellingId(null); onBack(); }} style={{ padding: "10px 18px", background: TOKENS.rust, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>취소 확인</button>
+              <button onClick={() => setCancellingId(null)} style={{ padding: "10px 14px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>돌아가기</button>
+            </>
+          ) : (
+            <button onClick={() => setCancellingId(proposal.id)} style={{ padding: "10px 18px", background: "transparent", border: `1px solid ${TOKENS.rustSoft}`, borderRadius: 8, fontSize: 13, color: TOKENS.rust, cursor: "pointer" }}>제안 취소</button>
+          )
+        )}
+        {isSelected && (
+          <>
+            <button
+              onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
+              style={{ flex: 1, minWidth: 120, padding: "12px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+            >
+              💬 {deal.chefName}과 채팅
+              {(chatUnreads[deal.id] || 0) > 0 && (
+                <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{chatUnreads[deal.id]}</span>
+              )}
+            </button>
+            <button onClick={() => onViewContract(deal, proposal)} style={{ padding: "12px 18px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>계약서</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -3923,6 +4091,29 @@ export default function FarmToTableApp() {
   const [deals, setDeals] = useState([]);
   const [farm, setFarm] = useState(null);
   const [chefProfile, setChefProfile] = useState(null);
+  const [notifHistory, setNotifHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("notif-history") || "[]"); } catch { return []; }
+  });
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unreadNotifCount = notifHistory.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    _recordNotif = (notif) => {
+      setNotifHistory((prev) => {
+        const next = [notif, ...prev].slice(0, 50);
+        localStorage.setItem("notif-history", JSON.stringify(next));
+        return next;
+      });
+    };
+    return () => { _recordNotif = null; };
+  }, []);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const close = (e) => { if (!e.target.closest("[data-notif-panel]")) setNotifOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [notifOpen]);
   const [loadState, setLoadState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
   const [chats, setChats] = useState({});
@@ -4432,6 +4623,52 @@ export default function FarmToTableApp() {
               {isChef ? "셰프" : "농가"}
             </span>
             <span style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500 }}>{user.name}</span>
+            {/* 벨 아이콘 */}
+            <div data-notif-panel style={{ position: "relative" }}>
+              <button
+                onClick={() => {
+                  setNotifOpen((v) => !v);
+                  if (!notifOpen) {
+                    setNotifHistory((prev) => {
+                      const next = prev.map((n) => ({ ...n, read: true }));
+                      localStorage.setItem("notif-history", JSON.stringify(next));
+                      return next;
+                    });
+                  }
+                }}
+                style={{ fontSize: 16, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", position: "relative", lineHeight: 1 }}
+              >
+                🔔
+                {unreadNotifCount > 0 && (
+                  <span style={{ position: "absolute", top: -4, right: -4, background: TOKENS.rust, color: "#fff", borderRadius: 999, fontSize: 9, fontWeight: 700, minWidth: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "'IBM Plex Mono', monospace" }}>
+                    {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, maxHeight: 380, overflowY: "auto", background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, boxShadow: "0 8px 32px rgba(32,40,31,0.16)", zIndex: 9998 }}>
+                  <div style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: TOKENS.ink }}>알림</span>
+                    {notifHistory.length > 0 && (
+                      <button onClick={() => { setNotifHistory([]); localStorage.removeItem("notif-history"); }} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: "none", cursor: "pointer", padding: 0 }}>모두 지우기</button>
+                    )}
+                  </div>
+                  {notifHistory.length === 0 ? (
+                    <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: TOKENS.inkSoft }}>알림이 없습니다</div>
+                  ) : (
+                    notifHistory.map((n) => (
+                      <div key={n.id} style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: n.read ? "#FFFFFF" : `${TOKENS.gold}10` }}>
+                        <div style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500, marginBottom: 2 }}>{n.title}</div>
+                        <div style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.5 }}>{n.body}</div>
+                        <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 4, fontFamily: "'IBM Plex Mono', monospace" }}>
+                          {new Date(n.ts).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleLogout}
               style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}
