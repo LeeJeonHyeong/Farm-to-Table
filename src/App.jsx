@@ -1110,7 +1110,14 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     isEditing
       ? { ...editingDeal, quantity: String(editingDeal.quantity), targetPrice: String(editingDeal.targetPrice) }
       : isCloning
-      ? { ...cloningFrom, quantity: String(cloningFrom.quantity), targetPrice: String(cloningFrom.targetPrice), photoURL: "" }
+      ? {
+          ...cloningFrom,
+          quantity: String(cloningFrom.quantity),
+          targetPrice: String(cloningFrom.targetPrice),
+          photoURL: "",
+          deliveryDate: (cloningFrom.deliveryDate && cloningFrom.deliveryDate >= new Date().toISOString().slice(0, 10))
+            ? cloningFrom.deliveryDate : "",
+        }
       : blank
   );
   const [errors, setErrors] = useState({});
@@ -2924,9 +2931,23 @@ function MiniBarChart({ items, max, colorFn }) {
 function DashboardScreen({ deals, user, onTabChange }) {
   const isMobile = useIsMobile();
   const isChef = user.role === "chef";
+  const [period, setPeriod] = useState("전체"); // "이번 주" | "이번 달" | "전체"
+
+  /* ── 기간 필터 기준점 ───────────────────────── */
+  const periodStart = (() => {
+    if (period === "이번 주") {
+      const d = new Date(); const day = d.getDay();
+      d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      d.setHours(0, 0, 0, 0); return d.getTime();
+    }
+    if (period === "이번 달") return new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    return 0;
+  })();
 
   /* ── 셰프 지표 ─────────────────────────────── */
-  const myDeals = isChef ? deals.filter((d) => d.createdBy === user.uid) : [];
+  const allMyDeals = isChef ? deals.filter((d) => d.createdBy === user.uid) : [];
+  const myDeals = allMyDeals.filter((d) => (d.createdAt || 0) >= periodStart);
+
   const openDeals   = myDeals.filter((d) => d.status === "open");
   const matchedDeals = myDeals.filter((d) => d.status === "matched");
   const doneDeals   = myDeals.filter((d) => d.status === "done");
@@ -2944,14 +2965,16 @@ function DashboardScreen({ deals, user, onTabChange }) {
   const chefCropCounts = myDeals.reduce((acc, d) => { acc[d.crop] = (acc[d.crop] || 0) + 1; return acc; }, {});
   const chefTopCrops = Object.entries(chefCropCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
 
-  const recentChefDeals = [...myDeals].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+  const recentChefDeals = [...allMyDeals].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
 
   /* ── 농가 지표 ─────────────────────────────── */
-  const myProposals = !isChef
+  const allMyProposals = !isChef
     ? deals.flatMap((d) =>
         d.proposals.filter((p) => p.farmerName === user.name).map((p) => ({ ...p, deal: d }))
       )
     : [];
+  const myProposals = allMyProposals.filter((p) => (p.createdAt || p.deal?.createdAt || 0) >= periodStart);
+
   const selectedProps = myProposals.filter((p) => p.deal.selectedProposalId === p.id);
   const selectRate   = myProposals.length > 0 ? Math.round((selectedProps.length / myProposals.length) * 100) : 0;
   const farmRevenue  = selectedProps.reduce((sum, p) => sum + p.price * p.deal.quantity, 0);
@@ -2963,7 +2986,7 @@ function DashboardScreen({ deals, user, onTabChange }) {
   const farmCropCounts = myProposals.reduce((acc, p) => { acc[p.deal.crop] = (acc[p.deal.crop] || 0) + 1; return acc; }, {});
   const farmTopCrops = Object.entries(farmCropCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
 
-  const recentProposals = [...myProposals].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+  const recentProposals = [...allMyProposals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5);
 
   /* ── 렌더 ──────────────────────────────────── */
   const sectionStyle = { background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 14 };
@@ -2972,13 +2995,35 @@ function DashboardScreen({ deals, user, onTabChange }) {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       {/* 환영 헤더 */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 14 }}>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: TOKENS.ink, marginBottom: 2 }}>
           안녕하세요, {user.name} {isChef ? "셰프" : "농가"}님
         </div>
         <div style={{ fontSize: 13, color: TOKENS.inkSoft }}>
-          {isChef ? `총 ${myDeals.length}건의 딜을 운영하고 있습니다.` : `총 ${myProposals.length}건의 제안을 보냈습니다.`}
+          {isChef
+            ? `${period === "전체" ? "전체" : period} ${myDeals.length}건의 딜`
+            : `${period === "전체" ? "전체" : period} ${myProposals.length}건의 제안`}
         </div>
+      </div>
+
+      {/* 기간 필터 토글 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+        {["이번 주", "이번 달", "전체"].map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            style={{
+              padding: "5px 16px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+              border: `1px solid ${period === p ? TOKENS.moss : TOKENS.line}`,
+              background: period === p ? TOKENS.moss : "#FFFFFF",
+              color: period === p ? "#FFFFFF" : TOKENS.inkSoft,
+              fontWeight: period === p ? 600 : 400,
+              transition: "all 0.12s",
+            }}
+          >
+            {p}
+          </button>
+        ))}
       </div>
 
       {/* KPI 타일 */}
@@ -2988,7 +3033,7 @@ function DashboardScreen({ deals, user, onTabChange }) {
             <StatTile label="등록 딜" value={myDeals.length} sub={`모집중 ${openDeals.length} · 진행중 ${matchedDeals.length}`} />
             <StatTile label="성사 딜" value={successCount} sub={`완료 ${doneDeals.length} · 마감 ${closedDeals.length}`} color={TOKENS.moss} bg={TOKENS.mossSoft} />
             <StatTile label="성사율" value={`${successRate}%`} sub={`${activeCount}건 중 ${successCount}건`} color={TOKENS.gold} bg={TOKENS.goldSoft} />
-            <StatTile label="누적 거래액" value={chefRevenue >= 10000 ? `${Math.floor(chefRevenue / 10000).toLocaleString()}만` : `${chefRevenue.toLocaleString()}`} sub={`${doneDeals.length}건 완료 기준`} color={TOKENS.rust} bg={TOKENS.rustSoft} />
+            <StatTile label="누적 거래액" value={chefRevenue >= 10000 ? `${Math.floor(chefRevenue / 10000).toLocaleString()}만` : `${chefRevenue.toLocaleString()}`} sub={`${period === "전체" ? "전체" : period} 완료 기준`} color={TOKENS.rust} bg={TOKENS.rustSoft} />
           </>
         ) : (
           <>
