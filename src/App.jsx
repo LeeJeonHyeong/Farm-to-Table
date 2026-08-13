@@ -2361,8 +2361,18 @@ const SCORE_BREAKDOWN_LABELS = [
   { key: "rating", label: "평점", max: 10 },
 ];
 
-function FarmProfileDetailCard({ proposal }) {
+function FarmProfileDetailCard({ proposal, allDeals = [] }) {
   const isMobile = useIsMobile();
+
+  const reviews = allDeals
+    .flatMap((d) => (d.proposals || []).map((p) => ({ ...p, dealCrop: d.crop })))
+    .filter((p) => p.farmName === proposal.farmName && p.ratedAt)
+    .sort((a, b) => b.ratedAt - a.ratedAt);
+
+  const avgRating = reviews.length > 0
+    ? (reviews.reduce((s, p) => s + p.rating, 0) / reviews.length).toFixed(1)
+    : null;
+
   return (
     <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
@@ -2384,12 +2394,41 @@ function FarmProfileDetailCard({ proposal }) {
             ))}
           </div>
         </div>
+        {avgRating && (
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 22, fontWeight: 700, color: TOKENS.moss }}>{avgRating}</div>
+            <StarRating value={parseFloat(avgRating)} size={12} />
+            <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 2 }}>{reviews.length}건 평균</div>
+          </div>
+        )}
       </div>
-      {proposal.ratedAt && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 12, borderTop: `1px solid ${TOKENS.moss}22` }}>
-          <StarRating value={proposal.rating} size={14} />
-          <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating.toFixed(1)}</span>
-          {proposal.review && <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontStyle: "italic" }}>"{proposal.review}"</span>}
+
+      {reviews.length > 0 && (
+        <div style={{ paddingTop: 12, borderTop: `1px solid ${TOKENS.moss}22` }}>
+          <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+            거래 평점 이력
+          </div>
+          {reviews.map((r, i) => (
+            <div key={i} style={{ marginBottom: i < reviews.length - 1 ? 10 : 0, paddingBottom: i < reviews.length - 1 ? 10 : 0, borderBottom: i < reviews.length - 1 ? `1px solid ${TOKENS.moss}15` : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: r.review ? 4 : 0 }}>
+                <StarRating value={r.rating} size={12} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace" }}>{r.rating.toFixed(1)}</span>
+                <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>· {r.dealCrop}</span>
+                <span style={{ fontSize: 10, color: TOKENS.inkSoft, marginLeft: "auto", fontFamily: "'IBM Plex Mono', monospace" }}>
+                  {new Date(r.ratedAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                </span>
+              </div>
+              {r.review && (
+                <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontStyle: "italic", paddingLeft: 2 }}>"{r.review}"</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {reviews.length === 0 && (
+        <div style={{ paddingTop: 10, borderTop: `1px solid ${TOKENS.moss}22`, fontSize: 12, color: TOKENS.inkSoft }}>
+          아직 평가 이력이 없습니다.
         </div>
       )}
     </div>
@@ -2657,7 +2696,7 @@ function DealTimeline({ deal }) {
   );
 }
 
-function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBack }) {
+function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBack, allDeals = [] }) {
   const isMobile = useIsMobile();
   const [aiComment, setAiComment] = useState(null);
   const [commentLoading, setCommentLoading] = useState(false);
@@ -2684,7 +2723,7 @@ function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBac
       </button>
 
       {/* 농가 프로필 상세 카드 */}
-      <FarmProfileDetailCard proposal={proposal} />
+      <FarmProfileDetailCard proposal={proposal} allDeals={allDeals} />
 
       {/* 제안 정보 그리드 */}
       <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 16 }}>
@@ -3007,6 +3046,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
         selectable={deal.status === "open"}
         onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
         onBack={() => setDetailProposal(null)}
+        allDeals={deals}
       />
     );
   }
