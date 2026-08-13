@@ -2591,6 +2591,226 @@ function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBac
   );
 }
 
+/* ---------- 대시보드 ---------- */
+
+function StatTile({ label, value, sub, color, bg }) {
+  const isMobile = useIsMobile();
+  return (
+    <div style={{ background: bg || "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 16px" : "20px 20px", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: isMobile ? 26 : 30, fontWeight: 600, color: color || TOKENS.ink, lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.4 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function MiniBarChart({ items, max, colorFn }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {items.map(([label, count]) => {
+        const pct = max > 0 ? (count / max) * 100 : 0;
+        const color = colorFn ? colorFn(label) : TOKENS.moss;
+        return (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 64, fontSize: 12, color: TOKENS.ink, textAlign: "right", flexShrink: 0 }}>{label}</div>
+            <div style={{ flex: 1, height: 8, background: TOKENS.line, borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 4, transition: "width 0.5s ease" }} />
+            </div>
+            <div style={{ width: 28, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textAlign: "right", flexShrink: 0 }}>{count}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DashboardScreen({ deals, user, onTabChange }) {
+  const isMobile = useIsMobile();
+  const isChef = user.role === "chef";
+
+  /* ── 셰프 지표 ─────────────────────────────── */
+  const myDeals = isChef ? deals.filter((d) => d.createdBy === user.uid) : [];
+  const openDeals   = myDeals.filter((d) => d.status === "open");
+  const matchedDeals = myDeals.filter((d) => d.status === "matched");
+  const doneDeals   = myDeals.filter((d) => d.status === "done");
+  const closedDeals = myDeals.filter((d) => d.status === "closed");
+  const successCount = matchedDeals.length + doneDeals.length;
+  const activeCount  = openDeals.length + matchedDeals.length + doneDeals.length;
+  const successRate  = activeCount > 0 ? Math.round((successCount / activeCount) * 100) : 0;
+  const chefRevenue  = doneDeals.reduce((sum, d) => {
+    const p = d.proposals.find((p) => p.id === d.selectedProposalId);
+    return sum + (p ? p.price * d.quantity : 0);
+  }, 0);
+  const totalReceivedProposals = myDeals.reduce((s, d) => s + d.proposals.length, 0);
+  const avgProposals = myDeals.length > 0 ? (totalReceivedProposals / myDeals.length).toFixed(1) : "0";
+
+  const chefCropCounts = myDeals.reduce((acc, d) => { acc[d.crop] = (acc[d.crop] || 0) + 1; return acc; }, {});
+  const chefTopCrops = Object.entries(chefCropCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+  const recentChefDeals = [...myDeals].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+
+  /* ── 농가 지표 ─────────────────────────────── */
+  const myProposals = !isChef
+    ? deals.flatMap((d) =>
+        d.proposals.filter((p) => p.farmerName === user.name).map((p) => ({ ...p, deal: d }))
+      )
+    : [];
+  const selectedProps = myProposals.filter((p) => p.deal.selectedProposalId === p.id);
+  const selectRate   = myProposals.length > 0 ? Math.round((selectedProps.length / myProposals.length) * 100) : 0;
+  const farmRevenue  = selectedProps.reduce((sum, p) => sum + p.price * p.deal.quantity, 0);
+  const ratedProps   = myProposals.filter((p) => p.ratedAt);
+  const avgRating    = ratedProps.length > 0
+    ? (ratedProps.reduce((s, p) => s + p.rating, 0) / ratedProps.length).toFixed(1)
+    : null;
+
+  const farmCropCounts = myProposals.reduce((acc, p) => { acc[p.deal.crop] = (acc[p.deal.crop] || 0) + 1; return acc; }, {});
+  const farmTopCrops = Object.entries(farmCropCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+  const recentProposals = [...myProposals].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+
+  /* ── 렌더 ──────────────────────────────────── */
+  const sectionStyle = { background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 14 };
+  const sectionLabel = { fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 };
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      {/* 환영 헤더 */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: TOKENS.ink, marginBottom: 2 }}>
+          안녕하세요, {user.name} {isChef ? "셰프" : "농가"}님
+        </div>
+        <div style={{ fontSize: 13, color: TOKENS.inkSoft }}>
+          {isChef ? `총 ${myDeals.length}건의 딜을 운영하고 있습니다.` : `총 ${myProposals.length}건의 제안을 보냈습니다.`}
+        </div>
+      </div>
+
+      {/* KPI 타일 */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+        {isChef ? (
+          <>
+            <StatTile label="등록 딜" value={myDeals.length} sub={`모집중 ${openDeals.length} · 진행중 ${matchedDeals.length}`} />
+            <StatTile label="성사 딜" value={successCount} sub={`완료 ${doneDeals.length} · 마감 ${closedDeals.length}`} color={TOKENS.moss} bg={TOKENS.mossSoft} />
+            <StatTile label="성사율" value={`${successRate}%`} sub={`${activeCount}건 중 ${successCount}건`} color={TOKENS.gold} bg={TOKENS.goldSoft} />
+            <StatTile label="누적 거래액" value={chefRevenue >= 10000 ? `${Math.floor(chefRevenue / 10000).toLocaleString()}만` : `${chefRevenue.toLocaleString()}`} sub={`${doneDeals.length}건 완료 기준`} color={TOKENS.rust} bg={TOKENS.rustSoft} />
+          </>
+        ) : (
+          <>
+            <StatTile label="보낸 제안" value={myProposals.length} sub={`선택됨 ${selectedProps.length}건`} />
+            <StatTile label="선택률" value={`${selectRate}%`} sub={`${myProposals.length}건 중 ${selectedProps.length}건`} color={TOKENS.moss} bg={TOKENS.mossSoft} />
+            <StatTile label="누적 거래액" value={farmRevenue >= 10000 ? `${Math.floor(farmRevenue / 10000).toLocaleString()}만` : `${farmRevenue.toLocaleString()}`} sub="선택된 제안 기준" color={TOKENS.rust} bg={TOKENS.rustSoft} />
+            <StatTile label="평균 평점" value={avgRating ? `★ ${avgRating}` : "-"} sub={ratedProps.length > 0 ? `${ratedProps.length}건 평가됨` : "아직 평가 없음"} color={TOKENS.gold} bg={TOKENS.goldSoft} />
+          </>
+        )}
+      </div>
+
+      {/* 딜 상태 분포 (셰프) */}
+      {isChef && myDeals.length > 0 && (
+        <div style={sectionStyle}>
+          <div style={sectionLabel}>딜 상태 분포</div>
+          <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>
+            {[
+              { count: openDeals.length, color: TOKENS.gold, label: "모집중" },
+              { count: matchedDeals.length, color: TOKENS.moss, label: "진행중" },
+              { count: doneDeals.length, color: TOKENS.inkSoft, label: "완료" },
+              { count: closedDeals.length, color: TOKENS.rust, label: "마감" },
+            ].filter((s) => s.count > 0).map((s) => (
+              <div key={s.label} style={{ flex: s.count, background: s.color, minWidth: 4 }} title={`${s.label} ${s.count}건`} />
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {[
+              { count: openDeals.length, color: TOKENS.gold, label: "모집중" },
+              { count: matchedDeals.length, color: TOKENS.moss, label: "진행중" },
+              { count: doneDeals.length, color: TOKENS.inkSoft, label: "완료" },
+              { count: closedDeals.length, color: TOKENS.rust, label: "마감" },
+            ].map((s) => (
+              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{s.label}</span>
+                <span style={{ fontSize: 12, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600 }}>{s.count}</span>
+              </div>
+            ))}
+            <div style={{ marginLeft: "auto", fontSize: 12, color: TOKENS.inkSoft }}>평균 {avgProposals}건/딜</div>
+          </div>
+        </div>
+      )}
+
+      {/* 품목 분포 */}
+      {(isChef ? chefTopCrops : farmTopCrops).length > 0 && (
+        <div style={sectionStyle}>
+          <div style={sectionLabel}>{isChef ? "요청 품목 분포" : "제안 품목 분포"}</div>
+          <MiniBarChart
+            items={isChef ? chefTopCrops : farmTopCrops}
+            max={(isChef ? chefTopCrops : farmTopCrops)[0]?.[1] || 1}
+            colorFn={() => isChef ? TOKENS.rust : TOKENS.moss}
+          />
+        </div>
+      )}
+
+      {/* 최근 활동 */}
+      <div style={sectionStyle}>
+        <div style={sectionLabel}>{isChef ? "최근 등록 딜" : "최근 보낸 제안"}</div>
+        {isChef ? (
+          recentChefDeals.length === 0 ? (
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, textAlign: "center", padding: "20px 0" }}>
+              아직 등록한 딜이 없습니다.
+              <button onClick={() => onTabChange?.("create")} style={{ display: "block", margin: "12px auto 0", padding: "8px 20px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
+                첫 딜 만들기
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {recentChefDeals.map((d) => {
+                const statusColor = d.status === "open" ? TOKENS.gold : d.status === "matched" ? TOKENS.moss : d.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
+                return (
+                  <div key={d.id} onClick={() => onTabChange?.("mydeals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: TOKENS.bg, borderRadius: 10, cursor: "pointer" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, color: TOKENS.ink }}>{d.crop}</span>
+                      <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{d.quantity}kg · {d.targetPrice.toLocaleString()}원/kg</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>제안 {d.proposals.length}건</span>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          recentProposals.length === 0 ? (
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, textAlign: "center", padding: "20px 0" }}>
+              아직 보낸 제안이 없습니다.
+              <button onClick={() => onTabChange?.("browse")} style={{ display: "block", margin: "12px auto 0", padding: "8px 20px", background: TOKENS.moss, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
+                딜 찾아보기
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {recentProposals.map((p) => {
+                const isSelected = p.deal.selectedProposalId === p.id;
+                const isPending  = !p.deal.selectedProposalId;
+                const dotColor   = isSelected ? TOKENS.moss : isPending ? TOKENS.gold : TOKENS.inkSoft;
+                return (
+                  <div key={p.id} onClick={() => onTabChange?.("myproposals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: TOKENS.bg, borderRadius: 10, cursor: "pointer" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, color: TOKENS.ink }}>{p.deal.crop}</span>
+                      <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{p.price.toLocaleString()}원/kg · {p.availableQty}kg</span>
+                    </div>
+                    <span style={{ fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", color: dotColor, flexShrink: 0 }}>
+                      {isSelected ? "✓ 선택됨" : isPending ? "검토 중" : "미선택"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
 const STATUS_FILTERS = [
   { key: "전체", label: "전체" },
   { key: "open", label: "모집중" },
@@ -4069,8 +4289,8 @@ export default function FarmToTableApp() {
   };
 
   const TABS = isChef
-    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount + totalUnreadChats }, { key: "chefprofile", label: "내 레스토랑" }]
-    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount + totalUnreadChats }, { key: "farm", label: "내 농가" }];
+    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount + totalUnreadChats }, { key: "dashboard", label: "대시보드" }, { key: "chefprofile", label: "내 레스토랑" }]
+    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount + totalUnreadChats }, { key: "dashboard", label: "대시보드" }, { key: "farm", label: "내 농가" }];
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
@@ -4297,6 +4517,7 @@ export default function FarmToTableApp() {
             {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} />}
+            {tab === "dashboard" && <DashboardScreen deals={deals} user={user} onTabChange={handleTabClick} />}
           </>
         )}
       </div>
