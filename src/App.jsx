@@ -1514,6 +1514,8 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
         rating: 4.0,
         message: data.message,
         createdAt: Date.now(),
+        photoURL: farmProfile?.photoURL || null,
+        specialty: farmProfile?.specialty || [],
       });
     }
   };
@@ -2115,7 +2117,42 @@ const SCORE_BREAKDOWN_LABELS = [
   { key: "rating", label: "평점", max: 10 },
 ];
 
-function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score }) {
+function FarmProfileDetailCard({ proposal }) {
+  const isMobile = useIsMobile();
+  return (
+    <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
+        <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: proposal.photoURL ? "transparent" : `linear-gradient(145deg, ${TOKENS.moss}, #3D5437)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {proposal.photoURL
+            ? <img src={proposal.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <span style={{ fontSize: 32 }}>🌱</span>
+          }
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: TOKENS.ink, fontWeight: 600, marginBottom: 2 }}>{proposal.farmName}</div>
+          {proposal.region && <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: 6 }}>{proposal.region}</div>}
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {proposal.cert && proposal.cert !== "인증 없음" && (
+              <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{proposal.cert}</span>
+            )}
+            {(proposal.specialty || []).map((c) => (
+              <span key={c} style={chipBadge("#E8F0E4", TOKENS.moss)}>{c}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {proposal.ratedAt && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 12, borderTop: `1px solid ${TOKENS.moss}22` }}>
+          <StarRating value={proposal.rating} size={14} />
+          <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating.toFixed(1)}</span>
+          {proposal.review && <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontStyle: "italic" }}>"{proposal.review}"</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score, onClick }) {
   const priceDiff = proposal.price - deal.targetPrice;
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [aiComment, setAiComment] = useState(null);
@@ -2136,12 +2173,14 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score 
   return (
     <div
       className="ftt-card"
+      onClick={onClick}
       style={{
         background: "#FFFFFF",
         border: `1px solid ${isSelected ? TOKENS.moss + "88" : TOKENS.line}`,
         borderLeft: `4px solid ${isSelected ? TOKENS.moss : TOKENS.line}`,
         borderRadius: 10,
         padding: 14,
+        cursor: onClick ? "pointer" : "default",
         boxShadow: isSelected
           ? "0 2px 12px rgba(91,117,83,0.12), 0 1px 4px rgba(91,117,83,0.08)"
           : "0 1px 3px rgba(32,40,31,0.05), 0 2px 8px rgba(32,40,31,0.03)",
@@ -2374,6 +2413,108 @@ function DealTimeline({ deal }) {
   );
 }
 
+function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBack }) {
+  const isMobile = useIsMobile();
+  const [aiComment, setAiComment] = useState(null);
+  const [commentLoading, setCommentLoading] = useState(false);
+  const priceDiff = proposal.price - deal.targetPrice;
+
+  useEffect(() => {
+    if (score && aiComment === null && !commentLoading) {
+      setCommentLoading(true);
+      getAIMatchComment(deal, proposal, score).then((c) => {
+        setAiComment(c);
+        setCommentLoading(false);
+      });
+    }
+  }, []);
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <button
+        onClick={onBack}
+        className="ftt-btn-secondary"
+        style={{ marginBottom: 18, padding: "7px 16px", fontSize: 13 }}
+      >
+        ← 제안 목록으로
+      </button>
+
+      {/* 농가 프로필 상세 카드 */}
+      <FarmProfileDetailCard proposal={proposal} />
+
+      {/* 제안 정보 그리드 */}
+      <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>
+          제안 내용
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+          {[
+            { label: "제안 단가", value: `${proposal.price.toLocaleString()}원/kg`, sub: priceDiff !== 0 ? `희망가 대비 ${priceDiff > 0 ? "+" : ""}${priceDiff.toLocaleString()}` : "희망가와 동일", subColor: priceDiff > 0 ? TOKENS.rust : priceDiff < 0 ? TOKENS.moss : TOKENS.inkSoft },
+            { label: "납품 가능 수량", value: `${proposal.availableQty}kg` },
+            { label: "납품 가능일", value: proposal.availableDate || "-" },
+            { label: "인증", value: proposal.cert },
+          ].map(({ label, value, sub, subColor }) => (
+            <div key={label} style={{ background: TOKENS.bg, borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: 14, color: TOKENS.ink, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}>{value}</div>
+              {sub && <div style={{ fontSize: 10, color: subColor || TOKENS.inkSoft, marginTop: 3 }}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+        {proposal.message && (
+          <div style={{ background: TOKENS.bg, borderRadius: 8, padding: "10px 12px" }}>
+            <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>농가 메시지</div>
+            <p style={{ fontSize: 13, color: TOKENS.ink, margin: 0, lineHeight: 1.6, fontStyle: "italic" }}>"{proposal.message}"</p>
+          </div>
+        )}
+      </div>
+
+      {/* AI 매칭 점수 */}
+      {score && (
+        <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em" }}>AI 매칭 점수</div>
+            <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 14, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, background: score.bg, color: score.color, border: `1px solid ${score.color}44` }}>
+              {score.total}점
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            {SCORE_BREAKDOWN_LABELS.map(({ key, label, max }) => {
+              const val = score.breakdown[key];
+              const pct = val / max;
+              const barColor = pct >= 0.8 ? TOKENS.moss : pct >= 0.5 ? TOKENS.gold : TOKENS.rust;
+              return (
+                <div key={key} style={{ flex: "1 1 80px", minWidth: 70 }}>
+                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 4 }}>{label}</div>
+                  <div style={{ height: 6, background: TOKENS.line, borderRadius: 3, position: "relative", overflow: "hidden", marginBottom: 4 }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct * 100}%`, background: barColor, borderRadius: 3 }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{val}/{max}</div>
+                </div>
+              );
+            })}
+          </div>
+          {commentLoading ? (
+            <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, fontStyle: "italic" }}>AI 분석 중...</p>
+          ) : aiComment ? (
+            <p style={{ fontSize: 12, color: TOKENS.ink, margin: 0, lineHeight: 1.6, background: TOKENS.bg, padding: "10px 12px", borderRadius: 8 }}>✦ {aiComment}</p>
+          ) : null}
+        </div>
+      )}
+
+      {/* 선택 버튼 */}
+      {selectable && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onSelect(proposal.id); onBack(); }}
+          style={{ width: "100%", padding: "14px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 12px rgba(32,40,31,0.18)", letterSpacing: "-0.01em" }}
+        >
+          이 농가 선택하기
+        </button>
+      )}
+    </div>
+  );
+}
+
 const STATUS_FILTERS = [
   { key: "전체", label: "전체" },
   { key: "open", label: "모집중" },
@@ -2389,6 +2530,22 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
   const [confirmComplete, setConfirmComplete] = useState(null);
   const [statusFilter, setStatusFilter] = useState("전체");
   const [proposalSort, setProposalSort] = useState("score");
+  const [detailProposal, setDetailProposal] = useState(null);
+
+  if (detailProposal) {
+    const { proposal, deal } = detailProposal;
+    const score = calcMatchScore(deal, proposal);
+    return (
+      <ProposalDetailView
+        proposal={proposal}
+        deal={deal}
+        score={score}
+        selectable={deal.status === "open"}
+        onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
+        onBack={() => setDetailProposal(null)}
+      />
+    );
+  }
 
   if (deals.length === 0) {
     return (
@@ -2598,6 +2755,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                             selectable
                             score={p._score}
                             onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
+                            onClick={() => setDetailProposal({ proposal: p, deal })}
                           />
                         ))}
                       </>
