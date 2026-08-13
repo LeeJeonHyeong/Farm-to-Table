@@ -2531,7 +2531,7 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
   );
 }
 
-function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score, onClick }) {
+function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score, onClick, onViewProfile }) {
   const priceDiff = proposal.price - deal.targetPrice;
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [aiComment, setAiComment] = useState(null);
@@ -2566,7 +2566,18 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score,
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, color: TOKENS.ink }}>{proposal.farmName}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, color: TOKENS.ink }}>{proposal.farmName}</span>
+          {onViewProfile && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onViewProfile(proposal); }}
+              title="농가 프로필 보기"
+              style={{ background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "1px 7px", fontSize: 11, color: TOKENS.inkSoft, cursor: "pointer", lineHeight: 1.5, flexShrink: 0 }}
+            >
+              👤
+            </button>
+          )}
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{proposal.region}</span>
           {score && (
@@ -2896,6 +2907,34 @@ function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBac
 
 /* ---------- 대시보드 ---------- */
 
+function FarmProfileModal({ proposal, allDeals, onClose }) {
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.70)", zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ maxWidth: 480, width: "100%", maxHeight: "85vh", overflowY: "auto", borderRadius: 16, background: TOKENS.bg, boxShadow: "0 20px 60px rgba(0,0,0,0.28)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: `1px solid ${TOKENS.line}`, position: "sticky", top: 0, background: TOKENS.bg, zIndex: 1 }}>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink }}>농가 프로필</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: TOKENS.inkSoft, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+        <div style={{ padding: "16px 18px" }}>
+          <FarmProfileDetailCard proposal={proposal} allDeals={allDeals} />
+          {proposal.message && (
+            <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>농가 메시지</div>
+              <div style={{ fontSize: 13, color: TOKENS.ink, lineHeight: 1.6 }}>{proposal.message}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatTile({ label, value, sub, color, bg }) {
   const isMobile = useIsMobile();
   return (
@@ -3168,6 +3207,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
   const [statusFilter, setStatusFilter] = useState("전체");
   const [proposalSort, setProposalSort] = useState("score");
   const [detailProposal, setDetailProposal] = useState(null);
+  const [farmProfileModal, setFarmProfileModal] = useState(null);
 
   if (detailProposal) {
     const { proposal, deal } = detailProposal;
@@ -3204,6 +3244,13 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 720, margin: "0 auto" }}>
+      {farmProfileModal && (
+        <FarmProfileModal
+          proposal={farmProfileModal}
+          allDeals={deals}
+          onClose={() => setFarmProfileModal(null)}
+        />
+      )}
       {/* 상태 필터 */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {STATUS_FILTERS.map((f) => {
@@ -3394,6 +3441,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                             score={p._score}
                             onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
                             onClick={() => setDetailProposal({ proposal: p, deal })}
+                            onViewProfile={(p) => setFarmProfileModal(p)}
                           />
                         ))}
                       </>
@@ -3403,7 +3451,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
 
                 {(deal.status === "matched" || deal.status === "done") && selectedProposal && (
                   <>
-                    <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} score={calcMatchScore(deal, selectedProposal)} />
+                    <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} score={calcMatchScore(deal, selectedProposal)} onViewProfile={(p) => setFarmProfileModal(p)} />
                     <SettlementCard deal={deal} proposal={selectedProposal} />
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
