@@ -3295,17 +3295,46 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
 
 function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) {
   const [text, setText] = useState("");
+  const [pendingImage, setPendingImage] = useState(null);
+  const [compressing, setCompressing] = useState(false);
   const bottomRef = useRef(null);
+  const imageRef = useRef(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const handleImageFile = (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    setCompressing(true);
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      setPendingImage(canvas.toDataURL("image/jpeg", 0.75));
+      setCompressing(false);
+    };
+    img.onerror = () => setCompressing(false);
+    img.src = url;
+  };
+
+  const canSend = !compressing && (text.trim() || pendingImage);
+
   const handleSend = () => {
-    if (!text.trim()) return;
-    onSend(text.trim());
+    if (!canSend) return;
+    onSend({ text: text.trim(), imageURL: pendingImage || null });
     setText("");
+    setPendingImage(null);
   };
 
   const partnerName = userRole === "chef" ? dealInfo.farmName : dealInfo.chefName;
@@ -3335,8 +3364,20 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
           return (
             <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
               {!isMe && <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 4, fontWeight: 500 }}>{m.senderName}</div>}
-              <div className={isMe ? "ftt-bubble-mine" : "ftt-bubble-other"} style={{ maxWidth: isMobile ? "85%" : "65%" }}>
-                {m.text}
+              <div style={{ maxWidth: isMobile ? "85%" : "65%", display: "flex", flexDirection: "column", gap: 4, alignItems: isMe ? "flex-end" : "flex-start" }}>
+                {m.imageURL && (
+                  <img
+                    src={m.imageURL}
+                    alt="첨부 이미지"
+                    style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", cursor: "pointer", boxShadow: "0 2px 8px rgba(32,40,31,0.15)" }}
+                    onClick={() => window.open(m.imageURL, "_blank")}
+                  />
+                )}
+                {m.text && (
+                  <div className={isMe ? "ftt-bubble-mine" : "ftt-bubble-other"}>
+                    {m.text}
+                  </div>
+                )}
               </div>
               <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 4, fontFamily: "'IBM Plex Mono', monospace" }}>
                 {new Date(m.ts).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
@@ -3347,7 +3388,30 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
         <div ref={bottomRef} />
       </div>
 
+      {pendingImage && (
+        <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ position: "relative", display: "inline-block", flexShrink: 0 }}>
+            <img src={pendingImage} alt="" style={{ height: 72, width: 72, objectFit: "cover", borderRadius: 8, display: "block", border: `1px solid ${TOKENS.line}` }} />
+            <button
+              onClick={() => setPendingImage(null)}
+              style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: TOKENS.ink, color: "#fff", border: "none", fontSize: 10, lineHeight: "18px", textAlign: "center", cursor: "pointer", padding: 0 }}
+            >✕</button>
+          </div>
+          <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>이미지 첨부됨 — 전송 버튼을 눌러 보내세요</span>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8 }}>
+        <input type="file" accept="image/*" ref={imageRef} style={{ display: "none" }}
+          onChange={(e) => { handleImageFile(e.target.files[0]); e.target.value = ""; }} />
+        <button
+          onClick={() => imageRef.current.click()}
+          disabled={compressing}
+          title="이미지 첨부"
+          style={{ padding: "10px 12px", background: pendingImage ? TOKENS.mossSoft : TOKENS.card, border: `1px solid ${pendingImage ? TOKENS.moss : TOKENS.line}`, borderRadius: 10, fontSize: 16, cursor: compressing ? "wait" : "pointer", flexShrink: 0, transition: "all 0.15s" }}
+        >
+          {compressing ? "⏳" : "📷"}
+        </button>
         <input
           type="text"
           placeholder="메시지를 입력하세요… (Enter로 전송)"
@@ -3358,9 +3422,9 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
         />
         <button
           onClick={handleSend}
-          disabled={!text.trim()}
-          className={text.trim() ? "ftt-btn-primary" : ""}
-          style={{ padding: "10px 20px", fontSize: 13, borderRadius: 10, whiteSpace: "nowrap", background: text.trim() ? undefined : TOKENS.line, color: text.trim() ? undefined : TOKENS.inkSoft, border: "none", cursor: text.trim() ? "pointer" : "default" }}
+          disabled={!canSend}
+          className={canSend ? "ftt-btn-primary" : ""}
+          style={{ padding: "10px 20px", fontSize: 13, borderRadius: 10, whiteSpace: "nowrap", background: canSend ? undefined : TOKENS.line, color: canSend ? undefined : TOKENS.inkSoft, border: "none", cursor: canSend ? "pointer" : "default" }}
         >
           전송 ↑
         </button>
@@ -4082,6 +4146,54 @@ function ContractModal({ deal, proposal, onClose }) {
   );
 }
 
+/* ---------- 온보딩 모달 ---------- */
+
+function OnboardingModal({ role, onDone }) {
+  const [step, setStep] = useState(0);
+
+  const chefSlides = [
+    { icon: "🌾", title: "환영합니다!", desc: "Farm-to-Table에서 신선한 식재료를\n직접 농가와 연결하세요." },
+    { icon: "📋", title: "딜 만들기", desc: "원하는 품목·수량·납품일을 딜로 등록하면\n농가가 직접 제안서를 보내드려요." },
+    { icon: "🤝", title: "제안 검토 & 선택", desc: "AI 매칭 점수와 농가 프로필을 비교해\n최적의 파트너를 선택하세요." },
+    { icon: "💬", title: "채팅 & 계약", desc: "매칭 후 채팅으로 세부사항을 조율하고\n계약서를 자동으로 생성하세요." },
+  ];
+
+  const farmerSlides = [
+    { icon: "🌾", title: "환영합니다!", desc: "Farm-to-Table에서 신선한 농산물을\n레스토랑에 직접 납품하세요." },
+    { icon: "🔍", title: "딜 찾기", desc: "셰프가 등록한 딜을 확인하고\n내 전문품목에 맞는 딜을 찾아보세요." },
+    { icon: "📤", title: "제안 보내기", desc: "나의 단가·수량·납품일로 제안서를 작성해\n셰프에게 직접 보내세요." },
+    { icon: "💬", title: "채팅 & 계약", desc: "선택되면 채팅으로 세부사항을 조율하고\n계약서가 자동으로 만들어져요." },
+  ];
+
+  const slides = role === "chef" ? chefSlides : farmerSlides;
+  const current = slides[step];
+  const isLast = step === slides.length - 1;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.82)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ background: TOKENS.bg, borderRadius: 20, maxWidth: 400, width: "100%", padding: "44px 32px 36px", boxShadow: "0 24px 64px rgba(0,0,0,0.30)", textAlign: "center", position: "relative" }}>
+        <button onClick={onDone} style={{ position: "absolute", top: 16, right: 18, background: "none", border: "none", fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace" }}>
+          건너뛰기
+        </button>
+        <div style={{ fontSize: 56, marginBottom: 18, lineHeight: 1 }}>{current.icon}</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: TOKENS.ink, marginBottom: 12 }}>{current.title}</div>
+        <div style={{ fontSize: 14, color: TOKENS.inkSoft, lineHeight: 1.8, whiteSpace: "pre-line", marginBottom: 32 }}>{current.desc}</div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 28 }}>
+          {slides.map((_, i) => (
+            <div key={i} style={{ width: i === step ? 20 : 6, height: 6, borderRadius: 999, background: i === step ? TOKENS.moss : TOKENS.line, transition: "all 0.2s" }} />
+          ))}
+        </div>
+        <button
+          onClick={() => isLast ? onDone() : setStep((s) => s + 1)}
+          style={{ width: "100%", padding: "14px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", letterSpacing: "-0.01em" }}
+        >
+          {isLast ? "시작하기 →" : "다음"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- App shell ---------- */
 
 export default function FarmToTableApp() {
@@ -4096,6 +4208,7 @@ export default function FarmToTableApp() {
   });
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadNotifCount = notifHistory.filter((n) => !n.read).length;
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     _recordNotif = (notif) => {
@@ -4156,6 +4269,9 @@ export default function FarmToTableApp() {
             const userData = { uid: firebaseUser.uid, email: firebaseUser.email, role, name: displayName };
             setUser(userData);
             setTab(role === "farmer" ? "browse" : "create");
+            if (!localStorage.getItem(`onboarding-done-${firebaseUser.uid}`)) {
+              setShowOnboarding(true);
+            }
           } else {
             await signOut(auth);
             setUser(null);
@@ -4361,11 +4477,18 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
-  const handleSendMessage = async (dealId, text) => {
+  const handleSendMessage = async (dealId, payload) => {
+    const { text = "", imageURL = null } = typeof payload === "string" ? { text: payload } : payload;
     const newMsg = { id: `m${Date.now()}`, senderName: user.name, senderRole: user.role, text, ts: Date.now() };
+    if (imageURL) newMsg.imageURL = imageURL;
     const updatedMsgs = [...(chats[dealId] || []), newMsg];
     setChats((prev) => ({ ...prev, [dealId]: updatedMsgs }));
     await setDoc(doc(db, "chats", dealId), { messages: updatedMsgs });
+  };
+
+  const handleOnboardingDone = () => {
+    localStorage.setItem(`onboarding-done-${user.uid}`, "1");
+    setShowOnboarding(false);
   };
 
   const handleOpenChat = (target) => {
@@ -4737,13 +4860,17 @@ export default function FarmToTableApp() {
           />
         )}
 
+        {showOnboarding && user && (
+          <OnboardingModal role={user.role} onDone={handleOnboardingDone} />
+        )}
+
         {chatTarget ? (
           <ChatScreen
             dealInfo={chatTarget}
             userName={user.name}
             userRole={user.role}
             messages={chats[chatTarget.dealId] || []}
-            onSend={(text) => handleSendMessage(chatTarget.dealId, text)}
+            onSend={(payload) => handleSendMessage(chatTarget.dealId, payload)}
             onBack={() => setChatTarget(null)}
           />
         ) : (
