@@ -153,6 +153,7 @@ const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKEN
 const ADMIN_EMAIL = "jhlove0490@nonghyup.com";
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
+const TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq";
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
 const USER_KEY = "current-user";
@@ -2677,8 +2678,7 @@ function fmtDateTime(ts) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
-  const [confirmDeposit, setConfirmDeposit] = useState(false);
+function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
   const total = proposal.price * deal.quantity;
   const fee = Math.round(total * FEE_RATE);
   const deposit = Math.round(total * DEPOSIT_RATE);
@@ -2687,6 +2687,7 @@ function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
 
   const isChef = userRole === "chef";
   const depositPaid = !!deal.depositPaidAt;
+  const balancePaid = !!deal.balancePaidAt;
   const isDone = deal.status === "done";
 
   const bothSigned = !!(deal.contractSignedChefAt && deal.contractSignedFarmAt);
@@ -2699,7 +2700,7 @@ function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
       : null },
     { label: `선급금 ${deposit.toLocaleString()}원 (${Math.round(DEPOSIT_RATE * 100)}%)`, done: depositPaid, ts: deal.depositPaidAt },
     { label: "납품 완료", done: isDone, ts: deal.completedAt },
-    { label: `잔금 ${balance.toLocaleString()}원 (${Math.round((1 - DEPOSIT_RATE) * 100)}%)`, done: isDone, ts: deal.completedAt },
+    { label: `잔금 ${balance.toLocaleString()}원 (${Math.round((1 - DEPOSIT_RATE) * 100)}%)`, done: balancePaid, ts: deal.balancePaidAt },
   ];
 
   return (
@@ -2738,22 +2739,29 @@ function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
               )}
               {i === 2 && !depositPaid && isChef && (
                 <div style={{ marginTop: 6 }}>
-                  {confirmDeposit ? (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => { onDepositConfirm?.(); setConfirmDeposit(false); }} style={{ padding: "5px 14px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                        지급 완료 확인
-                      </button>
-                      <button onClick={() => setConfirmDeposit(false)} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 6, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>취소</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setConfirmDeposit(true)} style={{ padding: "5px 14px", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
-                      선급금 지급 확인
-                    </button>
-                  )}
+                  <button
+                    onClick={() => onTossPayment?.("deposit")}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#0064FF", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: 14 }}>💳</span> 토스페이먼츠로 결제
+                  </button>
                 </div>
               )}
               {i === 2 && !depositPaid && !isChef && (
-                <div style={{ fontSize: 11, color: TOKENS.gold, marginTop: 2 }}>지급 대기 중</div>
+                <div style={{ fontSize: 11, color: TOKENS.gold, marginTop: 2 }}>결제 대기 중</div>
+              )}
+              {i === 4 && isDone && !balancePaid && isChef && (
+                <div style={{ marginTop: 6 }}>
+                  <button
+                    onClick={() => onTossPayment?.("balance")}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#0064FF", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: 14 }}>💳</span> 잔금 결제하기
+                  </button>
+                </div>
+              )}
+              {i === 4 && isDone && !balancePaid && !isChef && (
+                <div style={{ fontSize: 11, color: TOKENS.gold, marginTop: 2 }}>잔금 결제 대기 중</div>
               )}
             </div>
           </div>
@@ -3787,7 +3795,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onDepositPaid, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -4040,7 +4048,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onDepositPaid,
                 {(deal.status === "matched" || deal.status === "done") && selectedProposal && (
                   <>
                     <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} score={calcMatchScore(deal, selectedProposal)} onViewProfile={(p) => setFarmProfileModal(p)} />
-                    <SettlementCard deal={deal} proposal={selectedProposal} userRole="chef" onDepositConfirm={() => onDepositPaid?.(deal.id)} />
+                    <SettlementCard deal={deal} proposal={selectedProposal} userRole="chef" onTossPayment={(type) => onTossPayment?.(deal, selectedProposal, type)} />
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: selectedProposal.farmName })}
@@ -5100,6 +5108,46 @@ export default function FarmToTableApp() {
     if (outcome === "accepted") setInstallPrompt(null);
   };
 
+  // 토스 결제 리다이렉트 감지 (앱 최초 마운트 시 1회)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentKey = params.get("paymentKey");
+    if (paymentKey) {
+      localStorage.setItem("pending-toss-payment", JSON.stringify({
+        paymentKey,
+        orderId: params.get("orderId") || "",
+        amount: Number(params.get("amount") || 0),
+      }));
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    if (params.get("pay") === "fail" || params.get("code")) {
+      const msg = params.get("message") || "알 수 없는 오류가 발생했습니다.";
+      window.history.replaceState({}, "", window.location.pathname);
+      setTimeout(() => alert(`❌ 결제 실패: ${msg}`), 500);
+    }
+  }, []);
+
+  // 데이터 로드 완료 후 미처리 결제 반영
+  useEffect(() => {
+    if (loadState !== "ready") return;
+    const raw = localStorage.getItem("pending-toss-payment");
+    if (!raw) return;
+    localStorage.removeItem("pending-toss-payment");
+    try {
+      const { orderId, paymentKey, amount } = JSON.parse(raw);
+      const isDeposit = orderId.startsWith("dep-");
+      const dealId = orderId.slice(4);
+      if (isDeposit) {
+        handleDepositPaid(dealId, { paymentKey, amount });
+        showPushNotification("💰 선급금 결제 완료", `${Number(amount).toLocaleString()}원이 결제됐습니다.`, "mydeals");
+      } else {
+        handleBalancePaid(dealId, { paymentKey, amount });
+        showPushNotification("💰 잔금 결제 완료", `${Number(amount).toLocaleString()}원이 결제됐습니다.`, "mydeals");
+      }
+      setTab("mydeals");
+    } catch { /* ignore */ }
+  }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isMobile = useIsMobile();
 
   // Firebase Auth 상태 감지
@@ -5414,12 +5462,41 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
-  const handleDepositPaid = (dealId) => {
+  const handleDepositPaid = (dealId, paymentInfo = {}) => {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal) return;
-    const updated = { ...deal, depositPaidAt: Date.now() };
+    const updated = { ...deal, depositPaidAt: Date.now(), ...(paymentInfo.paymentKey && { depositPaymentKey: paymentInfo.paymentKey }) };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+  };
+
+  const handleBalancePaid = (dealId, paymentInfo = {}) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, balancePaidAt: Date.now(), ...(paymentInfo.paymentKey && { balancePaymentKey: paymentInfo.paymentKey }) };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
+  const handleTossPayment = (deal, proposal, type) => {
+    if (!window.TossPayments) {
+      alert("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    const total = proposal.price * deal.quantity;
+    const depositAmt = Math.round(total * DEPOSIT_RATE);
+    const amount = type === "deposit" ? depositAmt : total - depositAmt;
+    const orderId = `${type === "deposit" ? "dep" : "bal"}-${deal.id}`;
+    const orderName = `[${deal.crop}] ${type === "deposit" ? "선급금 (30%)" : "잔금 (70%)"}`;
+    const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
+    tossPayments.requestPayment("카드", {
+      amount,
+      orderId,
+      orderName,
+      customerName: user.name,
+      successUrl: `${window.location.origin}${window.location.pathname}?pay=ok`,
+      failUrl: `${window.location.origin}${window.location.pathname}?pay=fail`,
+    });
   };
 
   const handleSignContract = (dealId, role) => {
@@ -5856,7 +5933,7 @@ export default function FarmToTableApp() {
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} chatUnreads={chatUnreads} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onDepositPaid={handleDepositPaid} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "dashboard" && <DashboardScreen deals={deals} user={user} onTabChange={handleTabClick} />}
