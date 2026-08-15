@@ -1637,10 +1637,11 @@ const SORT_OPTIONS = [
   { value: "proposals", label: "제안 많은순" },
 ];
 
-function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, chatUnreads = {} }) {
+function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
+  const [shipTarget, setShipTarget] = useState(null);
   const myItems = [];
   for (const deal of deals) {
     const proposal = deal.proposals.find((p) => p.farmerName === userName);
@@ -1660,6 +1661,7 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
         onCancel={onCancelProposal}
         onOpenChat={onOpenChat}
         onViewContract={onViewContract}
+        onShipDeal={onShipDeal}
         chatUnreads={chatUnreads}
       />
     );
@@ -1685,6 +1687,12 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
+      {shipTarget && (
+        <ShipModal
+          onClose={() => setShipTarget(null)}
+          onConfirm={(info) => { onShipDeal?.(shipTarget.dealId, info); setShipTarget(null); }}
+        />
+      )}
       <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginBottom: 2 }}>
         총 {myItems.length}건의 제안
       </div>
@@ -1768,25 +1776,30 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
               </div>
             )}
             {isSelected && (
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
-                  style={{ flex: 1, padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-                >
-                  💬 {deal.chefName}과 채팅
-                  {(chatUnreads[deal.id] || 0) > 0 && (
-                    <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                      {chatUnreads[deal.id]}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => onViewContract(deal, proposal)}
-                  style={{ padding: "9px 16px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-                >
-                  계약서
-                </button>
-              </div>
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <button
+                    onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
+                    style={{ flex: 1, padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                  >
+                    💬 {deal.chefName}과 채팅
+                    {(chatUnreads[deal.id] || 0) > 0 && (
+                      <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                        {chatUnreads[deal.id]}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => onViewContract(deal, proposal)}
+                    style={{ padding: "9px 16px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                  >
+                    계약서
+                  </button>
+                </div>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <DeliveryTracker deal={deal} userRole="farmer" onShip={() => setShipTarget({ dealId: deal.id })} />
+                </div>
+              </>
             )}
           </div>
         );
@@ -1795,9 +1808,10 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
   );
 }
 
-function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, onViewContract, chatUnreads = {} }) {
+function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, onViewContract, onShipDeal, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
+  const [showShipModal, setShowShipModal] = useState(false);
   const score = calcMatchScore(deal, proposal);
   const priceDiff = proposal.price - deal.targetPrice;
   const isSelected = deal.selectedProposalId === proposal.id;
@@ -1936,6 +1950,12 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
             </button>
             <button onClick={() => onViewContract(deal, proposal)} style={{ padding: "12px 18px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>계약서</button>
           </>
+        )}
+        {isSelected && (
+          <DeliveryTracker deal={deal} userRole="farmer" onShip={() => setShowShipModal(true)} />
+        )}
+        {showShipModal && (
+          <ShipModal onClose={() => setShowShipModal(false)} onConfirm={(info) => { onShipDeal?.(deal.id, info); setShowShipModal(false); }} />
         )}
       </div>
     </div>
@@ -2678,6 +2698,105 @@ function fmtDateTime(ts) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function ShipModal({ onClose, onConfirm }) {
+  const [memo, setMemo] = useState("");
+  const [photoURL, setPhotoURL] = useState(null);
+  const [loading, setLoading] = useState(false);
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.70)", zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 24, maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: TOKENS.ink, marginBottom: 6 }}>🚛 발송 완료 신고</div>
+        <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: 20 }}>납품 발송이 완료됐음을 셰프에게 알립니다.</div>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>발송 사진 (선택)</div>
+          <ImageUpload value={photoURL} onChange={setPhotoURL} label="사진 추가" shape="square" size={100} />
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>메모 (선택)</div>
+          <textarea value={memo} onChange={(e) => setMemo(e.target.value)}
+            placeholder="예: 아이스팩과 함께 발송했습니다."
+            rows={3} style={{ width: "100%", padding: "10px 12px", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => { setLoading(true); onConfirm({ memo: memo.trim(), photoURL }); }}
+            disabled={loading}
+            style={{ flex: 1, padding: "12px 0", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1 }}>
+            {loading ? "처리 중…" : "발송 완료"}
+          </button>
+          <button onClick={onClose} style={{ padding: "12px 20px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 14, color: TOKENS.inkSoft, cursor: "pointer" }}>취소</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeliveryTracker({ deal, userRole, onShip, onConfirmDelivery }) {
+  const isChef = userRole === "chef";
+  const depositPaid = !!deal.depositPaidAt;
+  const shipped = !!deal.shippedAt;
+  const delivered = !!deal.deliveredAt;
+  const stages = [
+    { icon: "📦", label: "납품 준비", done: depositPaid, ts: deal.depositPaidAt },
+    { icon: "🚛", label: "발송 완료", done: shipped, ts: deal.shippedAt },
+    { icon: "✅", label: "수령 확인", done: delivered, ts: deal.deliveredAt },
+  ];
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16 }}>
+      <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 14 }}>납품 추적</div>
+      <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 14 }}>
+        {stages.map((stage, i) => (
+          <Fragment key={i}>
+            <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", width: 72 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: stage.done ? TOKENS.moss : TOKENS.card, border: `2px solid ${stage.done ? TOKENS.moss : TOKENS.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+                {stage.done ? "✓" : stage.icon}
+              </div>
+              <div style={{ fontSize: 11, color: stage.done ? TOKENS.ink : TOKENS.inkSoft, marginTop: 4, textAlign: "center", fontWeight: stage.done ? 500 : 400 }}>{stage.label}</div>
+              {stage.done && stage.ts && (
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textAlign: "center", marginTop: 1 }}>
+                  {new Date(stage.ts).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}
+                </div>
+              )}
+            </div>
+            {i < stages.length - 1 && (
+              <div style={{ flex: 1, height: 2, background: stage.done ? TOKENS.moss : TOKENS.line, opacity: 0.4, marginTop: 17 }} />
+            )}
+          </Fragment>
+        ))}
+      </div>
+      {shipped && deal.shippedMemo && (
+        <div style={{ background: TOKENS.mossSoft, borderRadius: 8, padding: "8px 12px", fontSize: 12, color: TOKENS.ink, marginBottom: 8 }}>
+          <span style={{ color: TOKENS.inkSoft }}>발송 메모: </span>{deal.shippedMemo}
+        </div>
+      )}
+      {shipped && deal.shippedPhotoURL && (
+        <img src={deal.shippedPhotoURL} alt="발송 사진" onClick={() => window.open(deal.shippedPhotoURL, "_blank")}
+          style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, cursor: "pointer", marginBottom: 8 }} />
+      )}
+      {!isChef && depositPaid && !shipped && (
+        <button onClick={onShip} style={{ width: "100%", padding: "10px 0", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          🚛 발송 완료 신고
+        </button>
+      )}
+      {!isChef && !depositPaid && (
+        <div style={{ fontSize: 12, color: TOKENS.inkSoft, textAlign: "center", padding: "6px 0" }}>선급금 입금 확인 후 발송해 주세요</div>
+      )}
+      {isChef && shipped && !delivered && (
+        <button onClick={onConfirmDelivery} style={{ width: "100%", padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          ✅ 수령 확인 (납품 완료)
+        </button>
+      )}
+      {isChef && !shipped && (
+        <div style={{ fontSize: 12, color: TOKENS.inkSoft, textAlign: "center", padding: "6px 0" }}>
+          {depositPaid ? "농가 발송 대기 중입니다" : "선급금 결제 후 납품이 진행됩니다"}
+        </div>
+      )}
+      {delivered && (
+        <div style={{ fontSize: 12, color: TOKENS.moss, textAlign: "center", padding: "6px 0", fontWeight: 600 }}>✓ 납품 완료</div>
+      )}
+    </div>
+  );
+}
+
 function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
   const total = proposal.price * deal.quantity;
   const fee = Math.round(total * FEE_RATE);
@@ -2699,7 +2818,7 @@ function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
         : (deal.contractSignedFarmAt ? "내 서명 완료 · 셰프 서명 대기" : "계약서에서 서명하세요"))
       : null },
     { label: `선급금 ${deposit.toLocaleString()}원 (${Math.round(DEPOSIT_RATE * 100)}%)`, done: depositPaid, ts: deal.depositPaidAt },
-    { label: "납품 완료", done: isDone, ts: deal.completedAt },
+    { label: "납품 완료", done: !!deal.deliveredAt, ts: deal.deliveredAt },
     { label: `잔금 ${balance.toLocaleString()}원 (${Math.round((1 - DEPOSIT_RATE) * 100)}%)`, done: balancePaid, ts: deal.balancePaidAt },
   ];
 
@@ -3795,7 +3914,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -4048,6 +4167,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onTossPayment,
                 {(deal.status === "matched" || deal.status === "done") && selectedProposal && (
                   <>
                     <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} score={calcMatchScore(deal, selectedProposal)} onViewProfile={(p) => setFarmProfileModal(p)} />
+                    <DeliveryTracker deal={deal} userRole="chef" onConfirmDelivery={() => onConfirmDelivery?.(deal.id)} />
                     <SettlementCard deal={deal} proposal={selectedProposal} userRole="chef" onTossPayment={(type) => onTossPayment?.(deal, selectedProposal, type)} />
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
@@ -4067,18 +4187,6 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onTossPayment,
                       >
                         계약서
                       </button>
-                      {deal.status === "matched" && (
-                        confirmComplete === deal.id ? (
-                          <div style={{ display: "flex", gap: 8, flex: 1 }}>
-                            <button onClick={() => { onCompleteDeal(deal.id); setConfirmComplete(null); }} style={{ flex: 1, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>확인 — 정산 완료</button>
-                            <button onClick={() => setConfirmComplete(null)} style={{ padding: "10px 14px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>취소</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setConfirmComplete(deal.id)} style={{ flex: 1, minWidth: 120, padding: "10px 0", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-                            납품 확인 후 정산 완료 처리
-                          </button>
-                        )
-                      )}
                     </div>
                     {deal.status === "done" && (
                       selectedProposal.ratedAt ? (
@@ -5285,9 +5393,16 @@ export default function FarmToTableApp() {
                 "mydeals"
               );
             }
+            if (!old.shippedAt && deal.shippedAt) {
+              showPushNotification(
+                "🚛 농가 발송 완료",
+                `${deal.crop} 딜 납품이 발송됐습니다. 수령 후 확인 버튼을 눌러주세요.`,
+                "mydeals"
+              );
+            }
             if (old.status !== "done" && deal.status === "done") {
               showPushNotification(
-                "✅ 정산 완료",
+                "✅ 납품·정산 완료",
                 `${deal.crop} 딜 납품·정산이 완료됐습니다.`,
                 "dashboard"
               );
@@ -5315,9 +5430,16 @@ export default function FarmToTableApp() {
                       "myproposals"
                     );
                   }
+                  if (!old.deliveredAt && deal.deliveredAt) {
+                    showPushNotification(
+                      "✅ 수령 확인 완료",
+                      `${deal.chefName}이(가) ${deal.crop} 납품을 수령 확인했습니다. 잔금 정산이 진행됩니다.`,
+                      "myproposals"
+                    );
+                  }
                   if (old.status !== "done" && deal.status === "done") {
                     showPushNotification(
-                      "✅ 정산 완료",
+                      "✅ 납품·정산 완료",
                       `${deal.chefName}의 ${deal.crop} 딜 납품·정산이 완료됐습니다.`,
                       "dashboard"
                     );
@@ -5458,6 +5580,35 @@ export default function FarmToTableApp() {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal) return;
     const updated = { ...deal, status: "done", completedAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
+  const handleShipDeal = (dealId, { photoURL = null, memo = "" } = {}) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = {
+      ...deal,
+      deliveryStatus: "shipped",
+      shippedAt: Date.now(),
+      ...(photoURL && { shippedPhotoURL: photoURL }),
+      ...(memo && { shippedMemo: memo }),
+    };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
+  const handleConfirmDelivery = (dealId) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const now = Date.now();
+    const updated = {
+      ...deal,
+      deliveryStatus: "delivered",
+      deliveredAt: now,
+      status: "done",
+      completedAt: now,
+    };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
   };
@@ -5932,8 +6083,8 @@ export default function FarmToTableApp() {
           <>
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
-            {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} chatUnreads={chatUnreads} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
+            {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} chatUnreads={chatUnreads} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "dashboard" && <DashboardScreen deals={deals} user={user} onTabChange={handleTabClick} />}

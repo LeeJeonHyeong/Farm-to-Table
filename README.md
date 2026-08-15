@@ -93,6 +93,7 @@ allow delete: if request.auth != null
 | AI 매칭 점수 | 제안별 100점 채점 + 매칭 점수순 정렬 + AI 한 줄 분석 |
 | 농가 평점/리뷰 | 거래 완료 후 별점 + 후기 등록 |
 | 정산 트래커 | 계약 확정→계약서 서명→선급금(30%)→납품 완료→잔금(70%) 5단계 진행 표시 |
+| 납품 추적 | 납품 준비→발송 완료→수령 확인 3단계 DeliveryTracker, 수령 확인 시 정산 완료 처리 |
 | 토스페이먼츠 결제 | 선급금·잔금 토스페이먼츠 카드 결제 (테스트 모드), 결제 완료 후 자동 상태 반영 |
 | 정산 이력 | 대시보드에서 매칭·완료 딜의 거래처·금액·단계·확정일 일람 |
 | 알림 뱃지 | 새 제안 도착 및 미확인 채팅 시 "내 거래" 탭에 숫자 뱃지 |
@@ -105,6 +106,7 @@ allow delete: if request.auth != null
 | 스마트 정렬 | 내 전문 품목 딜을 상단 노출 + "내 전문 품목" 뱃지 |
 | 제안 보내기 | 가격·수량·납품일·인증 입력 후 제안 제출 (중복 제출 방지) |
 | 제안 취소 | 모집중 딜에 한해 제안 취소 |
+| 발송 완료 신고 | 선급금 입금 확인 후 발송 완료 신고 (사진·메모 첨부 가능) |
 | 정산 이력 | 대시보드에서 선택된 제안의 거래처·금액·단계 일람 |
 | 알림 뱃지 | 내 제안 선택 및 미확인 채팅 시 "내 제안" 탭에 숫자 뱃지 |
 | 내 농가 | 농가 정보·전문 품목·리드타임 등록 + 누적 평균 평점 표시 |
@@ -182,6 +184,7 @@ allow delete: if request.auth != null
 | v2.10 | 관리자 화면 (ADMIN_EMAIL 접근제어, 현황 KPI 6종, 딜 관리 CRUD, 최근 등록/완료 딜 목록) |
 | v2.11 | UX 8항목 수정 (메시지 롤백·저장 상태 피드백·빈 상태 CTA·터치 영역·중복 제출 방지 등) + 관리자 유저 목록·채팅 로그 섹션 추가 |
 | v2.12 | 토스페이먼츠 테스트 결제 연동 — 선급금(30%)·잔금(70%) 실결제 UI, 결제 리다이렉트 자동 처리, balancePaidAt 필드 신규 |
+| v2.13 | 납품 확인·물류 추적 기능 — DeliveryTracker 3단계 (납품 준비→발송 완료→수령 확인), 농가 발송 신고(사진·메모), 셰프 수령 확인 버튼, 알림 2종 신규 |
 
 ### v1.6 상세 내역
 
@@ -484,6 +487,40 @@ allow delete: if request.auth != null
 - `balancePaymentKey`: 잔금 토스 결제 키 저장
 
 **테스트 카드**: `4242 4242 4242 4242`, 유효기간 미래 아무 날짜, CVC 3자리 아무 숫자
+
+### v2.13 상세 내역
+
+**납품 추적 신규 기능**
+
+**DeliveryTracker 컴포넌트**
+- 3단계 수평 트래커: 📦 납품 준비 → 🚛 발송 완료 → ✅ 수령 확인
+- 각 단계 완료 시 타임스탬프(월/일) 표시
+- 발송 완료 시 농가가 입력한 사진·메모 표시
+
+**ShipModal 컴포넌트 (농가 전용)**
+- 농가가 발송 완료 신고 시 호출되는 모달
+- 발송 사진 업로드 (선택), 발송 메모 입력 (선택) 후 확인
+- 카드 리스트 뷰·상세 뷰 양쪽에서 접근 가능
+
+**핸들러 추가**
+- `handleShipDeal(dealId, { photoURL, memo })`: 농가 발송 완료 처리 — `deliveryStatus: "shipped"`, `shippedAt`, `shippedPhotoURL`, `shippedMemo` 필드 저장
+- `handleConfirmDelivery(dealId)`: 셰프 수령 확인 처리 — `deliveryStatus: "delivered"`, `deliveredAt`, `status: "done"`, `completedAt` 동시 처리
+
+**화면 업데이트**
+- MyDealsScreen: 진행중 딜 카드에 DeliveryTracker 삽입 (ProposalCard와 SettlementCard 사이), 기존 2단계 "납품 확인 후 정산 완료" 버튼 제거
+- MyProposalsScreen: 선택된 제안 카드에 DeliveryTracker 삽입 (채팅·계약서 버튼 하단)
+- SettlementCard "납품 완료" 단계: `completedAt` → `deliveredAt` 연동
+
+**알림 2종 신규**
+- 농가 발송 완료(`shippedAt`) → 셰프에게 "🚛 농가 발송 완료" 알림 + mydeals 탭 이동
+- 셰프 수령 확인(`deliveredAt`) → 농가에게 "✅ 수령 확인 완료" 알림 + myproposals 탭 이동
+
+**데이터 확장**
+- `deliveryStatus`: `null` → `"shipped"` → `"delivered"`
+- `shippedAt`: 발송 완료 타임스탬프
+- `shippedPhotoURL`: 발송 사진 URL (선택)
+- `shippedMemo`: 발송 메모 (선택)
+- `deliveredAt`: 수령 확인 타임스탬프
 
 ## 향후 과제
 
