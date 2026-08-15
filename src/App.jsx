@@ -2664,37 +2664,95 @@ function fmtDateTime(ts) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function SettlementCard({ deal, proposal }) {
+function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
+  const [confirmDeposit, setConfirmDeposit] = useState(false);
   const total = proposal.price * deal.quantity;
   const fee = Math.round(total * FEE_RATE);
   const deposit = Math.round(total * DEPOSIT_RATE);
   const balance = total - deposit;
   const netToFarm = total - fee;
+
+  const isChef = userRole === "chef";
+  const depositPaid = !!deal.depositPaidAt;
+  const isDone = deal.status === "done";
+
+  const steps = [
+    { label: "계약 확정", done: true, ts: deal.selectedAt },
+    { label: `선급금 ${deposit.toLocaleString()}원 (${Math.round(DEPOSIT_RATE * 100)}%)`, done: depositPaid, ts: deal.depositPaidAt },
+    { label: "납품 완료", done: isDone, ts: deal.completedAt },
+    { label: `잔금 ${balance.toLocaleString()}원 (${Math.round((1 - DEPOSIT_RATE) * 100)}%)`, done: isDone, ts: deal.completedAt },
+  ];
+
   return (
     <div style={{ background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16 }}>
-      <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
-        정산 내역
+      <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 14 }}>
+        결제 · 정산
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: TOKENS.ink, marginBottom: 6 }}>
-        <span>총 계약금액 ({proposal.farmName} · {deal.quantity}kg × {proposal.price.toLocaleString()}원)</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{total.toLocaleString()}원</span>
+
+      {/* 단계 트래커 */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 14 }}>
+        {steps.map((step, i) => (
+          <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 20, flexShrink: 0 }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: "50%", border: `2px solid ${step.done ? TOKENS.moss : TOKENS.line}`,
+                background: step.done ? TOKENS.moss : "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, color: step.done ? "#fff" : TOKENS.inkSoft, fontWeight: 700, flexShrink: 0,
+              }}>
+                {step.done ? "✓" : i + 1}
+              </div>
+              {i < steps.length - 1 && (
+                <div style={{ width: 2, flex: 1, minHeight: 16, background: step.done ? TOKENS.moss : TOKENS.line, opacity: 0.4 }} />
+              )}
+            </div>
+            <div style={{ paddingBottom: i < steps.length - 1 ? 10 : 0, paddingTop: 1, flex: 1 }}>
+              <div style={{ fontSize: 13, color: step.done ? TOKENS.ink : TOKENS.inkSoft, fontWeight: step.done ? 500 : 400 }}>
+                {step.label}
+              </div>
+              {step.done && step.ts && (
+                <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
+                  {new Date(step.ts).toLocaleDateString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              )}
+              {i === 1 && !depositPaid && isChef && (
+                <div style={{ marginTop: 6 }}>
+                  {confirmDeposit ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => { onDepositConfirm?.(); setConfirmDeposit(false); }} style={{ padding: "5px 14px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        지급 완료 확인
+                      </button>
+                      <button onClick={() => setConfirmDeposit(false)} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 6, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>취소</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDeposit(true)} style={{ padding: "5px 14px", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                      선급금 지급 확인
+                    </button>
+                  )}
+                </div>
+              )}
+              {i === 1 && !depositPaid && !isChef && (
+                <div style={{ fontSize: 11, color: TOKENS.gold, marginTop: 2 }}>지급 대기 중</div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: TOKENS.inkSoft, marginBottom: 6 }}>
-        <span>선급금 ({Math.round(DEPOSIT_RATE * 100)}%, 딜 확정 시)</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{deposit.toLocaleString()}원</span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: TOKENS.inkSoft, marginBottom: 6 }}>
-        <span>잔금 ({Math.round((1 - DEPOSIT_RATE) * 100)}%, 납품 검수 후)</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{balance.toLocaleString()}원</span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: TOKENS.rust, marginBottom: 6 }}>
-        <span>플랫폼 수수료 ({Math.round(FEE_RATE * 100)}%)</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>-{fee.toLocaleString()}원</span>
-      </div>
-      <div style={{ height: 1, background: TOKENS.line, margin: "8px 0" }} />
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: TOKENS.ink, fontWeight: 500 }}>
-        <span>농가 실수령액</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{netToFarm.toLocaleString()}원</span>
+
+      {/* 금액 내역 */}
+      <div style={{ background: TOKENS.card, borderRadius: 8, padding: "10px 12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: TOKENS.inkSoft, marginBottom: 4 }}>
+          <span>계약금액 ({deal.quantity}kg × {proposal.price.toLocaleString()}원/kg)</span>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{total.toLocaleString()}원</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: TOKENS.rust, marginBottom: 4 }}>
+          <span>플랫폼 수수료 ({Math.round(FEE_RATE * 100)}%)</span>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>-{fee.toLocaleString()}원</span>
+        </div>
+        <div style={{ height: 1, background: TOKENS.line, margin: "6px 0" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: TOKENS.ink, fontWeight: 600 }}>
+          <span>농가 실수령액</span>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss }}>{netToFarm.toLocaleString()}원</span>
+        </div>
       </div>
     </div>
   );
@@ -3128,6 +3186,82 @@ function DashboardScreen({ deals, user, onTabChange }) {
         </div>
       )}
 
+      {/* 정산 이력 */}
+      {(() => {
+        const settlementDeals = isChef
+          ? allMyDeals
+              .filter((d) => d.status === "matched" || d.status === "done")
+              .sort((a, b) => (b.selectedAt || 0) - (a.selectedAt || 0))
+              .slice(0, 10)
+          : allMyProposals
+              .filter((p) => p.deal.selectedProposalId === p.id)
+              .sort((a, b) => (b.deal.selectedAt || 0) - (a.deal.selectedAt || 0))
+              .slice(0, 10);
+
+        if (settlementDeals.length === 0) return null;
+
+        const getStage = (item) => {
+          if (isChef) {
+            const d = item;
+            if (d.status === "done") return { label: "정산 완료", color: TOKENS.moss };
+            if (d.depositPaidAt) return { label: "선급금 지급", color: TOKENS.gold };
+            return { label: "선급금 대기", color: TOKENS.inkSoft };
+          } else {
+            const d = item.deal;
+            if (d.status === "done") return { label: "정산 완료", color: TOKENS.moss };
+            if (d.depositPaidAt) return { label: "선급금 수령", color: TOKENS.gold };
+            return { label: "선급금 대기", color: TOKENS.inkSoft };
+          }
+        };
+
+        return (
+          <div style={sectionStyle}>
+            <div style={sectionLabel}>정산 이력</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1, borderRadius: 8, overflow: "hidden", border: `1px solid ${TOKENS.line}` }}>
+              {/* 헤더 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 90px 80px", gap: 8, padding: "7px 12px", background: TOKENS.card, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+                <span>품목 · 거래처</span>
+                <span style={{ textAlign: "right" }}>금액</span>
+                <span style={{ textAlign: "center" }}>단계</span>
+                <span style={{ textAlign: "right" }}>확정일</span>
+              </div>
+              {settlementDeals.map((item, idx) => {
+                const d = isChef ? item : item.deal;
+                const p = isChef
+                  ? d.proposals.find((p) => p.id === d.selectedProposalId)
+                  : item;
+                if (!p) return null;
+                const total = p.price * d.quantity;
+                const stage = getStage(item);
+                return (
+                  <div
+                    key={isChef ? d.id : item.id}
+                    onClick={() => onTabChange?.(isChef ? "mydeals" : "myproposals")}
+                    style={{ display: "grid", gridTemplateColumns: "1fr 80px 90px 80px", gap: 8, padding: "9px 12px", background: idx % 2 === 0 ? "#fff" : TOKENS.card, cursor: "pointer", fontSize: 13 }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontFamily: "'Fraunces', serif", color: TOKENS.ink }}>{d.crop}</span>
+                      <span style={{ fontSize: 11, color: TOKENS.inkSoft, marginLeft: 6 }}>{isChef ? p.farmName : d.chefName}</span>
+                    </div>
+                    <div style={{ textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.ink, fontSize: 12 }}>
+                      {total >= 10000 ? `${Math.floor(total / 10000)}만` : `${total.toLocaleString()}`}
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: stage.color, background: `${stage.color}18`, borderRadius: 999, padding: "2px 8px" }}>
+                        {stage.label}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+                      {d.selectedAt ? new Date(d.selectedAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "-"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 최근 활동 */}
       <div style={sectionStyle}>
         <div style={sectionLabel}>{isChef ? "최근 등록 딜" : "최근 보낸 제안"}</div>
@@ -3199,7 +3333,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onDepositPaid, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -3452,7 +3586,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onOpenChat, on
                 {(deal.status === "matched" || deal.status === "done") && selectedProposal && (
                   <>
                     <ProposalCard proposal={selectedProposal} deal={deal} isSelected selectable={false} onSelect={() => {}} score={calcMatchScore(deal, selectedProposal)} onViewProfile={(p) => setFarmProfileModal(p)} />
-                    <SettlementCard deal={deal} proposal={selectedProposal} />
+                    <SettlementCard deal={deal} proposal={selectedProposal} userRole="chef" onDepositConfirm={() => onDepositPaid?.(deal.id)} />
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: selectedProposal.farmName })}
@@ -4709,6 +4843,14 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
+  const handleDepositPaid = (dealId) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, depositPaidAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
   const handleSendMessage = async (dealId, payload) => {
     const { text = "", imageURL = null } = typeof payload === "string" ? { text: payload } : payload;
     const newMsg = { id: `m${Date.now()}`, senderName: user.name, senderRole: user.role, text, ts: Date.now() };
@@ -5110,7 +5252,7 @@ export default function FarmToTableApp() {
             {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} chatUnreads={chatUnreads} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onDepositPaid={handleDepositPaid} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "dashboard" && <DashboardScreen deals={deals} user={user} onTabChange={handleTabClick} />}
