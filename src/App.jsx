@@ -150,6 +150,7 @@ const GRADE_LEVELS = ["보통", "상", "특"];
 const CYCLE_OPTIONS = ["단발성(1회)", "주 1회", "주 2회", "격주"];
 const DEAL_STATUS_LABEL = { open: "모집중", matched: "진행중", done: "완료", closed: "마감" };
 const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKENS.inkSoft, closed: TOKENS.rust };
+const ADMIN_EMAIL = "jhlove0490@nonghyup.com";
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
@@ -3046,6 +3047,277 @@ function MiniBarChart({ items, max, colorFn }) {
   );
 }
 
+function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }) {
+  const isMobile = useIsMobile();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("전체");
+  const [confirmAction, setConfirmAction] = useState(null); // { dealId, action }
+  const [activeSection, setActiveSection] = useState("overview"); // overview | deals | activity
+
+  /* ── 플랫폼 전체 지표 ── */
+  const totalDeals = deals.length;
+  const openDeals = deals.filter((d) => d.status === "open");
+  const matchedDeals = deals.filter((d) => d.status === "matched");
+  const doneDeals = deals.filter((d) => d.status === "done");
+  const closedDeals = deals.filter((d) => d.status === "closed");
+  const totalRevenue = doneDeals.reduce((sum, d) => {
+    const p = d.proposals.find((p) => p.id === d.selectedProposalId);
+    return sum + (p ? p.price * d.quantity : 0);
+  }, 0);
+  const totalFee = Math.round(totalRevenue * FEE_RATE);
+  const totalProposals = deals.reduce((s, d) => s + d.proposals.length, 0);
+  const avgProposals = totalDeals > 0 ? (totalProposals / totalDeals).toFixed(1) : "0";
+  const successRate = totalDeals > 0 ? Math.round(((doneDeals.length + matchedDeals.length) / totalDeals) * 100) : 0;
+
+  /* ── 딜 목록 필터 ── */
+  const filteredDeals = deals
+    .filter((d) => statusFilter === "전체" || d.status === statusFilter)
+    .filter((d) => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      return d.crop?.toLowerCase().includes(q) || d.chefName?.toLowerCase().includes(q);
+    })
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  /* ── 최근 활동 ── */
+  const recentCreated = [...deals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 8);
+  const recentCompleted = [...doneDeals].sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)).slice(0, 8);
+
+  /* ── 품목 분포 ── */
+  const cropCounts = deals.reduce((acc, d) => { acc[d.crop] = (acc[d.crop] || 0) + 1; return acc; }, {});
+  const topCrops = Object.entries(cropCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  const sectionStyle = { background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 14 };
+  const sectionLabel = { fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 };
+
+  const fmtAmt = (n) => n >= 100000000 ? `${(n / 100000000).toFixed(1)}억` : n >= 10000 ? `${Math.floor(n / 10000).toLocaleString()}만` : `${n.toLocaleString()}`;
+  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "-";
+
+  const handleConfirm = () => {
+    if (!confirmAction) return;
+    const { dealId, action } = confirmAction;
+    if (action === "delete") onDeleteDeal(dealId);
+    else if (action === "close") onCloseDeal(dealId);
+    else if (action === "complete") onCompleteDeal(dealId);
+    setConfirmAction(null);
+  };
+
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto" }}>
+      {/* 확인 다이얼로그 */}
+      {confirmAction && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, maxWidth: 360, width: "100%" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, marginBottom: 10 }}>
+              {confirmAction.action === "delete" ? "딜 삭제" : confirmAction.action === "close" ? "딜 강제 마감" : "정산 완료 처리"}
+            </div>
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: 22, lineHeight: 1.6 }}>
+              {confirmAction.action === "delete"
+                ? "이 딜을 영구 삭제합니다. 복구할 수 없습니다."
+                : confirmAction.action === "close"
+                ? "이 딜을 강제 마감 처리합니다."
+                : "이 딜을 정산 완료 상태로 변경합니다."}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleConfirm} style={{ flex: 1, padding: "10px 0", background: confirmAction.action === "delete" ? TOKENS.rust : TOKENS.ink, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                확인
+              </button>
+              <button onClick={() => setConfirmAction(null)} style={{ padding: "10px 20px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 헤더 */}
+      <div style={{ marginBottom: 18, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.1em", marginBottom: 4 }}>ADMIN PANEL</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: TOKENS.ink }}>관리자 대시보드</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[{ key: "overview", label: "현황" }, { key: "deals", label: "딜 관리" }, { key: "activity", label: "최근 활동" }].map((s) => (
+            <button key={s.key} onClick={() => setActiveSection(s.key)} style={{
+              padding: "6px 16px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+              border: `1px solid ${activeSection === s.key ? TOKENS.rust : TOKENS.line}`,
+              background: activeSection === s.key ? TOKENS.rust : "#fff",
+              color: activeSection === s.key ? "#fff" : TOKENS.inkSoft,
+              fontWeight: activeSection === s.key ? 600 : 400,
+            }}>{s.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── 현황 섹션 ─── */}
+      {activeSection === "overview" && (
+        <>
+          {/* KPI */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+            <StatTile label="전체 딜" value={totalDeals} sub={`모집중 ${openDeals.length} · 진행중 ${matchedDeals.length}`} />
+            <StatTile label="완료 딜" value={doneDeals.length} sub={`마감 ${closedDeals.length}건 포함`} color={TOKENS.moss} bg={TOKENS.mossSoft} />
+            <StatTile label="성사율" value={`${successRate}%`} sub={`${totalDeals}건 중 ${doneDeals.length + matchedDeals.length}건`} color={TOKENS.gold} bg={TOKENS.goldSoft} />
+            <StatTile label="총 제안" value={totalProposals} sub={`딜당 평균 ${avgProposals}건`} color={TOKENS.rust} bg={TOKENS.rustSoft} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr", gap: 10, marginBottom: 14 }}>
+            <StatTile label="누적 거래액" value={fmtAmt(totalRevenue) + "원"} sub="완료 딜 기준" color={TOKENS.ink} />
+            <StatTile label="플랫폼 수수료" value={fmtAmt(totalFee) + "원"} sub={`거래액의 ${Math.round(FEE_RATE * 100)}%`} color={TOKENS.rust} bg={TOKENS.rustSoft} />
+          </div>
+
+          {/* 딜 상태 분포 */}
+          <div style={sectionStyle}>
+            <div style={sectionLabel}>딜 상태 분포</div>
+            <div style={{ display: "flex", height: 14, borderRadius: 7, overflow: "hidden", marginBottom: 12 }}>
+              {[
+                { count: openDeals.length, color: TOKENS.gold },
+                { count: matchedDeals.length, color: TOKENS.moss },
+                { count: doneDeals.length, color: TOKENS.inkSoft },
+                { count: closedDeals.length, color: TOKENS.rust },
+              ].filter((s) => s.count > 0).map((s, i) => (
+                <div key={i} style={{ flex: s.count, background: s.color, minWidth: 4 }} />
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {[
+                { label: "모집중", count: openDeals.length, color: TOKENS.gold },
+                { label: "진행중", count: matchedDeals.length, color: TOKENS.moss },
+                { label: "완료", count: doneDeals.length, color: TOKENS.inkSoft },
+                { label: "마감", count: closedDeals.length, color: TOKENS.rust },
+              ].map((s) => (
+                <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
+                  <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{s.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace" }}>{s.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 품목 분포 */}
+          {topCrops.length > 0 && (
+            <div style={sectionStyle}>
+              <div style={sectionLabel}>품목 분포 (전체)</div>
+              <MiniBarChart items={topCrops} max={topCrops[0]?.[1] || 1} colorFn={() => TOKENS.moss} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ─── 딜 관리 섹션 ─── */}
+      {activeSection === "deals" && (
+        <div style={sectionStyle}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="품목·셰프명 검색"
+              style={{ flex: 1, minWidth: 160, padding: "8px 12px", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }}
+            />
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["전체", "open", "matched", "done", "closed"].map((s) => (
+                <button key={s} onClick={() => setStatusFilter(s)} style={{
+                  padding: "6px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${statusFilter === s ? TOKENS.ink : TOKENS.line}`,
+                  background: statusFilter === s ? TOKENS.ink : "#fff",
+                  color: statusFilter === s ? "#fff" : TOKENS.inkSoft,
+                  fontWeight: statusFilter === s ? 600 : 400,
+                }}>{s === "전체" ? "전체" : DEAL_STATUS_LABEL[s]}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10 }}>{filteredDeals.length}건</div>
+
+          {filteredDeals.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "30px 0", color: TOKENS.inkSoft, fontSize: 13 }}>해당하는 딜이 없습니다</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {filteredDeals.map((deal) => {
+                const selProp = deal.proposals.find((p) => p.id === deal.selectedProposalId);
+                const dealAmt = selProp ? selProp.price * deal.quantity : null;
+                return (
+                  <div key={deal.id} style={{ background: "#fff", border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: "12px 14px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ flex: 1, minWidth: 180 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, color: TOKENS.ink }}>{deal.crop}</span>
+                          <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 999, background: `${DEAL_STATUS_COLOR[deal.status]}18`, color: DEAL_STATUS_COLOR[deal.status], fontWeight: 600, border: `1px solid ${DEAL_STATUS_COLOR[deal.status]}44` }}>
+                            {DEAL_STATUS_LABEL[deal.status]}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: TOKENS.inkSoft }}>
+                          {deal.chefName} · {deal.quantity}kg · {deal.targetPrice.toLocaleString()}원/kg
+                          {selProp && <span style={{ color: TOKENS.moss }}> → {selProp.farmName} {dealAmt ? `(${fmtAmt(dealAmt)}원)` : ""}</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 3 }}>
+                          등록 {fmtDate(deal.createdAt)} · 제안 {deal.proposals.length}건 · ID {deal.id.slice(-6).toUpperCase()}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                        {deal.status === "open" && (
+                          <button onClick={() => setConfirmAction({ dealId: deal.id, action: "close" })} style={{ padding: "5px 12px", fontSize: 11, background: "#fff", border: `1px solid ${TOKENS.gold}`, color: "#7A5C20", borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>마감</button>
+                        )}
+                        {deal.status === "matched" && (
+                          <button onClick={() => setConfirmAction({ dealId: deal.id, action: "complete" })} style={{ padding: "5px 12px", fontSize: 11, background: "#fff", border: `1px solid ${TOKENS.moss}`, color: TOKENS.moss, borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>완료</button>
+                        )}
+                        <button onClick={() => setConfirmAction({ dealId: deal.id, action: "delete" })} style={{ padding: "5px 12px", fontSize: 11, background: "#fff", border: `1px solid ${TOKENS.rust}`, color: TOKENS.rust, borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>삭제</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── 최근 활동 섹션 ─── */}
+      {activeSection === "activity" && (
+        <>
+          <div style={sectionStyle}>
+            <div style={sectionLabel}>최근 등록 딜</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {recentCreated.map((d) => (
+                <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", background: "#fff", borderRadius: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: DEAL_STATUS_COLOR[d.status], flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontFamily: "'Fraunces', serif", color: TOKENS.ink, fontSize: 13 }}>{d.crop}</span>
+                    <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{d.chefName} · {d.quantity}kg</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>{fmtDate(d.createdAt)}</span>
+                </div>
+              ))}
+              {recentCreated.length === 0 && <div style={{ fontSize: 13, color: TOKENS.inkSoft, textAlign: "center", padding: "16px 0" }}>딜이 없습니다</div>}
+            </div>
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={sectionLabel}>최근 완료 거래</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {recentCompleted.map((d) => {
+                const p = d.proposals.find((p) => p.id === d.selectedProposalId);
+                const amt = p ? p.price * d.quantity : 0;
+                return (
+                  <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", background: "#fff", borderRadius: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: TOKENS.moss, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontFamily: "'Fraunces', serif", color: TOKENS.ink, fontSize: 13 }}>{d.crop}</span>
+                      <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{d.chefName} ↔ {p?.farmName || "-"}</span>
+                    </div>
+                    <span style={{ fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss, flexShrink: 0, fontWeight: 600 }}>{fmtAmt(amt)}원</span>
+                    <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>{fmtDate(d.completedAt)}</span>
+                  </div>
+                );
+              })}
+              {recentCompleted.length === 0 && <div style={{ fontSize: 13, color: TOKENS.inkSoft, textAlign: "center", padding: "16px 0" }}>완료된 거래가 없습니다</div>}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function DashboardScreen({ deals, user, onTabChange }) {
   const isMobile = useIsMobile();
   const isChef = user.role === "chef";
@@ -5112,9 +5384,11 @@ export default function FarmToTableApp() {
     setTab(key);
   };
 
+  const isAdmin = user.email === ADMIN_EMAIL;
+  const adminTab = isAdmin ? [{ key: "admin", label: "관리자" }] : [];
   const TABS = isChef
-    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount + totalUnreadChats }, { key: "dashboard", label: "대시보드" }, { key: "chefprofile", label: "내 레스토랑" }]
-    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount + totalUnreadChats }, { key: "dashboard", label: "대시보드" }, { key: "farm", label: "내 농가" }];
+    ? [{ key: "create", label: editingDeal ? "딜 수정" : cloningDeal ? "딜 복제" : "딜 만들기" }, { key: "mydeals", label: "내 거래", badge: newProposalCount + totalUnreadChats }, { key: "dashboard", label: "대시보드" }, { key: "chefprofile", label: "내 레스토랑" }, ...adminTab]
+    : [{ key: "browse", label: "딜 찾기" }, { key: "myproposals", label: "내 제안", badge: newSelectionCount + totalUnreadChats }, { key: "dashboard", label: "대시보드" }, { key: "farm", label: "내 농가" }, ...adminTab];
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
@@ -5340,7 +5614,7 @@ export default function FarmToTableApp() {
                 position: "relative", letterSpacing: tab === t.key ? "-0.01em" : "normal",
               }}
             >
-              {t.label}
+              {t.key === "admin" ? <span style={{ color: tab === "admin" ? TOKENS.rust : TOKENS.rust + "99" }}>⚙ {t.label}</span> : t.label}
               {t.key === "browse" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{openCount}</span>}
               {t.key === "mydeals" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{myDeals.length}</span>}
               {t.badge > 0 && (
@@ -5407,6 +5681,7 @@ export default function FarmToTableApp() {
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "dashboard" && <DashboardScreen deals={deals} user={user} onTabChange={handleTabClick} />}
+            {tab === "admin" && isAdmin && <AdminScreen deals={deals} chats={chats} onDeleteDeal={handleDeleteDeal} onCloseDeal={handleCloseDeal} onCompleteDeal={handleCompleteDeal} />}
           </>
         )}
       </div>
