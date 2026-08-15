@@ -917,8 +917,8 @@ JSON 형식:
 
 let _recordNotif = null;
 
-function showPushNotification(title, body) {
-  _recordNotif?.({ id: Date.now(), title, body, ts: Date.now(), read: false });
+function showPushNotification(title, body, tab) {
+  _recordNotif?.({ id: Date.now(), title, body, ts: Date.now(), read: false, tab: tab || null });
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const options = { body, icon: "/vite.svg", badge: "/vite.svg" };
   if ("serviceWorker" in navigator) {
@@ -2676,8 +2676,14 @@ function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
   const depositPaid = !!deal.depositPaidAt;
   const isDone = deal.status === "done";
 
+  const bothSigned = !!(deal.contractSignedChefAt && deal.contractSignedFarmAt);
   const steps = [
     { label: "계약 확정", done: true, ts: deal.selectedAt },
+    { label: "계약서 서명", done: bothSigned, ts: bothSigned ? Math.max(deal.contractSignedChefAt || 0, deal.contractSignedFarmAt || 0) : null,
+      extra: !bothSigned ? (isChef
+        ? (deal.contractSignedChefAt ? "내 서명 완료 · 농가 서명 대기" : "계약서에서 서명하세요")
+        : (deal.contractSignedFarmAt ? "내 서명 완료 · 셰프 서명 대기" : "계약서에서 서명하세요"))
+      : null },
     { label: `선급금 ${deposit.toLocaleString()}원 (${Math.round(DEPOSIT_RATE * 100)}%)`, done: depositPaid, ts: deal.depositPaidAt },
     { label: "납품 완료", done: isDone, ts: deal.completedAt },
     { label: `잔금 ${balance.toLocaleString()}원 (${Math.round((1 - DEPOSIT_RATE) * 100)}%)`, done: isDone, ts: deal.completedAt },
@@ -2714,7 +2720,10 @@ function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
                   {new Date(step.ts).toLocaleDateString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                 </div>
               )}
-              {i === 1 && !depositPaid && isChef && (
+              {step.extra && (
+                <div style={{ fontSize: 11, color: TOKENS.gold, marginTop: 2 }}>{step.extra}</div>
+              )}
+              {i === 2 && !depositPaid && isChef && (
                 <div style={{ marginTop: 6 }}>
                   {confirmDeposit ? (
                     <div style={{ display: "flex", gap: 6 }}>
@@ -2730,7 +2739,7 @@ function SettlementCard({ deal, proposal, userRole, onDepositConfirm }) {
                   )}
                 </div>
               )}
-              {i === 1 && !depositPaid && !isChef && (
+              {i === 2 && !depositPaid && !isChef && (
                 <div style={{ fontSize: 11, color: TOKENS.gold, marginTop: 2 }}>지급 대기 중</div>
               )}
             </div>
@@ -2797,10 +2806,22 @@ function DealTimeline({ deal }) {
       at: isClosed ? deal.closedAt : deal.selectedAt,
     },
     ...(!isClosed ? [{
+      label: "계약서 서명",
+      sub: (deal.contractSignedChefAt && deal.contractSignedFarmAt)
+        ? "양측 서명 완료"
+        : hasSelected
+        ? (deal.contractSignedChefAt ? "셰프 서명 완료 · 농가 대기" : deal.contractSignedFarmAt ? "농가 서명 완료 · 셰프 대기" : "서명 대기 중")
+        : "",
+      done: !!(deal.contractSignedChefAt && deal.contractSignedFarmAt),
+      current: hasSelected && !(deal.contractSignedChefAt && deal.contractSignedFarmAt),
+      at: (deal.contractSignedChefAt && deal.contractSignedFarmAt)
+        ? Math.max(deal.contractSignedChefAt, deal.contractSignedFarmAt) : null,
+    },
+    {
       label: "납품 희망일",
       sub: deal.deliveryDate,
       done: isDone,
-      current: isMatched,
+      current: isMatched && !!(deal.contractSignedChefAt && deal.contractSignedFarmAt),
       at: isDone ? deal.completedAt : null,
       isDelivery: true,
     },
@@ -4347,7 +4368,7 @@ function LoginScreen({ onLogin }) {
 
 /* ---------- 계약서 ---------- */
 
-function ContractModal({ deal, proposal, onClose }) {
+function ContractModal({ deal, proposal, onClose, userRole, onSign }) {
   const contractNo = `FTT-${deal.id.slice(-6).toUpperCase()}-${new Date(deal.selectedAt || Date.now()).toISOString().slice(0, 10).replace(/-/g, "")}`;
   const today = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
   const totalAmt = proposal.price * deal.quantity;
@@ -4490,13 +4511,37 @@ function ContractModal({ deal, proposal, onClose }) {
 
           {/* 서명란 */}
           <div style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid #E0E0E0" }}>
-            <div style={{ textAlign: "center", fontSize: 12, color: "#666", marginBottom: 28 }}>위 내용에 합의하며 본 계약서를 작성합니다.</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
-              {[{ label: "갑 (매수인)", name: deal.chefName }, { label: "을 (매도인)", name: proposal.farmName }].map(({ label, name }) => (
+            <div style={{ textAlign: "center", fontSize: 12, color: "#666", marginBottom: 20 }}>위 내용에 합의하며 본 계약서를 작성합니다.</div>
+            {deal.contractSignedChefAt && deal.contractSignedFarmAt && (
+              <div style={{ textAlign: "center", marginBottom: 16, padding: "8px 16px", background: "#E8F5E9", borderRadius: 8, fontSize: 13, color: "#2E7D32", fontWeight: 600 }}>
+                ✓ 양측 서명 완료 — 계약 확정
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+              {[
+                { label: "갑 (매수인)", name: deal.chefName, role: "chef", signedAt: deal.contractSignedChefAt },
+                { label: "을 (매도인)", name: proposal.farmName, role: "farm", signedAt: deal.contractSignedFarmAt },
+              ].map(({ label, name, role, signedAt }) => (
                 <div key={label} style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 28 }}>{name}</div>
-                  <div style={{ borderTop: "1px solid #1A1A1A", paddingTop: 6, fontSize: 10, color: "#aaa" }}>서명 / Signature</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{name}</div>
+                  {signedAt ? (
+                    <div style={{ background: "#E8F5E9", borderRadius: 6, padding: "6px 10px" }}>
+                      <div style={{ fontSize: 12, color: "#2E7D32", fontWeight: 600 }}>✓ 서명 완료</div>
+                      <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>
+                        {new Date(signedAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                  ) : userRole === role && onSign ? (
+                    <button
+                      onClick={onSign}
+                      style={{ width: "100%", padding: "8px 0", background: "#1A1A1A", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      서명하기
+                    </button>
+                  ) : (
+                    <div style={{ borderTop: "1px solid #1A1A1A", paddingTop: 6, fontSize: 10, color: "#aaa" }}>서명 대기</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -4696,6 +4741,34 @@ export default function FarmToTableApp() {
     batch.commit().catch(() => {});
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (loadState !== "ready" || !user) return;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const storageKey = `deadline-notif-${user.uid}-${todayKey}`;
+    if (localStorage.getItem(storageKey)) return;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d3 = new Date(today); d3.setDate(d3.getDate() + 3);
+    const upcoming = deals.filter((d) => {
+      if (d.status !== "open" && d.status !== "matched") return false;
+      if (user.role === "chef" && d.createdBy !== user.uid) return false;
+      if (!d.deliveryDate) return false;
+      const dl = new Date(d.deliveryDate);
+      return dl >= today && dl <= d3;
+    });
+    if (upcoming.length > 0) {
+      upcoming.forEach((d) => {
+        const dl = new Date(d.deliveryDate);
+        const diff = Math.round((dl - today) / 86400000);
+        showPushNotification(
+          `⚠️ 딜 마감 임박 — ${d.crop}`,
+          `납품일까지 ${diff === 0 ? "오늘" : `${diff}일`} 남았습니다. (${d.deliveryDate})`,
+          user.role === "chef" ? "mydeals" : "myproposals"
+        );
+      });
+      localStorage.setItem(storageKey, "1");
+    }
+  }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 딜·채팅 실시간 동기화
   useEffect(() => {
     if (loadState !== "ready") return;
@@ -4708,23 +4781,76 @@ export default function FarmToTableApp() {
           newDeals.forEach((deal) => {
             if (deal.createdBy !== cu.uid) return;
             const old = prev.find((d) => d.id === deal.id);
-            if (old && deal.proposals.length > old.proposals.length) {
+            if (!old) return;
+            if (deal.proposals.length > old.proposals.length) {
               const p = deal.proposals[deal.proposals.length - 1];
               showPushNotification(
                 `새 제안 도착 — ${deal.crop}`,
-                `${p.farmName}에서 ${p.price.toLocaleString()}원/kg으로 제안했습니다.`
+                `${p.farmName}에서 ${p.price.toLocaleString()}원/kg으로 제안했습니다.`,
+                "mydeals"
+              );
+            }
+            if (!old.contractSignedFarmAt && deal.contractSignedFarmAt) {
+              showPushNotification(
+                "✍️ 농가 서명 완료",
+                `${deal.proposals.find((p) => p.id === deal.selectedProposalId)?.farmName || "농가"}이(가) ${deal.crop} 계약서에 서명했습니다.`,
+                "mydeals"
+              );
+            }
+            if (!old.depositPaidAt && deal.depositPaidAt) {
+              showPushNotification(
+                "💰 선급금 지급 완료",
+                `${deal.crop} 딜 선급금이 지급 처리됐습니다.`,
+                "mydeals"
+              );
+            }
+            if (old.status !== "done" && deal.status === "done") {
+              showPushNotification(
+                "✅ 정산 완료",
+                `${deal.crop} 딜 납품·정산이 완료됐습니다.`,
+                "dashboard"
               );
             }
           });
         } else {
           newDeals.forEach((deal) => {
             const old = prev.find((d) => d.id === deal.id);
-            if (!old || !deal.selectedProposalId || deal.selectedProposalId === old.selectedProposalId) return;
+            if (!old) return;
+            if (!deal.selectedProposalId || deal.selectedProposalId === old.selectedProposalId) {
+              if (deal.selectedProposalId) {
+                const mine = deal.proposals.find((p) => p.farmerName === cu.name && p.id === deal.selectedProposalId);
+                if (mine) {
+                  if (!old.contractSignedChefAt && deal.contractSignedChefAt) {
+                    showPushNotification(
+                      "✍️ 셰프 서명 완료",
+                      `${deal.chefName}이(가) ${deal.crop} 계약서에 서명했습니다. 내 서명을 완료해 계약을 확정하세요.`,
+                      "myproposals"
+                    );
+                  }
+                  if (!old.depositPaidAt && deal.depositPaidAt) {
+                    showPushNotification(
+                      "💰 선급금이 지급됐습니다",
+                      `${deal.chefName}의 ${deal.crop} 딜 선급금이 입금됐습니다.`,
+                      "myproposals"
+                    );
+                  }
+                  if (old.status !== "done" && deal.status === "done") {
+                    showPushNotification(
+                      "✅ 정산 완료",
+                      `${deal.chefName}의 ${deal.crop} 딜 납품·정산이 완료됐습니다.`,
+                      "dashboard"
+                    );
+                  }
+                }
+              }
+              return;
+            }
             const mine = deal.proposals.find((p) => p.farmerName === cu.name && p.id === deal.selectedProposalId);
             if (mine) {
               showPushNotification(
                 "🎉 제안이 선택됐습니다!",
-                `${deal.chefName}의 ${deal.crop} 딜에서 내 제안이 선택됐습니다.`
+                `${deal.chefName}의 ${deal.crop} 딜에서 내 제안이 선택됐습니다. 계약서를 확인하세요.`,
+                "myproposals"
               );
             }
           });
@@ -4847,6 +4973,16 @@ export default function FarmToTableApp() {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal) return;
     const updated = { ...deal, depositPaidAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
+  const handleSignContract = (dealId, role) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const field = role === "chef" ? "contractSignedChefAt" : "contractSignedFarmAt";
+    if (deal[field]) return;
+    const updated = { ...deal, [field]: Date.now() };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
   };
@@ -5153,15 +5289,28 @@ export default function FarmToTableApp() {
                   {notifHistory.length === 0 ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: TOKENS.inkSoft }}>알림이 없습니다</div>
                   ) : (
-                    notifHistory.map((n) => (
-                      <div key={n.id} style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: n.read ? "#FFFFFF" : `${TOKENS.gold}10` }}>
-                        <div style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500, marginBottom: 2 }}>{n.title}</div>
-                        <div style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.5 }}>{n.body}</div>
-                        <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 4, fontFamily: "'IBM Plex Mono', monospace" }}>
-                          {new Date(n.ts).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    notifHistory.map((n) => {
+                      const today = new Date(); today.setHours(0, 0, 0, 0);
+                      const nDate = new Date(n.ts); nDate.setHours(0, 0, 0, 0);
+                      const diff = Math.round((today - nDate) / 86400000);
+                      const dateLabel = diff === 0 ? "오늘" : diff === 1 ? "어제" : `${diff}일 전`;
+                      return (
+                        <div
+                          key={n.id}
+                          onClick={() => { if (n.tab) { setTab(n.tab); setNotifOpen(false); } }}
+                          style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: n.read ? "#FFFFFF" : `${TOKENS.gold}10`, cursor: n.tab ? "pointer" : "default" }}
+                        >
+                          <div style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500, marginBottom: 2 }}>{n.title}</div>
+                          <div style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.5 }}>{n.body}</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                            <span style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+                              {dateLabel} {new Date(n.ts).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                            {n.tab && <span style={{ fontSize: 10, color: TOKENS.moss }}>→ 바로 가기</span>}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
@@ -5228,9 +5377,11 @@ export default function FarmToTableApp() {
 
         {contractTarget && (
           <ContractModal
-            deal={contractTarget.deal}
+            deal={deals.find((d) => d.id === contractTarget.deal.id) || contractTarget.deal}
             proposal={contractTarget.proposal}
             onClose={() => setContractTarget(null)}
+            userRole={user.role}
+            onSign={() => handleSignContract(contractTarget.deal.id, user.role)}
           />
         )}
 
