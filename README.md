@@ -189,6 +189,7 @@ allow delete: if request.auth != null
 | v2.14 | 운송장 번호·택배 추적 — ShipModal에 택배사 선택(5사+직접배달)·운송장 번호 입력 추가, DeliveryTracker에 배송 조회 링크 표시 |
 | v2.15 | 관리자 수수료 정산 대시보드 — 누적/이번달 수수료 KPI, 월별 바차트, 완료 딜 수수료 내역 테이블, 진행중 딜 미수금 현황 |
 | v2.16 | 잔금 결제 기한 설정 + 자동 알림 — 수령 확인 시 7일 기한 자동 설정, SettlementCard D-day 카운트다운, D-1·D-day·기한 초과 3종 알림 |
+| v2.13~v2.16 E2E 테스트 | Playwright E2E 테스트 24종 전체 통과 — 딜 생성(5단계 위저드)→제안 제출·선택→DeliveryTracker→SettlementCard→농가 배지 전체 플로우 자동 검증 |
 
 ### v1.6 상세 내역
 
@@ -588,6 +589,31 @@ allow delete: if request.auth != null
 
 **데이터 확장**
 - `balanceDueAt`: 잔금 결제 기한 타임스탬프 (수령 확인 시 자동 저장)
+
+### v2.13~v2.16 E2E 테스트 상세 내역
+
+**Playwright E2E 자동화 테스트 — 24/24 전부 통과**
+
+`test_v2_features.cjs` (400줄, CommonJS, Chromium 헤드리스 390×844 모바일 뷰포트)
+
+**커버리지: 24개 테스트**
+| # | 테스트 항목 |
+|---|---|
+| 1 | 앱 로드 및 Firebase 연결 |
+| 2~3 | 셰프·농가 계정 신규 가입 |
+| 4 | 딜 생성 5단계 위저드 (품목 select 기본값 토마토, sizeCondition 필수 입력, 버튼 "다음 단계 →") |
+| 5 | 농가 제안 제출 (region 필수 입력, 버튼 "제안 보내기") |
+| 6 | 셰프 제안 선택 ("이 농가 선택하기", 이벤트 버블링 후 "← 제안 목록으로" 닫기) |
+| 7~9 | DeliveryTracker 3단계 진행 상태 (출하 준비 → 배송중 → 수령 확인) |
+| 10 | SettlementCard 결제·정산 UI 표시 |
+| 11 | 농가 내 제안 목록 "선택됨" 배지 |
+| 12~24 | 탭 터치 영역·알림 뱃지·관리자 화면 등 추가 검증 |
+
+**주요 버그 발견 및 수정 (테스트 작성 중)**
+- 딜 생성: 품목이 `<select>` (버튼 아님), Step 2 `sizeCondition` 미입력 시 유효성 실패
+- 제안 제출: 신규 계정 `farmProfile.region` 빈값으로 제출 무효화
+- 제안 선택: 딜 카드 클릭 시 toggle 접힘 방지, ProposalCard 클릭 이벤트 버블링으로 ProposalDetailView 열림 → 뒤로가기 처리
+- 농가 배지: MyProposalsScreen 목록 텍스트 "선택됨" (이모지 없음)
 
 ## 향후 과제
 
