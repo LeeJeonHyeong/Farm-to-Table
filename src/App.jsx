@@ -2698,27 +2698,58 @@ function fmtDateTime(ts) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+const COURIERS = ["CJ대한통운", "한진택배", "롯데택배", "우체국택배", "로젠택배", "직접 배달"];
+const getTrackingURL = (courier, trackingNo) => {
+  if (!trackingNo) return null;
+  const map = {
+    "CJ대한통운": `https://www.cjlogistics.com/ko/tool/parcel/tracking?gnbInvcNo=${trackingNo}`,
+    "한진택배": `https://www.hanjin.com/kor/CMS/DeliveryMgr/WaybillResult.do?mCode=MN038&schLang=KR&wblnumText2=${trackingNo}`,
+    "롯데택배": `https://www.lotteglogis.com/home/reservation/tracking/linkView?InvNo=${trackingNo}`,
+    "우체국택배": `https://service.epost.go.kr/trace.RetrieveEmsRigiTraceList.retrieve?POST_CODE=${trackingNo}`,
+    "로젠택배": `https://www.ilogen.com/m/personal/trace/${trackingNo}`,
+  };
+  return map[courier] || null;
+};
+
 function ShipModal({ onClose, onConfirm }) {
+  const [courier, setCourier] = useState(COURIERS[0]);
+  const [trackingNumber, setTrackingNumber] = useState("");
   const [memo, setMemo] = useState("");
   const [photoURL, setPhotoURL] = useState(null);
   const [loading, setLoading] = useState(false);
+  const isDirect = courier === "직접 배달";
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.70)", zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
       <div style={{ background: "#fff", borderRadius: 14, padding: 24, maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ fontSize: 16, fontWeight: 700, color: TOKENS.ink, marginBottom: 6 }}>🚛 발송 완료 신고</div>
         <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: 20 }}>납품 발송이 완료됐음을 셰프에게 알립니다.</div>
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>발송 사진 (선택)</div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>택배사</div>
+          <select value={courier} onChange={(e) => { setCourier(e.target.value); setTrackingNumber(""); }}
+            style={{ width: "100%", padding: "10px 12px", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, background: "#fff", cursor: "pointer" }}>
+            {COURIERS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        {!isDirect && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>운송장 번호 <span style={{ color: TOKENS.inkSoft, fontWeight: 400 }}>(선택)</span></div>
+            <input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value.replace(/\s/g, ""))}
+              placeholder="숫자만 입력 (예: 1234567890123)"
+              style={{ width: "100%", padding: "10px 12px", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, boxSizing: "border-box", fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.04em" }} />
+          </div>
+        )}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>발송 사진 <span style={{ color: TOKENS.inkSoft, fontWeight: 400 }}>(선택)</span></div>
           <ImageUpload value={photoURL} onChange={setPhotoURL} label="사진 추가" shape="square" size={100} />
         </div>
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>메모 (선택)</div>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontWeight: 500, marginBottom: 6 }}>메모 <span style={{ color: TOKENS.inkSoft, fontWeight: 400 }}>(선택)</span></div>
           <textarea value={memo} onChange={(e) => setMemo(e.target.value)}
             placeholder="예: 아이스팩과 함께 발송했습니다."
-            rows={3} style={{ width: "100%", padding: "10px 12px", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+            rows={2} style={{ width: "100%", padding: "10px 12px", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setLoading(true); onConfirm({ memo: memo.trim(), photoURL }); }}
+          <button onClick={() => { setLoading(true); onConfirm({ courier, trackingNumber: trackingNumber.trim(), memo: memo.trim(), photoURL }); }}
             disabled={loading}
             style={{ flex: 1, padding: "12px 0", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1 }}>
             {loading ? "처리 중…" : "발송 완료"}
@@ -2763,9 +2794,23 @@ function DeliveryTracker({ deal, userRole, onShip, onConfirmDelivery }) {
           </Fragment>
         ))}
       </div>
-      {shipped && deal.shippedMemo && (
-        <div style={{ background: TOKENS.mossSoft, borderRadius: 8, padding: "8px 12px", fontSize: 12, color: TOKENS.ink, marginBottom: 8 }}>
-          <span style={{ color: TOKENS.inkSoft }}>발송 메모: </span>{deal.shippedMemo}
+      {shipped && (deal.courierName || deal.trackingNumber || deal.shippedMemo) && (
+        <div style={{ background: TOKENS.mossSoft, borderRadius: 8, padding: "10px 12px", fontSize: 12, color: TOKENS.ink, marginBottom: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+          {deal.courierName && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+              <div>
+                <span style={{ color: TOKENS.inkSoft }}>택배사: </span><span style={{ fontWeight: 500 }}>{deal.courierName}</span>
+                {deal.trackingNumber && <span style={{ color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginLeft: 8 }}>{deal.trackingNumber}</span>}
+              </div>
+              {deal.courierName !== "직접 배달" && deal.trackingNumber && getTrackingURL(deal.courierName, deal.trackingNumber) && (
+                <a href={getTrackingURL(deal.courierName, deal.trackingNumber)} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, padding: "3px 10px", background: TOKENS.moss, color: "#fff", borderRadius: 999, textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap" }}>
+                  배송 조회 →
+                </a>
+              )}
+            </div>
+          )}
+          {deal.shippedMemo && <div><span style={{ color: TOKENS.inkSoft }}>메모: </span>{deal.shippedMemo}</div>}
         </div>
       )}
       {shipped && deal.shippedPhotoURL && (
@@ -3297,7 +3342,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: TOKENS.ink }}>관리자 대시보드</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {[{ key: "overview", label: "현황" }, { key: "deals", label: "딜 관리" }, { key: "users", label: "유저" }, { key: "chatlogs", label: "채팅 로그" }, { key: "activity", label: "최근 활동" }].map((s) => (
+          {[{ key: "overview", label: "현황" }, { key: "deals", label: "딜 관리" }, { key: "settlement", label: "정산" }, { key: "users", label: "유저" }, { key: "chatlogs", label: "채팅 로그" }, { key: "activity", label: "최근 활동" }].map((s) => (
             <button key={s.key} onClick={() => setActiveSection(s.key)} style={{
               padding: "6px 16px", borderRadius: 999, fontSize: 12, cursor: "pointer",
               border: `1px solid ${activeSection === s.key ? TOKENS.rust : TOKENS.line}`,
@@ -3437,6 +3482,155 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
           )}
         </div>
       )}
+
+      {/* ─── 수수료 정산 섹션 ─── */}
+      {activeSection === "settlement" && (() => {
+        const doneFeeRows = doneDeals.map((d) => {
+          const p = d.proposals.find((pr) => pr.id === d.selectedProposalId);
+          if (!p) return null;
+          const total = p.price * d.quantity;
+          const fee = Math.round(total * FEE_RATE);
+          return { id: d.id, crop: d.crop, chefName: d.chefName, farmName: p.farmName, total, fee, completedAt: d.completedAt };
+        }).filter(Boolean);
+        const totalFeeEarned = doneFeeRows.reduce((s, r) => s + r.fee, 0);
+
+        const pendingRows = matchedDeals.map((d) => {
+          const p = d.proposals.find((pr) => pr.id === d.selectedProposalId);
+          if (!p) return null;
+          const total = p.price * d.quantity;
+          const fee = Math.round(total * FEE_RATE);
+          const depositPaid = !!d.depositPaidAt;
+          const balancePaid = !!d.balancePaidAt;
+          const collected = (depositPaid ? Math.round(total * DEPOSIT_RATE * FEE_RATE) : 0) + (balancePaid ? Math.round((total - total * DEPOSIT_RATE) * FEE_RATE) : 0);
+          return { id: d.id, crop: d.crop, chefName: d.chefName, farmName: p.farmName, fee, collected, remaining: fee - collected, depositPaid, balancePaid };
+        }).filter(Boolean);
+        const totalPending = pendingRows.reduce((s, r) => s + r.remaining, 0);
+
+        // 월별 수수료 집계
+        const monthlyMap = {};
+        doneFeeRows.forEach((r) => {
+          if (!r.completedAt) return;
+          const key = new Date(r.completedAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long" });
+          monthlyMap[key] = (monthlyMap[key] || 0) + r.fee;
+        });
+        const monthlyRows = Object.entries(monthlyMap).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
+
+        const th = { fontSize: 11, color: TOKENS.inkSoft, fontWeight: 500, padding: "6px 10px", textAlign: "left", borderBottom: `1px solid ${TOKENS.line}`, whiteSpace: "nowrap" };
+        const td = { fontSize: 12, color: TOKENS.ink, padding: "9px 10px", borderBottom: `1px solid ${TOKENS.line}88`, verticalAlign: "middle" };
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* KPI */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10 }}>
+              {[
+                { label: "누적 수수료 수입", value: `${totalFeeEarned.toLocaleString()}원`, sub: `완료 딜 ${doneDeals.length}건`, color: TOKENS.moss },
+                { label: "예상 미수금", value: `${totalPending.toLocaleString()}원`, sub: `진행중 딜 ${matchedDeals.length}건`, color: TOKENS.gold },
+                { label: "총 중개 거래액", value: fmtAmt(totalRevenue) + "원", sub: `수수료율 ${Math.round(FEE_RATE * 100)}%`, color: TOKENS.ink },
+                { label: "이번 달 수수료", value: (() => {
+                  const now = new Date(); const y = now.getFullYear(); const m = now.getMonth();
+                  const sum = doneFeeRows.filter((r) => { if (!r.completedAt) return false; const d = new Date(r.completedAt); return d.getFullYear() === y && d.getMonth() === m; }).reduce((s, r) => s + r.fee, 0);
+                  return `${sum.toLocaleString()}원`;
+                })(), sub: new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long" }), color: TOKENS.rust },
+              ].map((k, i) => (
+                <div key={i} style={{ ...sectionStyle, marginBottom: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{k.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: k.color, fontFamily: "'IBM Plex Mono', monospace" }}>{k.value}</div>
+                  <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{k.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 월별 수수료 */}
+            {monthlyRows.length > 0 && (
+              <div style={sectionStyle}>
+                <div style={sectionLabel}>월별 수수료 수입</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {monthlyRows.map(([month, fee]) => {
+                    const maxFee = Math.max(...monthlyRows.map(([, f]) => f));
+                    const pct = maxFee > 0 ? Math.round((fee / maxFee) * 100) : 0;
+                    return (
+                      <div key={month} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ fontSize: 12, color: TOKENS.inkSoft, width: 80, flexShrink: 0 }}>{month}</div>
+                        <div style={{ flex: 1, height: 10, background: TOKENS.line, borderRadius: 999, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${pct}%`, background: TOKENS.moss, borderRadius: 999, transition: "width 0.4s" }} />
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: TOKENS.moss, fontFamily: "'IBM Plex Mono', monospace", width: 80, textAlign: "right", flexShrink: 0 }}>{fee.toLocaleString()}원</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 완료 딜 수수료 내역 */}
+            <div style={sectionStyle}>
+              <div style={sectionLabel}>완료 딜 수수료 내역 ({doneFeeRows.length}건)</div>
+              {doneFeeRows.length === 0 ? (
+                <div style={{ fontSize: 13, color: TOKENS.inkSoft, textAlign: "center", padding: "24px 0" }}>완료된 딜이 없습니다</div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 480 }}>
+                    <thead><tr>
+                      <th style={th}>품목</th><th style={th}>셰프</th><th style={th}>농가</th>
+                      <th style={{ ...th, textAlign: "right" }}>거래액</th>
+                      <th style={{ ...th, textAlign: "right" }}>수수료 (10%)</th>
+                      <th style={th}>완료일</th>
+                    </tr></thead>
+                    <tbody>
+                      {[...doneFeeRows].sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)).map((r) => (
+                        <tr key={r.id}>
+                          <td style={td}><span style={{ fontFamily: "'Fraunces', serif" }}>{r.crop}</span></td>
+                          <td style={td}>{r.chefName}</td>
+                          <td style={td}>{r.farmName}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace" }}>{r.total.toLocaleString()}원</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss, fontWeight: 600 }}>{r.fee.toLocaleString()}원</td>
+                          <td style={{ ...td, color: TOKENS.inkSoft }}>{fmtDate(r.completedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* 진행중 딜 미수금 */}
+            <div style={sectionStyle}>
+              <div style={sectionLabel}>진행중 딜 예상 미수금 ({pendingRows.length}건)</div>
+              {pendingRows.length === 0 ? (
+                <div style={{ fontSize: 13, color: TOKENS.inkSoft, textAlign: "center", padding: "24px 0" }}>진행중 딜이 없습니다</div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 480 }}>
+                    <thead><tr>
+                      <th style={th}>품목</th><th style={th}>셰프</th>
+                      <th style={{ ...th, textAlign: "right" }}>총 수수료</th>
+                      <th style={{ ...th, textAlign: "right" }}>수납</th>
+                      <th style={{ ...th, textAlign: "right" }}>미수금</th>
+                      <th style={th}>단계</th>
+                    </tr></thead>
+                    <tbody>
+                      {pendingRows.map((r) => (
+                        <tr key={r.id}>
+                          <td style={td}><span style={{ fontFamily: "'Fraunces', serif" }}>{r.crop}</span></td>
+                          <td style={td}>{r.chefName}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace" }}>{r.fee.toLocaleString()}원</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss }}>{r.collected.toLocaleString()}원</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", color: r.remaining > 0 ? TOKENS.rust : TOKENS.moss, fontWeight: 600 }}>{r.remaining.toLocaleString()}원</td>
+                          <td style={td}>
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: r.balancePaid ? TOKENS.mossSoft : r.depositPaid ? TOKENS.goldSoft : TOKENS.card, color: r.balancePaid ? TOKENS.moss : r.depositPaid ? "#7A5C20" : TOKENS.inkSoft }}>
+                              {r.balancePaid ? "잔금 완료" : r.depositPaid ? "선급금 완료" : "결제 대기"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ─── 유저 목록 섹션 ─── */}
       {activeSection === "users" && (
@@ -5584,13 +5778,15 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
-  const handleShipDeal = (dealId, { photoURL = null, memo = "" } = {}) => {
+  const handleShipDeal = (dealId, { courier = "", trackingNumber = "", photoURL = null, memo = "" } = {}) => {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal) return;
     const updated = {
       ...deal,
       deliveryStatus: "shipped",
       shippedAt: Date.now(),
+      ...(courier && { courierName: courier }),
+      ...(trackingNumber && { trackingNumber }),
       ...(photoURL && { shippedPhotoURL: photoURL }),
       ...(memo && { shippedMemo: memo }),
     };
