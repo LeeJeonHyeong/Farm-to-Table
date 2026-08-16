@@ -154,6 +154,7 @@ const ADMIN_EMAIL = "jhlove0490@nonghyup.com";
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
 const TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq";
+const BALANCE_DUE_DAYS = 7;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
 const USER_KEY = "current-user";
@@ -2914,6 +2915,21 @@ function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
               {i === 2 && !depositPaid && !isChef && (
                 <div style={{ fontSize: 11, color: TOKENS.gold, marginTop: 2 }}>결제 대기 중</div>
               )}
+              {i === 4 && isDone && !balancePaid && (() => {
+                const due = deal.balanceDueAt;
+                if (!due) return null;
+                const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+                const dueStart = new Date(due); dueStart.setHours(0,0,0,0);
+                const diffDays = Math.round((dueStart - todayStart) / 86400000);
+                const dueLabel = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? "오늘 마감" : `기한 초과 +${Math.abs(diffDays)}일`;
+                const dueColor = diffDays <= 0 ? TOKENS.rust : diffDays <= 2 ? TOKENS.gold : TOKENS.inkSoft;
+                const dueDateStr = new Date(due).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+                return (
+                  <div style={{ fontSize: 11, color: dueColor, marginTop: 3, fontFamily: "'IBM Plex Mono', monospace" }}>
+                    결제 기한 {dueDateStr} ({dueLabel})
+                  </div>
+                );
+              })()}
               {i === 4 && isDone && !balancePaid && isChef && (
                 <div style={{ marginTop: 6 }}>
                   <button
@@ -5450,6 +5466,31 @@ export default function FarmToTableApp() {
     } catch { /* ignore */ }
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 잔금 결제 기한 알림 (앱 로드 시 1회 체크)
+  useEffect(() => {
+    if (loadState !== "ready" || !user) return;
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayKey = todayStart.toISOString().slice(0, 10);
+    deals.forEach((deal) => {
+      if (!deal.balanceDueAt || deal.balancePaidAt) return;
+      if (deal.createdBy !== user.uid) return;
+      const notifyKey = `balance-due-notified-${deal.id}-${todayKey}`;
+      if (localStorage.getItem(notifyKey)) return;
+      const dueStart = new Date(deal.balanceDueAt); dueStart.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((dueStart - todayStart) / 86400000);
+      if (diffDays === 1) {
+        showPushNotification("📅 잔금 결제 내일까지", `${deal.crop} 딜 잔금 결제 기한이 내일입니다.`, "mydeals");
+        localStorage.setItem(notifyKey, "1");
+      } else if (diffDays === 0) {
+        showPushNotification("⚠️ 잔금 결제 오늘까지", `${deal.crop} 딜 잔금 결제 기한이 오늘까지입니다!`, "mydeals");
+        localStorage.setItem(notifyKey, "1");
+      } else if (diffDays < 0) {
+        showPushNotification("🚨 잔금 결제 기한 초과", `${deal.crop} 딜 잔금 결제 기한이 ${Math.abs(diffDays)}일 지났습니다.`, "mydeals");
+        localStorage.setItem(notifyKey, "1");
+      }
+    });
+  }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isMobile = useIsMobile();
 
   // Firebase Auth 상태 감지
@@ -5804,6 +5845,7 @@ export default function FarmToTableApp() {
       deliveredAt: now,
       status: "done",
       completedAt: now,
+      balanceDueAt: now + BALANCE_DUE_DAYS * 24 * 60 * 60 * 1000,
     };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
