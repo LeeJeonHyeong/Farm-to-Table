@@ -6866,7 +6866,77 @@ export default function FarmToTableApp() {
           />
         ) : (
           <>
-            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} />}
+            {tab === "create" && (
+              <div style={{ position: "relative" }}>
+                {/* 왼쪽 사이드 일러스트 — 채소 바구니 */}
+                {!isMobile && (
+                  <svg viewBox="0 0 110 260" style={{ position: "absolute", left: -118, top: 20, width: 100, height: 240, opacity: 0.55, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
+                    {/* 줄기·잎 */}
+                    <path d="M55 240 Q55 180 55 120" stroke="#5B7553" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                    <path d="M55 200 Q35 185 22 165" stroke="#7A9B6E" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    <ellipse cx="18" cy="158" rx="18" ry="11" fill="#7A9B6E" transform="rotate(-30 18 158)"/>
+                    <path d="M55 175 Q75 160 85 140" stroke="#5B7553" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    <ellipse cx="89" cy="134" rx="17" ry="10" fill="#5B7553" transform="rotate(25 89 134)"/>
+                    <path d="M55 150 Q32 140 20 120" stroke="#7A9B6E" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    <ellipse cx="15" cy="114" rx="16" ry="10" fill="#7A9B6E" transform="rotate(-20 15 114)"/>
+                    {/* 토마토 */}
+                    <circle cx="55" cy="108" r="22" fill="#BB4A2E" opacity="0.9"/>
+                    <circle cx="55" cy="108" r="22" fill="url(#tomLeft)" opacity="0.3"/>
+                    <path d="M44 90 Q55 78 66 90" stroke="#5B7553" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                    <path d="M55 88 L55 80" stroke="#5B7553" strokeWidth="2.5" strokeLinecap="round"/>
+                    {/* 토마토 광택 */}
+                    <ellipse cx="46" cy="99" rx="6" ry="4" fill="white" opacity="0.22" transform="rotate(-20 46 99)"/>
+                    {/* 바구니 */}
+                    <rect x="18" y="218" width="74" height="32" rx="6" fill="#C8A87A"/>
+                    <rect x="14" y="213" width="82" height="12" rx="5" fill="#B89060"/>
+                    {/* 바구니 격자 */}
+                    <line x1="38" y1="213" x2="38" y2="250" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
+                    <line x1="58" y1="213" x2="58" y2="250" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
+                    <line x1="78" y1="213" x2="78" y2="250" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
+                    <line x1="14" y1="228" x2="96" y2="228" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
+                    <line x1="14" y1="241" x2="96" y2="241" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
+                    {/* 바구니 안 채소들 */}
+                    <circle cx="38" cy="210" r="10" fill="#BB4A2E" opacity="0.85"/>
+                    <circle cx="72" cy="208" r="9" fill="#BB4A2E" opacity="0.8"/>
+                    <ellipse cx="55" cy="206" rx="8" ry="6" fill="#7A9B6E" opacity="0.85"/>
+                  </svg>
+                )}
+                {/* 오른쪽 사이드 일러스트 — 밀·허브 묶음 */}
+                {!isMobile && (
+                  <svg viewBox="0 0 110 260" style={{ position: "absolute", right: -118, top: 30, width: 100, height: 240, opacity: 0.52, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
+                    {/* 밀 이삭 3개 */}
+                    <line x1="35" y1="240" x2="35" y2="60" stroke="#C9A84C" strokeWidth="2.2" strokeLinecap="round"/>
+                    <ellipse cx="35" cy="55" rx="6" ry="14" fill="#C9A84C"/>
+                    <ellipse cx="28" cy="75" rx="5" ry="11" fill="#C9A84C" transform="rotate(-18 28 75)"/>
+                    <ellipse cx="42" cy="80" rx="5" ry="11" fill="#C9A84C" transform="rotate(18 42 80)"/>
+                    <ellipse cx="27" cy="95" rx="5" ry="11" fill="#D4B05A" transform="rotate(-15 27 95)"/>
+                    <ellipse cx="43" cy="99" rx="5" ry="11" fill="#D4B05A" transform="rotate(15 43 99)"/>
+
+                    <line x1="60" y1="240" x2="60" y2="80" stroke="#C9A84C" strokeWidth="2.2" strokeLinecap="round"/>
+                    <ellipse cx="60" cy="74" rx="6" ry="13" fill="#C9A84C"/>
+                    <ellipse cx="52" cy="92" rx="5" ry="11" fill="#C9A84C" transform="rotate(-18 52 92)"/>
+                    <ellipse cx="68" cy="96" rx="5" ry="11" fill="#C9A84C" transform="rotate(18 68 96)"/>
+                    <ellipse cx="51" cy="112" rx="5" ry="10" fill="#D4B05A" transform="rotate(-15 51 112)"/>
+                    <ellipse cx="69" cy="115" rx="5" ry="10" fill="#D4B05A" transform="rotate(15 69 115)"/>
+
+                    <line x1="82" y1="240" x2="82" y2="70" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round"/>
+                    <ellipse cx="82" cy="64" rx="5" ry="12" fill="#C9A84C"/>
+                    <ellipse cx="75" cy="82" rx="4" ry="10" fill="#C9A84C" transform="rotate(-16 75 82)"/>
+                    <ellipse cx="89" cy="86" rx="4" ry="10" fill="#C9A84C" transform="rotate(16 89 86)"/>
+
+                    {/* 허브 잎 */}
+                    <path d="M35 160 Q18 148 12 132 Q24 138 35 155" fill="#5B7553" opacity="0.85"/>
+                    <path d="M35 145 Q20 135 16 120 Q27 128 35 143" fill="#7A9B6E" opacity="0.8"/>
+                    <path d="M60 170 Q78 158 84 142 Q72 148 60 167" fill="#5B7553" opacity="0.75"/>
+
+                    {/* 묶음 끈 */}
+                    <path d="M20 210 Q55 220 90 210" stroke="#B89060" strokeWidth="3" fill="none" strokeLinecap="round"/>
+                    <path d="M20 215 Q55 225 90 215" stroke="#A07840" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                  </svg>
+                )}
+                <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} />
+              </div>
+            )}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} onSubmitInquiry={handleSubmitInquiry} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} chatUnreads={chatUnreads} />}
             {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} onAnswerInquiry={handleAnswerInquiry} />}
