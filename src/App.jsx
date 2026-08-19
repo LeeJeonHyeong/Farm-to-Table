@@ -5424,56 +5424,135 @@ function LoginScreen({ onLogin }) {
           </p>
 
           {/* 팜-투-테이블 일러스트 */}
-          <svg viewBox="0 0 300 180" style={{ width: "100%", maxWidth: 300, marginBottom: 24, display: "block", margin: "0 auto 24px" }} xmlns="http://www.w3.org/2000/svg">
-            {/* 배경 하늘 */}
-            <rect width="300" height="180" fill="#F5F0E4" rx="16"/>
-            {/* 언덕 */}
-            <ellipse cx="60" cy="170" rx="100" ry="55" fill="#7A9B6E" opacity="0.55"/>
-            <ellipse cx="240" cy="175" rx="110" ry="60" fill="#5B7553" opacity="0.45"/>
-            <ellipse cx="150" cy="180" rx="180" ry="60" fill="#4A7A44" opacity="0.3"/>
-            {/* 태양 */}
-            <circle cx="248" cy="36" r="22" fill="#E8B84B" opacity="0.85"/>
-            <line x1="248" y1="7" x2="248" y2="1" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            <line x1="266" y1="18" x2="270" y2="14" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            <line x1="276" y1="36" x2="282" y2="36" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            <line x1="266" y1="54" x2="270" y2="58" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            <line x1="230" y1="18" x2="226" y2="14" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            {/* 농가 */}
-            <rect x="30" y="100" width="48" height="36" fill="#C8A87A" rx="2"/>
-            <polygon points="54,78 18,104 90,104" fill="#BB4A2E" opacity="0.85"/>
-            <rect x="48" y="114" width="12" height="22" fill="#8B6A3E" rx="1"/>
-            <rect x="34" y="106" width="10" height="9" fill="#E8D4A8" rx="1"/>
-            <rect x="56" y="106" width="10" height="9" fill="#E8D4A8" rx="1"/>
-            {/* 나무 */}
-            <rect x="95" y="118" width="5" height="20" fill="#8B6A3E"/>
-            <ellipse cx="97" cy="108" rx="14" ry="16" fill="#5B7553"/>
-            <ellipse cx="92" cy="113" rx="9" ry="11" fill="#7A9B6E"/>
-            {/* 밭 이랑 */}
-            <path d="M120 155 Q150 148 180 155" stroke="#4A7A44" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-            <path d="M118 163 Q150 156 182 163" stroke="#4A7A44" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-            {/* 토마토 */}
-            <circle cx="138" cy="150" r="6" fill="#BB4A2E"/>
-            <path d="M136 144 L138 141 L140 144" fill="#5B7553"/>
-            <circle cx="160" cy="148" r="6" fill="#BB4A2E"/>
-            <path d="M158 142 L160 139 L162 142" fill="#5B7553"/>
-            {/* 허브 */}
-            <path d="M200 145 Q198 135 200 125" stroke="#7A9B6E" strokeWidth="1.5" fill="none"/>
-            <ellipse cx="196" cy="130" rx="5" ry="3" fill="#7A9B6E" transform="rotate(-30 196 130)"/>
-            <ellipse cx="204" cy="133" rx="5" ry="3" fill="#5B7553" transform="rotate(25 204 133)"/>
-            <ellipse cx="198" cy="138" rx="5" ry="3" fill="#7A9B6E" transform="rotate(-10 198 138)"/>
-            {/* 밀 이삭 */}
-            <path d="M230 140 L230 110" stroke="#C9A84C" strokeWidth="1.5" fill="none"/>
-            <ellipse cx="230" cy="108" rx="3" ry="6" fill="#C9A84C"/>
-            <ellipse cx="227" cy="114" rx="3" ry="5" fill="#C9A84C" transform="rotate(-20 227 114)"/>
-            <ellipse cx="233" cy="116" rx="3" ry="5" fill="#C9A84C" transform="rotate(20 233 116)"/>
-            <path d="M245 143 L245 116" stroke="#C9A84C" strokeWidth="1.5" fill="none"/>
-            <ellipse cx="245" cy="114" rx="3" ry="6" fill="#C9A84C"/>
-            <ellipse cx="242" cy="120" rx="3" ry="5" fill="#C9A84C" transform="rotate(-20 242 120)"/>
-            <ellipse cx="248" cy="122" rx="3" ry="5" fill="#C9A84C" transform="rotate(20 248 122)"/>
+          <svg viewBox="0 0 300 180" style={{ width: "100%", maxWidth: 300, display: "block", margin: "0 auto 28px", borderRadius: 18, boxShadow: "0 4px 24px rgba(32,40,31,0.10)" }} xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="lgSky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#F8D8DC"/>
+                <stop offset="40%" stopColor="#FDE8C0"/>
+                <stop offset="100%" stopColor="#F5F0E4"/>
+              </linearGradient>
+              <radialGradient id="lgSun" cx="79%" cy="22%" r="28%">
+                <stop offset="0%" stopColor="#FFD060" stopOpacity="0.38"/>
+                <stop offset="100%" stopColor="#FFD060" stopOpacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="300" height="180" rx="18" fill="url(#lgSky)"/>
+            <rect width="300" height="180" rx="18" fill="url(#lgSun)"/>
             {/* 구름 */}
-            <ellipse cx="110" cy="45" rx="22" ry="12" fill="#fff" opacity="0.75"/>
-            <ellipse cx="126" cy="42" rx="16" ry="11" fill="#fff" opacity="0.75"/>
-            <ellipse cx="96" cy="48" rx="14" ry="9" fill="#fff" opacity="0.75"/>
+            <ellipse cx="66" cy="30" rx="30" ry="13" fill="#FFF8F2" opacity="0.9"/>
+            <ellipse cx="86" cy="24" rx="22" ry="11" fill="#FFF8F2" opacity="0.9"/>
+            <ellipse cx="48" cy="34" rx="19" ry="10" fill="#FFF8F2" opacity="0.88"/>
+            <ellipse cx="163" cy="17" rx="22" ry="9" fill="#FFF8F2" opacity="0.75"/>
+            <ellipse cx="180" cy="12" rx="16" ry="8" fill="#FFF8F2" opacity="0.75"/>
+            <ellipse cx="150" cy="20" rx="13" ry="7" fill="#FFF8F2" opacity="0.68"/>
+            {/* 태양 */}
+            <circle cx="234" cy="34" r="28" fill="#FFD060" opacity="0.16"/>
+            <circle cx="234" cy="34" r="19" fill="#F5C842" opacity="0.96"/>
+            <line x1="234" y1="9" x2="234" y2="3" stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
+            <line x1="253" y1="16" x2="258" y2="11" stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
+            <line x1="262" y1="34" x2="268" y2="34" stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
+            <line x1="253" y1="52" x2="258" y2="57" stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
+            <line x1="215" y1="16" x2="210" y2="11" stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
+            <line x1="206" y1="34" x2="200" y2="34" stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
+            <line x1="215" y1="52" x2="210" y2="57" stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round" opacity="0.55"/>
+            {/* 언덕 레이어 */}
+            <ellipse cx="150" cy="193" rx="250" ry="80" fill="#8CB870" opacity="0.36"/>
+            <ellipse cx="60" cy="196" rx="160" ry="76" fill="#6A9B58" opacity="0.5"/>
+            <ellipse cx="268" cy="198" rx="145" ry="72" fill="#4A8040" opacity="0.46"/>
+            <ellipse cx="148" cy="204" rx="255" ry="64" fill="#3D7038" opacity="0.4"/>
+            {/* 울타리 */}
+            <line x1="78" y1="140" x2="295" y2="140" stroke="#C8A87A" strokeWidth="1.8" opacity="0.5"/>
+            <line x1="78" y1="134" x2="295" y2="134" stroke="#C8A87A" strokeWidth="1.2" opacity="0.35"/>
+            <line x1="90" y1="130" x2="90" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="108" y1="130" x2="108" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="126" y1="130" x2="126" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="155" y1="130" x2="155" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="174" y1="130" x2="174" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="196" y1="130" x2="196" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="220" y1="130" x2="220" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="244" y1="130" x2="244" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            <line x1="270" y1="130" x2="270" y2="144" stroke="#C8A87A" strokeWidth="1.8" strokeLinecap="round" opacity="0.5"/>
+            {/* 농가 */}
+            <rect x="12" y="97" width="62" height="53" fill="#D4B07A" rx="2"/>
+            <polygon points="43,70 6,101 80,101" fill="#BB4A2E" opacity="0.9"/>
+            <rect x="52" y="60" width="12" height="22" fill="#9A7050"/>
+            <ellipse cx="58" cy="56" rx="5" ry="4" fill="#E0D8CC" opacity="0.52"/>
+            <ellipse cx="55" cy="49" rx="4" ry="3" fill="#E0D8CC" opacity="0.38"/>
+            <ellipse cx="60" cy="43" rx="3.5" ry="2.5" fill="#E0D8CC" opacity="0.24"/>
+            <rect x="35" y="117" width="18" height="33" fill="#7A4A28" rx="3"/>
+            <circle cx="51" cy="134" r="2" fill="#C9A84C"/>
+            <rect x="14" y="104" width="14" height="11" fill="#FFE494" rx="2"/>
+            <line x1="21" y1="104" x2="21" y2="115" stroke="#C8A060" strokeWidth="0.9" opacity="0.7"/>
+            <line x1="14" y1="109.5" x2="28" y2="109.5" stroke="#C8A060" strokeWidth="0.9" opacity="0.7"/>
+            <rect x="60" y="104" width="14" height="11" fill="#FFE494" rx="2"/>
+            <line x1="67" y1="104" x2="67" y2="115" stroke="#C8A060" strokeWidth="0.9" opacity="0.7"/>
+            <line x1="60" y1="109.5" x2="74" y2="109.5" stroke="#C8A060" strokeWidth="0.9" opacity="0.7"/>
+            {/* 사과나무 */}
+            <rect x="85" y="109" width="7" height="38" fill="#7A5A30" rx="2"/>
+            <ellipse cx="88" cy="88" rx="27" ry="24" fill="#4A7A44" opacity="0.88"/>
+            <ellipse cx="76" cy="98" rx="16" ry="14" fill="#5B7553" opacity="0.76"/>
+            <ellipse cx="104" cy="97" rx="15" ry="13" fill="#3D6B38" opacity="0.76"/>
+            <circle cx="81" cy="91" r="5.5" fill="#C83828" opacity="0.93"/>
+            <path d="M81 85 L81 83" stroke="#5B7553" strokeWidth="1.3" strokeLinecap="round"/>
+            <ellipse cx="78" cy="88" rx="2" ry="1.5" fill="white" opacity="0.28"/>
+            <circle cx="97" cy="85" r="5" fill="#C83828" opacity="0.88"/>
+            <path d="M97 80 L97 78" stroke="#5B7553" strokeWidth="1.3" strokeLinecap="round"/>
+            <ellipse cx="94" cy="82" rx="1.8" ry="1.3" fill="white" opacity="0.28"/>
+            <circle cx="88" cy="102" r="4" fill="#E04030" opacity="0.83"/>
+            <circle cx="73" cy="99" r="3.5" fill="#C83828" opacity="0.78"/>
+            {/* 해바라기 1 (center 148, 107) */}
+            <line x1="148" y1="161" x2="148" y2="114" stroke="#5B7553" strokeWidth="3" strokeLinecap="round"/>
+            <ellipse cx="139" cy="131" rx="11" ry="6" fill="#7A9B6E" transform="rotate(-28 139 131)"/>
+            <ellipse cx="157" cy="139" rx="10" ry="5.5" fill="#5B7553" transform="rotate(22 157 139)"/>
+            <ellipse cx="162" cy="107" rx="7" ry="3.5" fill="#F5C842"/>
+            <ellipse cx="157" cy="117" rx="7" ry="3.5" fill="#F5C842" transform="rotate(45 157 117)"/>
+            <ellipse cx="148" cy="120" rx="7" ry="3.5" fill="#F5C842" transform="rotate(90 148 120)"/>
+            <ellipse cx="139" cy="117" rx="7" ry="3.5" fill="#F5C842" transform="rotate(135 139 117)"/>
+            <ellipse cx="134" cy="107" rx="7" ry="3.5" fill="#F5C842" transform="rotate(180 134 107)"/>
+            <ellipse cx="139" cy="97" rx="7" ry="3.5" fill="#F5C842" transform="rotate(225 139 97)"/>
+            <ellipse cx="148" cy="94" rx="7" ry="3.5" fill="#F5C842" transform="rotate(270 148 94)"/>
+            <ellipse cx="157" cy="97" rx="7" ry="3.5" fill="#F5C842" transform="rotate(315 157 97)"/>
+            <circle cx="148" cy="107" r="9" fill="#8B5C10"/>
+            <circle cx="148" cy="107" r="5" fill="#5A3A06" opacity="0.5"/>
+            {/* 해바라기 2 (center 169, 121) */}
+            <line x1="169" y1="163" x2="169" y2="128" stroke="#5B7553" strokeWidth="2.5" strokeLinecap="round"/>
+            <ellipse cx="179" cy="121" rx="5.5" ry="2.8" fill="#F5C842"/>
+            <ellipse cx="175" cy="129" rx="5.5" ry="2.8" fill="#F5C842" transform="rotate(45 175 129)"/>
+            <ellipse cx="169" cy="131" rx="5.5" ry="2.8" fill="#F5C842" transform="rotate(90 169 131)"/>
+            <ellipse cx="163" cy="129" rx="5.5" ry="2.8" fill="#F5C842" transform="rotate(135 163 129)"/>
+            <ellipse cx="159" cy="121" rx="5.5" ry="2.8" fill="#F5C842" transform="rotate(180 159 121)"/>
+            <ellipse cx="163" cy="113" rx="5.5" ry="2.8" fill="#F5C842" transform="rotate(225 163 113)"/>
+            <ellipse cx="169" cy="111" rx="5.5" ry="2.8" fill="#F5C842" transform="rotate(270 169 111)"/>
+            <ellipse cx="175" cy="113" rx="5.5" ry="2.8" fill="#F5C842" transform="rotate(315 175 113)"/>
+            <circle cx="169" cy="121" r="7" fill="#7A4E08"/>
+            {/* 라벤더 */}
+            <line x1="196" y1="160" x2="196" y2="131" stroke="#8A8AB0" strokeWidth="1.8" strokeLinecap="round"/>
+            <ellipse cx="196" cy="128" rx="3.5" ry="8" fill="#9B8DB8" opacity="0.82"/>
+            <line x1="207" y1="162" x2="207" y2="134" stroke="#9090B8" strokeWidth="1.8" strokeLinecap="round"/>
+            <ellipse cx="207" cy="131" rx="3" ry="7" fill="#B0A0D0" opacity="0.78"/>
+            <line x1="218" y1="160" x2="218" y2="132" stroke="#8A8AB0" strokeWidth="1.8" strokeLinecap="round"/>
+            <ellipse cx="218" cy="129" rx="3.5" ry="7.5" fill="#9B8DB8" opacity="0.82"/>
+            <line x1="212" y1="163" x2="212" y2="136" stroke="#9090B8" strokeWidth="1.5" strokeLinecap="round"/>
+            <ellipse cx="212" cy="133" rx="2.8" ry="7" fill="#C0B0E0" opacity="0.72"/>
+            {/* 가지 */}
+            <line x1="243" y1="155" x2="243" y2="128" stroke="#5B7553" strokeWidth="1.5" strokeLinecap="round"/>
+            <ellipse cx="243" cy="142" rx="8" ry="13" fill="#5B2D8E" opacity="0.85"/>
+            <ellipse cx="243" cy="134" rx="6" ry="7" fill="#4A2478" opacity="0.6"/>
+            <path d="M239 131 Q243 125 247 131" stroke="#5B7553" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+            <ellipse cx="240" cy="137" rx="2.5" ry="4" fill="white" opacity="0.14"/>
+            {/* 당근 */}
+            <path d="M263 143 L258 158 L268 158 Z" fill="#E8782A" opacity="0.88"/>
+            <path d="M261 143 L260 137" stroke="#5B7553" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M263 142 L262 136" stroke="#5B7553" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M266 143 L267 137" stroke="#5B7553" strokeWidth="1.5" strokeLinecap="round"/>
+            {/* 나비 */}
+            <path d="M192 74 Q185 64 178 69 Q184 76 192 74" fill="#E8A0C8" opacity="0.78"/>
+            <path d="M192 74 Q199 64 206 69 Q200 76 192 74" fill="#E8A0C8" opacity="0.78"/>
+            <path d="M192 74 Q187 82 184 88 Q189 85 192 74" fill="#C878A8" opacity="0.62"/>
+            <path d="M192 74 Q197 82 200 88 Q195 85 192 74" fill="#C878A8" opacity="0.62"/>
+            <circle cx="192" cy="74" r="2" fill="#8B4A6E"/>
+            <line x1="192" y1="72" x2="188" y2="66" stroke="#8B4A6E" strokeWidth="0.9" strokeLinecap="round"/>
+            <line x1="192" y1="72" x2="196" y2="66" stroke="#8B4A6E" strokeWidth="0.9" strokeLinecap="round"/>
           </svg>
 
           <div style={{ display: "flex", gap: 10 }}>
@@ -6868,70 +6947,167 @@ export default function FarmToTableApp() {
           <>
             {tab === "create" && (
               <div style={{ position: "relative" }}>
-                {/* 왼쪽 사이드 일러스트 — 채소 바구니 */}
+                {/* 왼쪽 사이드 일러스트 — 해바라기·토마토·호박 */}
                 {!isMobile && (
-                  <svg viewBox="0 0 110 260" style={{ position: "absolute", left: -118, top: 20, width: 100, height: 240, opacity: 0.55, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
-                    {/* 줄기·잎 */}
-                    <path d="M55 240 Q55 180 55 120" stroke="#5B7553" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-                    <path d="M55 200 Q35 185 22 165" stroke="#7A9B6E" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                    <ellipse cx="18" cy="158" rx="18" ry="11" fill="#7A9B6E" transform="rotate(-30 18 158)"/>
-                    <path d="M55 175 Q75 160 85 140" stroke="#5B7553" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                    <ellipse cx="89" cy="134" rx="17" ry="10" fill="#5B7553" transform="rotate(25 89 134)"/>
-                    <path d="M55 150 Q32 140 20 120" stroke="#7A9B6E" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                    <ellipse cx="15" cy="114" rx="16" ry="10" fill="#7A9B6E" transform="rotate(-20 15 114)"/>
-                    {/* 토마토 */}
-                    <circle cx="55" cy="108" r="22" fill="#BB4A2E" opacity="0.9"/>
-                    <circle cx="55" cy="108" r="22" fill="url(#tomLeft)" opacity="0.3"/>
-                    <path d="M44 90 Q55 78 66 90" stroke="#5B7553" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-                    <path d="M55 88 L55 80" stroke="#5B7553" strokeWidth="2.5" strokeLinecap="round"/>
-                    {/* 토마토 광택 */}
-                    <ellipse cx="46" cy="99" rx="6" ry="4" fill="white" opacity="0.22" transform="rotate(-20 46 99)"/>
-                    {/* 바구니 */}
-                    <rect x="18" y="218" width="74" height="32" rx="6" fill="#C8A87A"/>
-                    <rect x="14" y="213" width="82" height="12" rx="5" fill="#B89060"/>
-                    {/* 바구니 격자 */}
-                    <line x1="38" y1="213" x2="38" y2="250" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
-                    <line x1="58" y1="213" x2="58" y2="250" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
-                    <line x1="78" y1="213" x2="78" y2="250" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
-                    <line x1="14" y1="228" x2="96" y2="228" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
-                    <line x1="14" y1="241" x2="96" y2="241" stroke="#A07840" strokeWidth="1.2" opacity="0.6"/>
-                    {/* 바구니 안 채소들 */}
-                    <circle cx="38" cy="210" r="10" fill="#BB4A2E" opacity="0.85"/>
-                    <circle cx="72" cy="208" r="9" fill="#BB4A2E" opacity="0.8"/>
-                    <ellipse cx="55" cy="206" rx="8" ry="6" fill="#7A9B6E" opacity="0.85"/>
+                  <svg viewBox="0 0 110 280" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 255, opacity: 0.82, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
+                    {/* 배경 워시 */}
+                    <rect width="110" height="280" rx="14" fill="#F5F0E4" opacity="0.45"/>
+                    {/* 덩굴 줄기 */}
+                    <path d="M55 280 Q53 230 52 180 Q50 130 53 80 Q54 60 55 38" stroke="#5B7553" strokeWidth="3" fill="none" strokeLinecap="round"/>
+                    {/* 잎들 */}
+                    <path d="M52 240 Q32 228 18 210 Q34 218 52 237" fill="#7A9B6E" opacity="0.85"/>
+                    <path d="M53 215 Q73 203 86 185 Q70 193 53 212" fill="#5B7553" opacity="0.82"/>
+                    <path d="M51 190 Q30 180 14 162 Q32 172 51 187" fill="#6A8A60" opacity="0.8"/>
+                    <path d="M54 162 Q74 152 88 135 Q72 144 54 160" fill="#5B7553" opacity="0.78"/>
+                    <path d="M52 140 Q33 130 18 112 Q34 121 52 137" fill="#7A9B6E" opacity="0.82"/>
+                    {/* 해바라기 (top, center 55,48) */}
+                    <line x1="55" y1="72" x2="55" y2="18" stroke="#5B7553" strokeWidth="3" strokeLinecap="round"/>
+                    <ellipse cx="40" cy="56" rx="13" ry="7" fill="#7A9B6E" transform="rotate(-25 40 56)"/>
+                    <ellipse cx="72" cy="62" rx="12" ry="6.5" fill="#5B7553" transform="rotate(20 72 62)"/>
+                    {/* 꽃잎 8장 (center 55, 45) radius 15 */}
+                    <ellipse cx="70" cy="45" rx="8" ry="4" fill="#F5C842"/>
+                    <ellipse cx="65.6" cy="55.6" rx="8" ry="4" fill="#F0C038" transform="rotate(45 65.6 55.6)"/>
+                    <ellipse cx="55" cy="60" rx="8" ry="4" fill="#F5C842" transform="rotate(90 55 60)"/>
+                    <ellipse cx="44.4" cy="55.6" rx="8" ry="4" fill="#F0C038" transform="rotate(135 44.4 55.6)"/>
+                    <ellipse cx="40" cy="45" rx="8" ry="4" fill="#F5C842" transform="rotate(180 40 45)"/>
+                    <ellipse cx="44.4" cy="34.4" rx="8" ry="4" fill="#F0C038" transform="rotate(225 44.4 34.4)"/>
+                    <ellipse cx="55" cy="30" rx="8" ry="4" fill="#F5C842" transform="rotate(270 55 30)"/>
+                    <ellipse cx="65.6" cy="34.4" rx="8" ry="4" fill="#F0C038" transform="rotate(315 65.6 34.4)"/>
+                    <circle cx="55" cy="45" r="10" fill="#8B5C10"/>
+                    <circle cx="55" cy="45" r="6.5" fill="#5A3A06" opacity="0.55"/>
+                    <circle cx="52" cy="43" r="1.2" fill="#3A2004" opacity="0.5"/>
+                    <circle cx="56" cy="41" r="1.2" fill="#3A2004" opacity="0.5"/>
+                    <circle cx="59" cy="44" r="1.2" fill="#3A2004" opacity="0.5"/>
+                    <circle cx="57" cy="48" r="1.2" fill="#3A2004" opacity="0.5"/>
+                    <circle cx="53" cy="49" r="1.2" fill="#3A2004" opacity="0.5"/>
+                    {/* 큰 빨간 토마토 (center 55, 140) */}
+                    <circle cx="55" cy="140" r="22" fill="#CC3020" opacity="0.93"/>
+                    <path d="M44 120 Q55 112 66 120" stroke="#5B7553" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                    <path d="M55 118 L55 111" stroke="#5B7553" strokeWidth="2.5" strokeLinecap="round"/>
+                    <path d="M48 117 Q45 111 48 109" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                    <path d="M62 117 Q65 111 62 109" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                    <ellipse cx="46" cy="131" rx="7" ry="5" fill="white" opacity="0.22" transform="rotate(-20 46 131)"/>
+                    <ellipse cx="60" cy="126" rx="4" ry="2.5" fill="white" opacity="0.15"/>
+                    {/* 반숙 주황 토마토 (left) */}
+                    <circle cx="26" cy="175" r="13" fill="#DD7030" opacity="0.88"/>
+                    <path d="M22 163 Q26 158 30 163" stroke="#5B7553" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    <path d="M26 161 L26 156" stroke="#5B7553" strokeWidth="1.8" strokeLinecap="round"/>
+                    <ellipse cx="21" cy="170" rx="3" ry="2" fill="white" opacity="0.25" transform="rotate(-20 21 170)"/>
+                    {/* 초록 토마토 (right) */}
+                    <circle cx="80" cy="192" r="9" fill="#5B7A38" opacity="0.88"/>
+                    <circle cx="90" cy="200" r="7" fill="#4A7030" opacity="0.8"/>
+                    <path d="M77 188 Q80 184 83 188" stroke="#3A5A28" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                    {/* 무당벌레 */}
+                    <ellipse cx="26" cy="128" rx="5" ry="4" fill="#CC1A1A" opacity="0.88"/>
+                    <line x1="22" y1="128" x2="30" y2="128" stroke="#1A1A1A" strokeWidth="0.8" opacity="0.6"/>
+                    <circle cx="24" cy="126" r="1.2" fill="#1A1A1A" opacity="0.6"/>
+                    <circle cx="28" cy="126" r="1.2" fill="#1A1A1A" opacity="0.6"/>
+                    <circle cx="24" cy="130" r="1" fill="#1A1A1A" opacity="0.5"/>
+                    <circle cx="28" cy="130" r="1" fill="#1A1A1A" opacity="0.5"/>
+                    <ellipse cx="26" cy="125" rx="3.5" ry="1.5" fill="#1A1A1A" opacity="0.6"/>
+                    <line x1="24" y1="124" x2="22" y2="121" stroke="#1A1A1A" strokeWidth="0.7" strokeLinecap="round" opacity="0.5"/>
+                    <line x1="28" y1="124" x2="30" y2="121" stroke="#1A1A1A" strokeWidth="0.7" strokeLinecap="round" opacity="0.5"/>
+                    {/* 호박 (bottom, center 55, 252) */}
+                    <path d="M55 228 Q42 235 38 248" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                    <path d="M55 230 Q68 237 72 249" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                    <path d="M35 244 Q22 237 18 228 Q28 234 35 242" fill="#5B7553" opacity="0.8"/>
+                    <path d="M76 247 Q88 240 92 231 Q82 237 76 245" fill="#7A9B6E" opacity="0.75"/>
+                    <ellipse cx="55" cy="254" rx="33" ry="22" fill="#D4601E" opacity="0.9"/>
+                    <path d="M55 233 Q58 244 55 268 Q52 244 55 233" stroke="#B84010" strokeWidth="2" fill="none" opacity="0.5"/>
+                    <path d="M55 236 Q65 245 67 261 Q61 247 55 236" stroke="#B84010" strokeWidth="1.5" fill="none" opacity="0.4"/>
+                    <path d="M55 236 Q45 245 43 261 Q49 247 55 236" stroke="#B84010" strokeWidth="1.5" fill="none" opacity="0.4"/>
+                    <path d="M55 240 Q73 248 77 262 Q67 249 55 240" stroke="#B84010" strokeWidth="1.2" fill="none" opacity="0.3"/>
+                    <path d="M55 240 Q37 248 33 262 Q43 249 55 240" stroke="#B84010" strokeWidth="1.2" fill="none" opacity="0.3"/>
+                    <rect x="51" y="229" width="8" height="6" rx="2" fill="#7A5A30"/>
+                    <path d="M59 228 Q66 220 62 213" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                    <ellipse cx="44" cy="248" rx="5" ry="7" fill="white" opacity="0.12" transform="rotate(-10 44 248)"/>
                   </svg>
                 )}
-                {/* 오른쪽 사이드 일러스트 — 밀·허브 묶음 */}
+                {/* 오른쪽 사이드 일러스트 — 마늘묶음·허브화분·가지·당근 */}
                 {!isMobile && (
-                  <svg viewBox="0 0 110 260" style={{ position: "absolute", right: -118, top: 30, width: 100, height: 240, opacity: 0.52, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
-                    {/* 밀 이삭 3개 */}
-                    <line x1="35" y1="240" x2="35" y2="60" stroke="#C9A84C" strokeWidth="2.2" strokeLinecap="round"/>
-                    <ellipse cx="35" cy="55" rx="6" ry="14" fill="#C9A84C"/>
-                    <ellipse cx="28" cy="75" rx="5" ry="11" fill="#C9A84C" transform="rotate(-18 28 75)"/>
-                    <ellipse cx="42" cy="80" rx="5" ry="11" fill="#C9A84C" transform="rotate(18 42 80)"/>
-                    <ellipse cx="27" cy="95" rx="5" ry="11" fill="#D4B05A" transform="rotate(-15 27 95)"/>
-                    <ellipse cx="43" cy="99" rx="5" ry="11" fill="#D4B05A" transform="rotate(15 43 99)"/>
-
-                    <line x1="60" y1="240" x2="60" y2="80" stroke="#C9A84C" strokeWidth="2.2" strokeLinecap="round"/>
-                    <ellipse cx="60" cy="74" rx="6" ry="13" fill="#C9A84C"/>
-                    <ellipse cx="52" cy="92" rx="5" ry="11" fill="#C9A84C" transform="rotate(-18 52 92)"/>
-                    <ellipse cx="68" cy="96" rx="5" ry="11" fill="#C9A84C" transform="rotate(18 68 96)"/>
-                    <ellipse cx="51" cy="112" rx="5" ry="10" fill="#D4B05A" transform="rotate(-15 51 112)"/>
-                    <ellipse cx="69" cy="115" rx="5" ry="10" fill="#D4B05A" transform="rotate(15 69 115)"/>
-
-                    <line x1="82" y1="240" x2="82" y2="70" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round"/>
-                    <ellipse cx="82" cy="64" rx="5" ry="12" fill="#C9A84C"/>
-                    <ellipse cx="75" cy="82" rx="4" ry="10" fill="#C9A84C" transform="rotate(-16 75 82)"/>
-                    <ellipse cx="89" cy="86" rx="4" ry="10" fill="#C9A84C" transform="rotate(16 89 86)"/>
-
-                    {/* 허브 잎 */}
-                    <path d="M35 160 Q18 148 12 132 Q24 138 35 155" fill="#5B7553" opacity="0.85"/>
-                    <path d="M35 145 Q20 135 16 120 Q27 128 35 143" fill="#7A9B6E" opacity="0.8"/>
-                    <path d="M60 170 Q78 158 84 142 Q72 148 60 167" fill="#5B7553" opacity="0.75"/>
-
-                    {/* 묶음 끈 */}
-                    <path d="M20 210 Q55 220 90 210" stroke="#B89060" strokeWidth="3" fill="none" strokeLinecap="round"/>
-                    <path d="M20 215 Q55 225 90 215" stroke="#A07840" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                  <svg viewBox="0 0 110 280" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 255, opacity: 0.82, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
+                    {/* 배경 워시 */}
+                    <rect width="110" height="280" rx="14" fill="#F5F0E4" opacity="0.45"/>
+                    {/* 마늘 줄기 */}
+                    <path d="M30 12 Q28 24 26 36 Q28 48 30 57" stroke="#7A9B6E" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+                    <path d="M55 10 Q53 22 55 34 Q55 46 56 60" stroke="#7A9B6E" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+                    <path d="M80 12 Q82 24 82 36 Q80 48 78 57" stroke="#7A9B6E" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+                    {/* 마늘 머리 */}
+                    <ellipse cx="30" cy="64" rx="14" ry="16" fill="#F0E8D4" opacity="0.92"/>
+                    <path d="M24 57 Q30 52 36 57" stroke="#D4C8A8" strokeWidth="1.2" fill="none"/>
+                    <path d="M21 62 Q30 58 39 62" stroke="#D4C8A8" strokeWidth="1" fill="none" opacity="0.7"/>
+                    <line x1="30" y1="52" x2="30" y2="48" stroke="#D4C8A8" strokeWidth="1.5" strokeLinecap="round"/>
+                    <ellipse cx="55" cy="68" rx="13" ry="15" fill="#EDE4CC" opacity="0.92"/>
+                    <path d="M49 61 Q55 56 61 61" stroke="#C8BCA0" strokeWidth="1.2" fill="none"/>
+                    <line x1="55" y1="55" x2="55" y2="51" stroke="#C8BCA0" strokeWidth="1.5" strokeLinecap="round"/>
+                    <ellipse cx="80" cy="64" rx="14" ry="16" fill="#F0E8D4" opacity="0.92"/>
+                    <path d="M74 57 Q80 52 86 57" stroke="#D4C8A8" strokeWidth="1.2" fill="none"/>
+                    <line x1="80" y1="52" x2="80" y2="48" stroke="#D4C8A8" strokeWidth="1.5" strokeLinecap="round"/>
+                    {/* 묶음 끈 (상단) */}
+                    <line x1="18" y1="12" x2="92" y2="12" stroke="#8B4A2E" strokeWidth="2.5" strokeLinecap="round"/>
+                    {/* 빨간 리본 */}
+                    <path d="M42 12 Q55 18 68 12" stroke="#BB4A2E" strokeWidth="3" fill="none" strokeLinecap="round"/>
+                    <path d="M50 12 Q46 5 41 9" stroke="#BB4A2E" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                    <path d="M60 12 Q64 5 69 9" stroke="#BB4A2E" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                    {/* 가지 (왼쪽 중단) */}
+                    <line x1="22" y1="128" x2="22" y2="93" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M18 93 Q22 86 26 93" stroke="#5B7553" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+                    <ellipse cx="22" cy="113" rx="14" ry="22" fill="#5B2D8E" opacity="0.88"/>
+                    <ellipse cx="22" cy="127" rx="10" ry="8" fill="#4A2478" opacity="0.58"/>
+                    <ellipse cx="18" cy="105" rx="4" ry="6" fill="white" opacity="0.15" transform="rotate(-15 18 105)"/>
+                    {/* 라벤더 (오른쪽) */}
+                    <line x1="85" y1="128" x2="85" y2="93" stroke="#8A8AB0" strokeWidth="1.8" strokeLinecap="round"/>
+                    <ellipse cx="85" cy="90" rx="4" ry="10" fill="#9B8DB8" opacity="0.85"/>
+                    <line x1="95" y1="130" x2="95" y2="99" stroke="#9090B8" strokeWidth="1.8" strokeLinecap="round"/>
+                    <ellipse cx="95" cy="96" rx="3.5" ry="9" fill="#B0A0D0" opacity="0.8"/>
+                    <line x1="75" y1="132" x2="75" y2="103" stroke="#8080A8" strokeWidth="1.5" strokeLinecap="round"/>
+                    <ellipse cx="75" cy="100" rx="3" ry="8" fill="#9088C0" opacity="0.78"/>
+                    <line x1="88" y1="134" x2="88" y2="107" stroke="#9090B8" strokeWidth="1.5" strokeLinecap="round"/>
+                    <ellipse cx="88" cy="104" rx="3" ry="7.5" fill="#C0B0E0" opacity="0.72"/>
+                    {/* 바질 화분 (왼쪽) */}
+                    <ellipse cx="28" cy="163" rx="21" ry="5" fill="#7A4A20" opacity="0.7"/>
+                    <ellipse cx="28" cy="148" rx="21" ry="18" fill="#2A5A20" opacity="0.82"/>
+                    <ellipse cx="22" cy="155" rx="14" ry="12" fill="#3A7A28" opacity="0.72"/>
+                    <ellipse cx="35" cy="153" rx="12" ry="10" fill="#224A18" opacity="0.7"/>
+                    <ellipse cx="28" cy="141" rx="10" ry="9" fill="#3A7A28" opacity="0.68"/>
+                    <ellipse cx="22" cy="147" rx="5" ry="4" fill="#4A9A34" opacity="0.55"/>
+                    <ellipse cx="33" cy="144" rx="4" ry="3.5" fill="#4A9A34" opacity="0.5"/>
+                    <path d="M8 163 L12 200 L44 200 L48 163 Z" fill="#C8603A" opacity="0.9"/>
+                    <rect x="6" y="160" width="44" height="9" rx="3" fill="#B44A28"/>
+                    <line x1="20" y1="169" x2="18" y2="200" stroke="#A84020" strokeWidth="1" opacity="0.35"/>
+                    <line x1="36" y1="169" x2="38" y2="200" stroke="#A84020" strokeWidth="1" opacity="0.35"/>
+                    {/* 로즈마리 화분 (오른쪽) */}
+                    <ellipse cx="82" cy="158" rx="18" ry="5" fill="#7A4A20" opacity="0.7"/>
+                    <line x1="82" y1="158" x2="80" y2="118" stroke="#5B7553" strokeWidth="2.5" strokeLinecap="round"/>
+                    <line x1="82" y1="158" x2="74" y2="124" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="82" y1="158" x2="90" y2="122" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="82" y1="158" x2="70" y2="136" stroke="#5B7553" strokeWidth="1.5" strokeLinecap="round"/>
+                    <line x1="82" y1="158" x2="94" y2="133" stroke="#5B7553" strokeWidth="1.5" strokeLinecap="round"/>
+                    <ellipse cx="80" cy="126" rx="2.5" ry="5" fill="#3D6B38" transform="rotate(-8 80 126)"/>
+                    <ellipse cx="75" cy="132" rx="2" ry="4.5" fill="#4A7A44" transform="rotate(-15 75 132)"/>
+                    <ellipse cx="90" cy="130" rx="2.5" ry="5" fill="#3D6B38" transform="rotate(10 90 130)"/>
+                    <ellipse cx="70" cy="142" rx="2" ry="4" fill="#4A7A44" transform="rotate(-20 70 142)"/>
+                    <ellipse cx="94" cy="140" rx="2" ry="4.5" fill="#3D6B38" transform="rotate(15 94 140)"/>
+                    <ellipse cx="77" cy="146" rx="2" ry="4" fill="#5B7553" transform="rotate(-5 77 146)"/>
+                    <ellipse cx="87" cy="144" rx="2" ry="4" fill="#4A7A44" transform="rotate(8 87 144)"/>
+                    <path d="M64 158 L68 194 L96 194 L100 158 Z" fill="#C8603A" opacity="0.88"/>
+                    <rect x="62" y="155" width="40" height="8" rx="3" fill="#B44A28"/>
+                    {/* 당근 1 (하단 왼쪽) */}
+                    <path d="M25 228 L18 263 L32 263 Z" fill="#E8782A" opacity="0.9"/>
+                    <path d="M20 226 L17 216" stroke="#5B7553" strokeWidth="1.8" strokeLinecap="round"/>
+                    <path d="M25 224 L23 214" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M30 226 L33 216" stroke="#5B7553" strokeWidth="1.8" strokeLinecap="round"/>
+                    <ellipse cx="19" cy="219" rx="4" ry="2.5" fill="#3D6B38" opacity="0.7" transform="rotate(-25 19 219)"/>
+                    <ellipse cx="24" cy="217" rx="4" ry="2.5" fill="#5B7553" opacity="0.7" transform="rotate(-5 24 217)"/>
+                    <ellipse cx="30" cy="219" rx="4" ry="2.5" fill="#3D6B38" opacity="0.7" transform="rotate(20 30 219)"/>
+                    {/* 당근 2 (하단 오른쪽) */}
+                    <path d="M82 222 L76 256 L88 256 Z" fill="#DD6A20" opacity="0.88"/>
+                    <path d="M77 220 L74 211" stroke="#5B7553" strokeWidth="1.8" strokeLinecap="round"/>
+                    <path d="M82 218 L80 209" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M87 220 L90 211" stroke="#5B7553" strokeWidth="1.8" strokeLinecap="round"/>
+                    <ellipse cx="75" cy="213" rx="4" ry="2.5" fill="#3D6B38" opacity="0.7" transform="rotate(-25 75 213)"/>
+                    <ellipse cx="81" cy="211" rx="4" ry="2.5" fill="#5B7553" opacity="0.7" transform="rotate(-5 81 211)"/>
+                    <ellipse cx="87" cy="213" rx="4" ry="2.5" fill="#3D6B38" opacity="0.7" transform="rotate(20 87 213)"/>
                   </svg>
                 )}
                 <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} />
