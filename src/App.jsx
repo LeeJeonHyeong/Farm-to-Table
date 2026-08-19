@@ -1532,14 +1532,15 @@ function ChefProfileMiniCard({ chefData, deal }) {
   );
 }
 
-function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
+function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastProposal }) {
+  const preFilled = lastProposal != null;
   const [data, setData] = useState({
     farmName: farmProfile?.farmName || farmerName || "",
     region: farmProfile?.region || "",
-    price: "",
-    availableQty: "",
+    price: lastProposal?.price ?? "",
+    availableQty: lastProposal?.availableQty ?? "",
     availableDate: "",
-    cert: farmProfile?.cert || "인증 없음",
+    cert: farmProfile?.cert || lastProposal?.cert || "인증 없음",
     message: "",
   });
   const [errors, setErrors] = useState({});
@@ -1576,6 +1577,11 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName }) {
 
   return (
     <div style={{ background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16, marginTop: 12 }}>
+      {preFilled && (
+        <div style={{ fontSize: 11, color: TOKENS.moss, background: TOKENS.mossSoft, borderRadius: 6, padding: "6px 10px", marginBottom: 12 }}>
+          이전 제안의 단가·수량·인증이 미리 채워졌습니다
+        </div>
+      )}
       <FarmProfileMiniCard farmProfile={farmProfile} />
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
         <div>
@@ -1963,7 +1969,7 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
   );
 }
 
-function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack }) {
+function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack, lastProposal }) {
   const [openForm, setOpenForm] = useState(false);
   const [chefData, setChefData] = useState(null);
   const isMobile = useIsMobile();
@@ -2065,6 +2071,7 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack 
             onCancel={() => setOpenForm(false)}
             farmProfile={farmProfile}
             farmerName={userName}
+            lastProposal={lastProposal}
           />
         ) : (
           <button
@@ -2180,12 +2187,18 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
     priceMax && { key: "priceMax", label: `~${Number(priceMax).toLocaleString()}원`, clear: () => setPriceMax("") },
   ].filter(Boolean);
 
+  const lastProposal = deals
+    .flatMap((d) => d.proposals)
+    .filter((p) => p.farmerName === userName)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] ?? null;
+
   if (detailDeal) {
     return (
       <DealDetailView
         deal={detailDeal}
         farmProfile={farmProfile}
         userName={userName}
+        lastProposal={lastProposal}
         onSubmitProposal={(id, proposal) => { onSubmitProposal(id, proposal); setDetailDeal(null); }}
         onBack={() => setDetailDeal(null)}
       />
@@ -2432,6 +2445,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
           {filtered.map((deal) => {
             const isMySpecialty = specialty.has(deal.crop);
             const myProposal = deal.proposals.find((p) => p.farmerName === userName);
+            const daysLeft = Math.ceil((new Date(deal.deliveryDate) - Date.now()) / 86400000);
             return (
             <div
               key={deal.id}
@@ -2460,7 +2474,16 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName }) {
               </div>
               <DealSummaryRow deal={deal} />
               <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: myProposal ? 10 : 0 }}>
-                희망 납품일 {deal.deliveryDate} · 들어온 제안 {deal.proposals.length}건
+                희망 납품일 {deal.deliveryDate}
+                <span style={{
+                  marginLeft: 6, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
+                  padding: "1px 6px", borderRadius: 4, fontWeight: 600,
+                  background: daysLeft <= 3 ? TOKENS.rustSoft : daysLeft <= 7 ? TOKENS.goldSoft : TOKENS.line,
+                  color: daysLeft <= 3 ? TOKENS.rust : daysLeft <= 7 ? "#7A5C20" : TOKENS.inkSoft,
+                }}>
+                  {daysLeft <= 0 ? "D-day" : `D-${daysLeft}`}
+                </span>
+                {" · "}들어온 제안 {deal.proposals.length}건
               </div>
               {myProposal && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: TOKENS.mossSoft, borderRadius: 8, fontSize: 13 }}>
@@ -4133,6 +4156,8 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
   const [proposalSort, setProposalSort] = useState("score");
   const [detailProposal, setDetailProposal] = useState(null);
   const [farmProfileModal, setFarmProfileModal] = useState(null);
+  const [compareIds, setCompareIds] = useState([]);
+  useEffect(() => { setCompareIds([]); }, [expandedId]);
 
   if (detailProposal) {
     const { proposal, deal } = detailProposal;
@@ -4355,20 +4380,93 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                               {s === "score" ? "매칭 점수순" : "가격순"}
                             </button>
                           ))}
+                          {compareIds.length >= 1 && (
+                            <button
+                              onClick={() => setCompareIds([])}
+                              style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: 999, fontSize: 11, cursor: "pointer", border: `1px solid ${TOKENS.rust}`, background: TOKENS.rustSoft, color: TOKENS.rust }}
+                            >
+                              비교 초기화 ({compareIds.length})
+                            </button>
+                          )}
                         </div>
-                        {sortedProposals.map((p) => (
-                          <ProposalCard
-                            key={p.id}
-                            proposal={p}
-                            deal={deal}
-                            isSelected={false}
-                            selectable
-                            score={p._score}
-                            onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
-                            onClick={() => setDetailProposal({ proposal: p, deal })}
-                            onViewProfile={(p) => setFarmProfileModal(p)}
-                          />
-                        ))}
+                        {compareIds.length >= 2 && (() => {
+                          const cps = sortedProposals.filter((p) => compareIds.includes(p.id));
+                          const minPrice = Math.min(...cps.map((p) => p.price));
+                          const maxScore = Math.max(...cps.map((p) => p._score?.total ?? 0));
+                          const maxQty = Math.max(...cps.map((p) => p.availableQty));
+                          const minDate = [...cps.map((p) => p.availableDate)].filter(Boolean).sort()[0];
+                          const rows = [
+                            { label: "단가", vals: cps.map((p) => ({ v: `${p.price.toLocaleString()}원/kg`, best: p.price === minPrice })) },
+                            { label: "AI점수", vals: cps.map((p) => ({ v: `${p._score?.total ?? "-"}점`, best: (p._score?.total ?? 0) === maxScore })) },
+                            { label: "납품가능일", vals: cps.map((p) => ({ v: p.availableDate || "-", best: p.availableDate === minDate })) },
+                            { label: "수량", vals: cps.map((p) => ({ v: `${p.availableQty}kg`, best: p.availableQty === maxQty })) },
+                            { label: "인증", vals: cps.map((p) => ({ v: p.cert, best: false })) },
+                          ];
+                          return (
+                            <div style={{ background: "#fff", border: `1px solid ${TOKENS.moss}44`, borderRadius: 10, padding: 12, marginBottom: 2 }}>
+                              <div style={{ fontSize: 11, color: TOKENS.moss, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
+                                제안 비교 ({cps.length}건)
+                              </div>
+                              <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                  <thead>
+                                    <tr>
+                                      <th style={{ width: 64, textAlign: "left", color: TOKENS.inkSoft, fontWeight: 400, paddingBottom: 6 }} />
+                                      {cps.map((p) => (
+                                        <th key={p.id} style={{ textAlign: "center", fontFamily: "'Fraunces', serif", fontSize: 13, fontWeight: 600, color: TOKENS.ink, paddingBottom: 6 }}>
+                                          {p.farmName}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {rows.map(({ label, vals }) => (
+                                      <tr key={label} style={{ borderTop: `1px solid ${TOKENS.line}` }}>
+                                        <td style={{ padding: "6px 0", color: TOKENS.inkSoft, fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>{label}</td>
+                                        {vals.map((cell, i) => (
+                                          <td key={i} style={{ textAlign: "center", padding: "6px 4px", color: cell.best ? TOKENS.moss : TOKENS.ink, fontWeight: cell.best ? 700 : 400 }}>
+                                            {cell.v}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        {sortedProposals.map((p) => {
+                          const isComparing = compareIds.includes(p.id);
+                          return (
+                            <div key={p.id} style={{ position: "relative" }}>
+                              <button
+                                onClick={() => setCompareIds((prev) =>
+                                  isComparing ? prev.filter((id) => id !== p.id) : prev.length < 3 ? [...prev, p.id] : prev
+                                )}
+                                style={{
+                                  position: "absolute", top: 10, right: 10, zIndex: 1,
+                                  background: isComparing ? TOKENS.moss : "#fff",
+                                  color: isComparing ? "#fff" : TOKENS.inkSoft,
+                                  border: `1px solid ${isComparing ? TOKENS.moss : TOKENS.line}`,
+                                  borderRadius: 6, padding: "3px 8px", fontSize: 10, cursor: "pointer",
+                                }}
+                              >
+                                {isComparing ? "✓ 비교중" : "+ 비교"}
+                              </button>
+                              <ProposalCard
+                                proposal={p}
+                                deal={deal}
+                                isSelected={false}
+                                selectable
+                                score={p._score}
+                                onSelect={(proposalId) => onSelectProposal(deal.id, proposalId)}
+                                onClick={() => setDetailProposal({ proposal: p, deal })}
+                                onViewProfile={(pp) => setFarmProfileModal(pp)}
+                              />
+                            </div>
+                          );
+                        })}
                       </>
                     )}
                   </div>
