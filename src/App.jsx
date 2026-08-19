@@ -2240,7 +2240,7 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
   );
 }
 
-function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSubmitInquiry }) {
+function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSubmitInquiry, userId }) {
   const [detailDeal, setDetailDeal] = useState(null);
   const [search, setSearch] = useState("");
   useEffect(() => {
@@ -2268,6 +2268,20 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
   });
   const [searchFocused, setSearchFocused] = useState(false);
   const isMobile = useIsMobile();
+
+  const [bookmarks, setBookmarks] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`farm-bookmarks-${userId}`) || "[]")); } catch { return new Set(); }
+  });
+  const [showBookmarks, setShowBookmarks] = useState(false);
+  const toggleBookmark = (dealId, e) => {
+    e.stopPropagation();
+    setBookmarks((prev) => {
+      const next = new Set(prev);
+      if (next.has(dealId)) next.delete(dealId); else next.add(dealId);
+      localStorage.setItem(`farm-bookmarks-${userId}`, JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   const specialty = new Set(farmProfile?.specialty ?? []);
   const openDeals = deals.filter((d) => d.status === "open");
@@ -2346,6 +2360,9 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
     .filter((p) => p.farmerName === userName)
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] ?? null;
 
+  const bookmarkedDeals = openDeals.filter((d) => bookmarks.has(d.id));
+  const displayDeals = showBookmarks ? bookmarkedDeals : filtered;
+
   if (detailDeal) {
     return (
       <DealDetailView
@@ -2409,11 +2426,11 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
         </div>
       )}
 
-      {/* 내 전문품목만 빠른 필터 */}
-      {hasSpecialty && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+      {/* 빠른 필터 토글 행: 내 전문품목만 + 저장한 딜 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        {hasSpecialty && (
           <button
-            onClick={() => { setSpecialtyOnly((v) => !v); if (!specialtyOnly) setCropFilter("전체"); }}
+            onClick={() => { setSpecialtyOnly((v) => !v); if (!specialtyOnly) setCropFilter("전체"); setShowBookmarks(false); }}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
@@ -2425,11 +2442,29 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
           >
             🌱 내 전문품목만
           </button>
-          {specialtyOnly && (farmProfile.specialty || []).map((c) => (
-            <span key={c} style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{c}</span>
-          ))}
-        </div>
-      )}
+        )}
+        {hasSpecialty && specialtyOnly && (farmProfile.specialty || []).map((c) => (
+          <span key={c} style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{c}</span>
+        ))}
+        <button
+          onClick={() => { setShowBookmarks((v) => !v); setSpecialtyOnly(false); }}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
+            border: `1px solid ${showBookmarks ? TOKENS.gold : TOKENS.line}`,
+            background: showBookmarks ? TOKENS.goldSoft : "#FFFFFF",
+            color: showBookmarks ? "#7A5C20" : TOKENS.inkSoft,
+            transition: "all 0.12s ease",
+          }}
+        >
+          🔖 저장한 딜
+          {bookmarks.size > 0 && (
+            <span style={{ background: showBookmarks ? "#7A5C20" : TOKENS.gold, color: "#fff", borderRadius: 999, fontSize: 10, padding: "0 6px", fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1.6 }}>
+              {bookmarks.size}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* 필터 행 */}
       <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: isMobile ? "10px 10px" : "12px 14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2549,19 +2584,28 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
       </div>
 
       {/* 결과 수 + 초기화 */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: activeFilterChips.length > 0 ? 8 : 12, gap: 10 }}>
-        <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
-          {filtered.length}건 / 전체 {openDeals.length}건
-        </span>
-        {hasFilters && (
-          <button
-            onClick={resetFilters}
-            style={{ fontSize: 11, color: TOKENS.rust, background: "none", border: `1px solid ${TOKENS.rustSoft}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
-          >
-            전체 초기화
-          </button>
-        )}
-      </div>
+      {!showBookmarks && (
+        <div style={{ display: "flex", alignItems: "center", marginBottom: activeFilterChips.length > 0 ? 8 : 12, gap: 10 }}>
+          <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+            {filtered.length}건 / 전체 {openDeals.length}건
+          </span>
+          {hasFilters && (
+            <button
+              onClick={resetFilters}
+              style={{ fontSize: 11, color: TOKENS.rust, background: "none", border: `1px solid ${TOKENS.rustSoft}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+            >
+              전체 초기화
+            </button>
+          )}
+        </div>
+      )}
+      {showBookmarks && (
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 12, gap: 10 }}>
+          <span style={{ fontSize: 12, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace" }}>
+            🔖 저장한 딜 {bookmarkedDeals.length}건
+          </span>
+        </div>
+      )}
 
       {/* 활성 필터 요약 칩 */}
       {activeFilterChips.length > 0 && (
@@ -2584,7 +2628,16 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
       )}
 
       {/* 딜 목록 */}
-      {filtered.length === 0 ? (
+      {showBookmarks && bookmarkedDeals.length === 0 ? (
+        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.gold}88`, borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🔖</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6, fontWeight: 600 }}>저장한 딜이 없어요</div>
+          <div style={{ fontSize: 13, color: TOKENS.inkSoft, lineHeight: 1.6, marginBottom: 16 }}>딜 카드의 🔖 버튼을 눌러 나중에 볼 딜을 저장하세요</div>
+          <button onClick={() => setShowBookmarks(false)} style={{ padding: "7px 18px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
+            전체 딜 보기
+          </button>
+        </div>
+      ) : !showBookmarks && filtered.length === 0 ? (
         <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
           {/* 빈 밭 일러스트 */}
           <svg viewBox="0 0 220 130" style={{ width: 180, height: 108, margin: "0 auto 16px", display: "block", opacity: 0.75 }} xmlns="http://www.w3.org/2000/svg">
@@ -2627,7 +2680,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {filtered.map((deal) => {
+          {displayDeals.map((deal) => {
             const isMySpecialty = specialty.has(deal.crop);
             const myProposal = deal.proposals.find((p) => p.farmerName === userName);
             const daysLeft = Math.ceil((new Date(deal.deliveryDate) - Date.now()) / 86400000);
@@ -2643,7 +2696,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
                   <img src={deal.photoURL} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
                 </div>
               )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
                   {isMySpecialty && (
@@ -2652,7 +2705,22 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
                     </span>
                   )}
                 </div>
-                <StatusBadge status={deal.status} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <StatusBadge status={deal.status} />
+                  <button
+                    onClick={(e) => toggleBookmark(deal.id, e)}
+                    title={bookmarks.has(deal.id) ? "북마크 해제" : "나중에 제안하기"}
+                    style={{
+                      background: bookmarks.has(deal.id) ? TOKENS.goldSoft : "transparent",
+                      border: `1px solid ${bookmarks.has(deal.id) ? TOKENS.gold : TOKENS.line}`,
+                      borderRadius: 8, padding: "3px 8px", cursor: "pointer", fontSize: 14, lineHeight: 1,
+                      color: bookmarks.has(deal.id) ? "#7A5C20" : TOKENS.inkSoft,
+                      transition: "all 0.12s ease", flexShrink: 0,
+                    }}
+                  >
+                    {bookmarks.has(deal.id) ? "🔖" : "🔖"}
+                  </button>
+                </div>
               </div>
               <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 2 }}>
                 {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
@@ -7430,7 +7498,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="87" cy="231" rx="4" ry="2.5" fill="#3D6B38" opacity="0.7" transform="rotate(20 87 231)"/>
                   </svg>
                 )}
-                <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} onSubmitInquiry={handleSubmitInquiry} />
+                <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} onSubmitInquiry={handleSubmitInquiry} userId={user.uid} />
               </div>
             )}
             {/* ── 내 제안 ── */}
