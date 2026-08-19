@@ -1747,6 +1747,61 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
           onConfirm={(info) => { onShipDeal?.(shipTarget.dealId, info); setShipTarget(null); }}
         />
       )}
+      {/* 내 제안 데코 배너 */}
+      {!isMobile && (
+        <div style={{ background: `linear-gradient(135deg, ${TOKENS.mossSoft}55, ${TOKENS.goldSoft}50)`, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16, overflow: "hidden" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink, marginBottom: 3 }}>내 제안 현황</div>
+            <div style={{ fontSize: 12, color: TOKENS.inkSoft }}>셰프의 딜에 보낸 제안들을 확인하고 선택 결과를 기다리세요</div>
+          </div>
+          <svg viewBox="0 0 130 76" style={{ width: 118, height: 69, opacity: 0.6, flexShrink: 0 }} xmlns="http://www.w3.org/2000/svg">
+            {/* 밭 배경 */}
+            <ellipse cx="65" cy="82" rx="75" ry="30" fill="#8CB870" opacity="0.38"/>
+            <ellipse cx="65" cy="86" rx="75" ry="26" fill="#4A7A44" opacity="0.35"/>
+            {/* 밭 이랑 */}
+            <path d="M8 62 Q65 54 122 62" stroke="#5B7553" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.5"/>
+            <path d="M10 68 Q65 60 120 68" stroke="#4A7A44" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.4"/>
+            {/* 해바라기 (왼쪽) */}
+            <line x1="22" y1="62" x2="22" y2="22" stroke="#5B7553" strokeWidth="2.8" strokeLinecap="round"/>
+            <ellipse cx="22" cy="17" rx="6" ry="3" fill="#F5C842"/>
+            <ellipse cx="22" cy="25" rx="6" ry="3" fill="#F5C842" transform="rotate(90 22 25)"/>
+            <ellipse cx="14" cy="21" rx="6" ry="3" fill="#F5C842" transform="rotate(180 14 21)"/>
+            <ellipse cx="30" cy="21" rx="6" ry="3" fill="#F5C842"/>
+            <ellipse cx="16.3" cy="15.3" rx="6" ry="3" fill="#F0C038" transform="rotate(-45 16.3 15.3)"/>
+            <ellipse cx="27.7" cy="15.3" rx="6" ry="3" fill="#F0C038" transform="rotate(45 27.7 15.3)"/>
+            <ellipse cx="16.3" cy="26.7" rx="6" ry="3" fill="#F0C038" transform="rotate(45 16.3 26.7)"/>
+            <ellipse cx="27.7" cy="26.7" rx="6" ry="3" fill="#F0C038" transform="rotate(-45 27.7 26.7)"/>
+            <circle cx="22" cy="21" r="7" fill="#8B5C10"/>
+            <circle cx="22" cy="21" r="4.5" fill="#5A3A06" opacity="0.5"/>
+            {/* 토마토 */}
+            <circle cx="56" cy="57" r="9" fill="#CC3020" opacity="0.88"/>
+            <path d="M51 49 Q56 45 61 49" stroke="#5B7553" strokeWidth="2" fill="none" strokeLinecap="round"/>
+            <path d="M56 47 L56 43" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+            <ellipse cx="52" cy="54" rx="2.5" ry="2" fill="white" opacity="0.2"/>
+            {/* 당근 */}
+            <path d="M85" y1="60 L79 73 L91 73 Z" fill="#E8782A" opacity="0.88"/>
+            <path d="M85 60 L79 73 L91 73 Z" fill="#E8782A" opacity="0.88"/>
+            <path d="M80 58 L77 49" stroke="#5B7553" strokeWidth="1.8" strokeLinecap="round"/>
+            <path d="M85 57 L83 48" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M90 58 L93 49" stroke="#5B7553" strokeWidth="1.8" strokeLinecap="round"/>
+            {/* 가지 */}
+            <line x1="110" y1="62" x2="110" y2="36" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+            <ellipse cx="110" cy="49" rx="10" ry="14" fill="#5B2D8E" opacity="0.82"/>
+            <ellipse cx="110" cy="61" rx="8" ry="5.5" fill="#4A2478" opacity="0.55"/>
+            <path d="M106 40 Q110 34 114 40" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            {/* 태양 */}
+            <circle cx="14" cy="12" r="9" fill="#F5C842" opacity="0.82"/>
+            <circle cx="14" cy="12" r="14" fill="#F5C842" opacity="0.1"/>
+            <line x1="14" y1="1" x2="14" y2="-1" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            <line x1="22" y1="4" x2="24" y2="2" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            <line x1="25" y1="12" x2="27" y2="12" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            {/* 구름 */}
+            <ellipse cx="96" cy="14" rx="20" ry="9" fill="white" opacity="0.72"/>
+            <ellipse cx="112" cy="10" rx="16" ry="8" fill="white" opacity="0.72"/>
+            <ellipse cx="82" cy="17" rx="14" ry="7" fill="white" opacity="0.65"/>
+          </svg>
+        </div>
+      )}
       <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginBottom: 2 }}>
         총 {myItems.length}건의 제안
       </div>
@@ -4132,15 +4187,79 @@ function DashboardScreen({ deals, user, onTabChange }) {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       {/* 환영 헤더 */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: TOKENS.ink, marginBottom: 2 }}>
-          안녕하세요, {user.name} {isChef ? "셰프" : "농가"}님
+      <div style={{ background: isChef ? `linear-gradient(135deg, ${TOKENS.rustSoft}55, ${TOKENS.goldSoft}50)` : `linear-gradient(135deg, ${TOKENS.mossSoft}55, ${TOKENS.goldSoft}50)`, border: `1px solid ${TOKENS.line}`, borderRadius: 16, padding: isMobile ? "16px" : "18px 24px", marginBottom: 14, display: "flex", alignItems: "center", gap: 16, overflow: "hidden" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: isMobile ? 18 : 22, fontWeight: 600, color: TOKENS.ink, marginBottom: 3 }}>
+            안녕하세요, {user.name} {isChef ? "셰프" : "농가"}님
+          </div>
+          <div style={{ fontSize: 13, color: TOKENS.inkSoft }}>
+            {isChef
+              ? `${period === "전체" ? "전체" : period} ${myDeals.length}건의 딜`
+              : `${period === "전체" ? "전체" : period} ${myProposals.length}건의 제안`}
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: TOKENS.inkSoft }}>
-          {isChef
-            ? `${period === "전체" ? "전체" : period} ${myDeals.length}건의 딜`
-            : `${period === "전체" ? "전체" : period} ${myProposals.length}건의 제안`}
-        </div>
+        {!isMobile && (isChef ? (
+          <svg viewBox="0 0 130 76" style={{ width: 118, height: 69, opacity: 0.55, flexShrink: 0 }} xmlns="http://www.w3.org/2000/svg">
+            {/* 셰프 대시보드 — 테이블·음식·와인 */}
+            <rect x="10" y="42" width="110" height="11" rx="4" fill="#C8A87A" opacity="0.65"/>
+            <rect x="22" y="53" width="6" height="20" rx="2" fill="#B08A5A" opacity="0.5"/>
+            <rect x="102" y="53" width="6" height="20" rx="2" fill="#B08A5A" opacity="0.5"/>
+            <ellipse cx="65" cy="37" rx="32" ry="12" fill="#F5F0E4" opacity="0.95"/>
+            <ellipse cx="65" cy="37" rx="23" ry="8.5" fill="#EDE4CC" opacity="0.8"/>
+            <circle cx="60" cy="35" r="6" fill="#CC3020" opacity="0.85"/>
+            <path d="M57 30 Q60 27 63 30" stroke="#5B7553" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+            <ellipse cx="70" cy="36" rx="5" ry="3.5" fill="#E8782A" opacity="0.8"/>
+            <ellipse cx="60" cy="41" rx="6" ry="2.5" fill="#5B7553" opacity="0.7"/>
+            <ellipse cx="57" cy="33" rx="2" ry="1.5" fill="white" opacity="0.28"/>
+            <line x1="34" y1="24" x2="34" y2="49" stroke="#B89060" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="30" y1="24" x2="30" y2="34" stroke="#B89060" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="34" y1="24" x2="34" y2="34" stroke="#B89060" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="38" y1="24" x2="38" y2="34" stroke="#B89060" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="96" y1="24" x2="96" y2="49" stroke="#B89060" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M96 24 Q103 32 103 40 Q100 44 96 42" fill="#B89060" opacity="0.55"/>
+            <path d="M116 8 Q124 22 120 34 Q118 38 116 34 Q112 22 118 8 Z" fill="#9B8DB8" opacity="0.52"/>
+            <line x1="118" y1="34" x2="118" y2="45" stroke="#9B8DB8" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            <line x1="114" y1="45" x2="122" y2="45" stroke="#9B8DB8" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            <path d="M65 10 L66.6 14.8 L72 14.8 L67.8 17.7 L69.4 22.5 L65 19.6 L60.6 22.5 L62.2 17.7 L58 14.8 L63.4 14.8 Z" fill="#C9A84C" opacity="0.75"/>
+            <path d="M18 36 Q16 27 18 18" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <ellipse cx="13" cy="24" rx="6" ry="3.2" fill="#7A9B6E" transform="rotate(-28 13 24)"/>
+            <ellipse cx="22" cy="30" rx="6" ry="3.2" fill="#5B7553" transform="rotate(28 22 30)"/>
+          </svg>
+        ) : (
+          <svg viewBox="0 0 130 76" style={{ width: 118, height: 69, opacity: 0.55, flexShrink: 0 }} xmlns="http://www.w3.org/2000/svg">
+            {/* 농가 대시보드 — 밭·수확물 */}
+            <ellipse cx="65" cy="84" rx="75" ry="30" fill="#8CB870" opacity="0.38"/>
+            <ellipse cx="65" cy="88" rx="75" ry="26" fill="#4A7A44" opacity="0.35"/>
+            <path d="M8 64 Q65 56 122 64" stroke="#5B7553" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.5"/>
+            <path d="M10 70 Q65 62 120 70" stroke="#4A7A44" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.4"/>
+            <line x1="22" y1="64" x2="22" y2="18" stroke="#5B7553" strokeWidth="2.8" strokeLinecap="round"/>
+            <ellipse cx="22" cy="14" rx="6" ry="3" fill="#F5C842"/>
+            <ellipse cx="22" cy="22" rx="6" ry="3" fill="#F5C842" transform="rotate(90 22 22)"/>
+            <ellipse cx="14" cy="18" rx="6" ry="3" fill="#F5C842" transform="rotate(180 14 18)"/>
+            <ellipse cx="30" cy="18" rx="6" ry="3" fill="#F5C842"/>
+            <ellipse cx="16.3" cy="12.3" rx="6" ry="3" fill="#F0C038" transform="rotate(-45 16.3 12.3)"/>
+            <ellipse cx="27.7" cy="12.3" rx="6" ry="3" fill="#F0C038" transform="rotate(45 27.7 12.3)"/>
+            <ellipse cx="16.3" cy="23.7" rx="6" ry="3" fill="#F0C038" transform="rotate(45 16.3 23.7)"/>
+            <ellipse cx="27.7" cy="23.7" rx="6" ry="3" fill="#F0C038" transform="rotate(-45 27.7 23.7)"/>
+            <circle cx="22" cy="18" r="7" fill="#8B5C10"/>
+            <circle cx="22" cy="18" r="4.5" fill="#5A3A06" opacity="0.5"/>
+            <circle cx="65" cy="58" r="9" fill="#CC3020" opacity="0.88"/>
+            <path d="M60 50 Q65 46 70 50" stroke="#5B7553" strokeWidth="2" fill="none" strokeLinecap="round"/>
+            <path d="M65 48 L65 44" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+            <ellipse cx="61" cy="55" rx="2.5" ry="2" fill="white" opacity="0.2"/>
+            <line x1="105" y1="64" x2="105" y2="38" stroke="#5B7553" strokeWidth="2" strokeLinecap="round"/>
+            <ellipse cx="105" cy="51" rx="10" ry="14" fill="#5B2D8E" opacity="0.82"/>
+            <path d="M101 42 Q105 36 109 42" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <circle cx="14" cy="12" r="9" fill="#F5C842" opacity="0.82"/>
+            <circle cx="14" cy="12" r="14" fill="#F5C842" opacity="0.1"/>
+            <line x1="14" y1="1" x2="14" y2="-2" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            <line x1="23" y1="4" x2="25" y2="2" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            <line x1="26" y1="12" x2="28" y2="12" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            <ellipse cx="100" cy="12" rx="22" ry="9" fill="white" opacity="0.72"/>
+            <ellipse cx="116" cy="8" rx="17" ry="8" fill="white" opacity="0.72"/>
+            <ellipse cx="86" cy="16" rx="15" ry="7" fill="white" opacity="0.65"/>
+          </svg>
+        ))}
       </div>
 
       {/* 기간 필터 토글 */}
@@ -4387,6 +4506,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
   const [compareIds, setCompareIds] = useState([]);
   const [favFarms, setFavFarms] = useState(() => getFavFarms(userId));
   useEffect(() => { setCompareIds([]); }, [expandedId]);
+  const isMobile = useIsMobile();
 
   if (detailProposal) {
     const { proposal, deal } = detailProposal;
@@ -4457,6 +4577,49 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
           allDeals={deals}
           onClose={() => setFarmProfileModal(null)}
         />
+      )}
+      {/* 내 거래 데코 배너 */}
+      {!isMobile && (
+        <div style={{ background: `linear-gradient(135deg, ${TOKENS.rustSoft}50, ${TOKENS.goldSoft}55)`, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16, overflow: "hidden" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink, marginBottom: 3 }}>내 거래 현황</div>
+            <div style={{ fontSize: 12, color: TOKENS.inkSoft }}>등록된 딜에 들어온 제안을 비교하고 최고의 농가를 선택하세요</div>
+          </div>
+          <svg viewBox="0 0 130 76" style={{ width: 118, height: 69, opacity: 0.6, flexShrink: 0 }} xmlns="http://www.w3.org/2000/svg">
+            {/* 테이블 */}
+            <rect x="10" y="40" width="110" height="11" rx="4" fill="#C8A87A" opacity="0.65"/>
+            <rect x="22" y="51" width="6" height="22" rx="2" fill="#B08A5A" opacity="0.5"/>
+            <rect x="102" y="51" width="6" height="22" rx="2" fill="#B08A5A" opacity="0.5"/>
+            {/* 접시 */}
+            <ellipse cx="65" cy="35" rx="32" ry="12" fill="#F5F0E4" opacity="0.95"/>
+            <ellipse cx="65" cy="35" rx="23" ry="8.5" fill="#EDE4CC" opacity="0.8"/>
+            {/* 음식 (토마토+채소+당근) */}
+            <circle cx="60" cy="33" r="6" fill="#CC3020" opacity="0.85"/>
+            <path d="M57 28 Q60 25 63 28" stroke="#5B7553" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+            <ellipse cx="70" cy="34" rx="5" ry="3.5" fill="#E8782A" opacity="0.8"/>
+            <ellipse cx="60" cy="39" rx="6" ry="2.5" fill="#5B7553" opacity="0.7"/>
+            {/* 광택 */}
+            <ellipse cx="57" cy="31" rx="2" ry="1.5" fill="white" opacity="0.28"/>
+            {/* 포크 */}
+            <line x1="34" y1="22" x2="34" y2="47" stroke="#B89060" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="30" y1="22" x2="30" y2="32" stroke="#B89060" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="34" y1="22" x2="34" y2="32" stroke="#B89060" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="38" y1="22" x2="38" y2="32" stroke="#B89060" strokeWidth="1.5" strokeLinecap="round"/>
+            {/* 나이프 */}
+            <line x1="96" y1="22" x2="96" y2="47" stroke="#B89060" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M96 22 Q103 30 103 38 Q100 42 96 40" fill="#B89060" opacity="0.55"/>
+            {/* 와인잔 */}
+            <path d="M114 8 Q122 22 118 34 Q116 38 114 34 Q110 22 116 8 Z" fill="#9B8DB8" opacity="0.52"/>
+            <line x1="116" y1="34" x2="116" y2="44" stroke="#9B8DB8" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            <line x1="112" y1="44" x2="120" y2="44" stroke="#9B8DB8" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            {/* 별 */}
+            <path d="M65 10 L66.6 14.8 L71.8 14.8 L67.8 17.7 L69.4 22.5 L65 19.6 L60.6 22.5 L62.2 17.7 L58.2 14.8 L63.4 14.8 Z" fill="#C9A84C" opacity="0.75"/>
+            {/* 허브 */}
+            <path d="M18 34 Q16 26 18 18" stroke="#5B7553" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <ellipse cx="13" cy="24" rx="6" ry="3.2" fill="#7A9B6E" transform="rotate(-28 13 24)"/>
+            <ellipse cx="22" cy="28" rx="6" ry="3.2" fill="#5B7553" transform="rotate(28 22 28)"/>
+          </svg>
+        </div>
       )}
       {/* 상태 필터 */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -4998,10 +5161,33 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
             : <span style={{ fontSize: 22 }}>🍳</span>
           }
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 2px" }}>내 레스토랑 정보</h2>
           <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.5 }}>저장하면 농가에게 레스토랑 정보가 표시되고, 딜 작성 시 자동으로 불러옵니다.</p>
         </div>
+        {!isMobile && (
+          <svg viewBox="0 0 110 68" style={{ width: 96, height: 59, opacity: 0.52, flexShrink: 0 }} xmlns="http://www.w3.org/2000/svg">
+            {/* 포크 */}
+            <line x1="30" y1="6" x2="30" y2="62" stroke="#BB4A2E" strokeWidth="2.5" strokeLinecap="round"/>
+            <line x1="25" y1="6" x2="25" y2="22" stroke="#BB4A2E" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="30" y1="6" x2="30" y2="22" stroke="#BB4A2E" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="35" y1="6" x2="35" y2="22" stroke="#BB4A2E" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M25 22 Q30 29 35 22" stroke="#BB4A2E" strokeWidth="2" fill="none"/>
+            {/* 나이프 */}
+            <line x1="68" y1="6" x2="68" y2="62" stroke="#BB4A2E" strokeWidth="2.5" strokeLinecap="round"/>
+            <path d="M68 6 Q77 15 77 28 Q73 32 68 30" fill="#BB4A2E" opacity="0.65"/>
+            {/* 허브 줄기 */}
+            <path d="M49 18 Q49 38 49 60" stroke="#5B7553" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+            <ellipse cx="43" cy="29" rx="7.5" ry="4" fill="#7A9B6E" transform="rotate(-28 43 29)"/>
+            <ellipse cx="55" cy="38" rx="7.5" ry="4" fill="#5B7553" transform="rotate(28 55 38)"/>
+            <ellipse cx="42" cy="47" rx="6.5" ry="3.5" fill="#7A9B6E" transform="rotate(-22 42 47)"/>
+            <ellipse cx="56" cy="54" rx="6.5" ry="3.5" fill="#5B7553" transform="rotate(22 56 54)"/>
+            {/* 미슐랭 별 */}
+            <path d="M49 8 L51 13.5 L57 13.5 L52.4 16.8 L54.4 22.3 L49 19 L43.6 22.3 L45.6 16.8 L41 13.5 L47 13.5 Z" fill="#C9A84C" opacity="0.82"/>
+            {/* 접시 반원 */}
+            <ellipse cx="49" cy="64" rx="26" ry="6" fill="#C9A84C" opacity="0.22"/>
+          </svg>
+        )}
       </div>
       <div style={{ padding: isMobile ? "14px 14px 20px" : "20px 24px 28px" }}>
 
@@ -5170,10 +5356,41 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
             : <span style={{ fontSize: 22 }}>🌱</span>
           }
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: TOKENS.ink, margin: "0 0 2px" }}>내 농가 정보</h2>
           <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.5 }}>저장해두면 제안서 작성 시 자동으로 불러올 수 있습니다.</p>
         </div>
+        {!isMobile && (
+          <svg viewBox="0 0 110 68" style={{ width: 96, height: 59, opacity: 0.52, flexShrink: 0 }} xmlns="http://www.w3.org/2000/svg">
+            {/* 언덕 */}
+            <ellipse cx="55" cy="74" rx="62" ry="24" fill="#8CB870" opacity="0.4"/>
+            <ellipse cx="22" cy="76" rx="38" ry="20" fill="#6A9B58" opacity="0.5"/>
+            <ellipse cx="88" cy="77" rx="38" ry="20" fill="#4A8040" opacity="0.46"/>
+            {/* 큰 새싹 (가운데) */}
+            <line x1="55" y1="60" x2="55" y2="24" stroke="#5B7553" strokeWidth="2.8" strokeLinecap="round"/>
+            <path d="M55 42 Q41 30 32 16 Q46 26 55 40" fill="#7A9B6E" opacity="0.88"/>
+            <path d="M55 38 Q69 26 78 12 Q64 22 55 36" fill="#5B7553" opacity="0.88"/>
+            {/* 작은 새싹 왼쪽 */}
+            <line x1="20" y1="64" x2="20" y2="48" stroke="#5B7553" strokeWidth="2.2" strokeLinecap="round"/>
+            <path d="M20 56 Q12 47 7 38 Q15 45 20 54" fill="#7A9B6E" opacity="0.75"/>
+            {/* 작은 새싹 오른쪽 */}
+            <line x1="90" y1="64" x2="90" y2="50" stroke="#5B7553" strokeWidth="2.2" strokeLinecap="round"/>
+            <path d="M90 58 Q98 49 103 40 Q95 47 90 56" fill="#5B7553" opacity="0.75"/>
+            {/* 해 */}
+            <circle cx="90" cy="14" r="12" fill="#F5C842" opacity="0.88"/>
+            <circle cx="90" cy="14" r="18" fill="#F5C842" opacity="0.12"/>
+            <line x1="90" y1="0" x2="90" y2="-4" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            <line x1="101" y1="4" x2="104" y2="1" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            <line x1="105" y1="14" x2="109" y2="14" stroke="#F5C842" strokeWidth="2.2" strokeLinecap="round" opacity="0.5"/>
+            {/* 나비 */}
+            <path d="M14" cy="30 Q8 22 3 25 Q8 30 14 29" fill="#E8A0C8" opacity="0.72"/>
+            <path d="M14 29 Q8 22 3 25 Q8 30 14 29" fill="#E8A0C8" opacity="0.72"/>
+            <path d="M14 29 Q20 22 25 25 Q20 30 14 29" fill="#E8A0C8" opacity="0.72"/>
+            <path d="M14 29 Q11 34 10 38 Q13 36 14 29" fill="#C878A8" opacity="0.62"/>
+            <path d="M14 29 Q17 34 18 38 Q15 36 14 29" fill="#C878A8" opacity="0.62"/>
+            <circle cx="14" cy="29" r="1.5" fill="#8B4A6E"/>
+          </svg>
+        )}
       </div>
       <div style={{ padding: isMobile ? "14px 14px 20px" : "20px 24px 28px" }}>
 
