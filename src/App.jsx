@@ -1276,7 +1276,21 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 14 : 24 }}>
 
       {/* AI 자동 입력 패널 */}
-      <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}55`, borderRadius: 10, padding: 16, marginBottom: 24 }}>
+      <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}55`, borderRadius: 10, padding: 16, marginBottom: 24, position: "relative", overflow: "hidden" }}>
+        {/* 배경 채소 실루엣 장식 */}
+        <svg viewBox="0 0 120 80" style={{ position: "absolute", right: -8, top: -8, width: 100, height: 66, opacity: 0.1, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="42" r="22" fill="#7A5C20"/>
+          <path d="M38 20 L40 14 L42 20" fill="#4A7A44"/>
+          <ellipse cx="70" cy="50" rx="18" ry="13" fill="#4A7A44" transform="rotate(-15 70 50)"/>
+          <ellipse cx="80" cy="40" rx="14" ry="10" fill="#5B7553" transform="rotate(-5 80 40)"/>
+          <path d="M95 55 Q100 40 105 30" stroke="#4A7A44" strokeWidth="3" fill="none"/>
+          <ellipse cx="100" cy="35" rx="8" ry="5" fill="#4A7A44" transform="rotate(-25 100 35)"/>
+          <ellipse cx="106" cy="42" rx="7" ry="5" fill="#5B7553" transform="rotate(15 106 42)"/>
+          <path d="M15 55 L15 30" stroke="#C9A84C" strokeWidth="2.5"/>
+          <ellipse cx="15" cy="27" rx="5" ry="9" fill="#C9A84C"/>
+          <ellipse cx="10" cy="35" rx="4" ry="7" fill="#C9A84C" transform="rotate(-20 10 35)"/>
+          <ellipse cx="20" cy="37" rx="4" ry="7" fill="#C9A84C" transform="rotate(20 20 37)"/>
+        </svg>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <span style={{ fontSize: 14, color: "#7A5C20" }}>✦</span>
           <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#7A5C20", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
@@ -2516,12 +2530,42 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
 
       {/* 딜 목록 */}
       {filtered.length === 0 ? (
-        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 32, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
-          <div style={{ marginBottom: openDeals.length > 0 ? 10 : 0 }}>
-            {openDeals.length === 0 ? "현재 모집 중인 딜이 없습니다." : "검색 조건에 맞는 딜이 없습니다."}
+        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+          {/* 빈 밭 일러스트 */}
+          <svg viewBox="0 0 220 130" style={{ width: 180, height: 108, margin: "0 auto 16px", display: "block", opacity: 0.75 }} xmlns="http://www.w3.org/2000/svg">
+            <rect width="220" height="130" fill="#F5F0E4" rx="12"/>
+            <ellipse cx="110" cy="128" rx="120" ry="45" fill="#7A9B6E" opacity="0.3"/>
+            <ellipse cx="110" cy="132" rx="140" ry="50" fill="#5B7553" opacity="0.2"/>
+            {/* 빈 밭 이랑 */}
+            <path d="M30 100 Q110 88 190 100" stroke="#4A7A44" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.5"/>
+            <path d="M25 112 Q110 100 195 112" stroke="#4A7A44" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.5"/>
+            {/* 씨앗/새싹 */}
+            <circle cx="70" cy="97" r="3" fill="#C9A84C" opacity="0.7"/>
+            <circle cx="110" cy="95" r="3" fill="#C9A84C" opacity="0.7"/>
+            <circle cx="150" cy="97" r="3" fill="#C9A84C" opacity="0.7"/>
+            {/* 작은 새싹 */}
+            <path d="M90 93 L90 86 M90 88 Q86 84 83 82 M90 88 Q94 84 97 82" stroke="#7A9B6E" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <path d="M130 93 L130 86 M130 88 Q126 84 123 82 M130 88 Q134 84 137 82" stroke="#7A9B6E" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            {/* 태양 */}
+            <circle cx="185" cy="28" r="18" fill="#E8B84B" opacity="0.7"/>
+            <line x1="185" y1="5" x2="185" y2="1" stroke="#E8B84B" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            <line x1="200" y1="13" x2="203" y2="10" stroke="#E8B84B" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            <line x1="207" y1="28" x2="211" y2="28" stroke="#E8B84B" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            <line x1="200" y1="43" x2="203" y2="46" stroke="#E8B84B" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            <line x1="170" y1="13" x2="167" y2="10" stroke="#E8B84B" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+            {/* 구름 */}
+            <ellipse cx="55" cy="32" rx="22" ry="11" fill="#fff" opacity="0.8"/>
+            <ellipse cx="70" cy="29" rx="16" ry="10" fill="#fff" opacity="0.8"/>
+            <ellipse cx="40" cy="35" rx="14" ry="8" fill="#fff" opacity="0.8"/>
+          </svg>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink, marginBottom: 6, fontWeight: 600 }}>
+            {openDeals.length === 0 ? "아직 등록된 딜이 없어요" : "조건에 맞는 딜이 없어요"}
+          </div>
+          <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: openDeals.length > 0 ? 16 : 0, lineHeight: 1.6 }}>
+            {openDeals.length === 0 ? "셰프들의 식자재 요청을 기다리는 중입니다" : "필터를 조정해 더 많은 딜을 찾아보세요"}
           </div>
           {openDeals.length > 0 && (
-            <button onClick={() => { setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax(""); }} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
+            <button onClick={() => { setCropFilter("전체"); setGradeFilter("전체"); setRegionFilter("전체"); setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax(""); }} style={{ padding: "7px 18px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
               필터 초기화
             </button>
           )}
@@ -4362,10 +4406,38 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
 
   if (deals.length === 0) {
     return (
-      <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 32, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
-        <div style={{ marginBottom: 12 }}>아직 등록한 딜이 없습니다.</div>
-        <button onClick={() => onTabChange?.("create")} style={{ padding: "8px 20px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-          첫 딜 만들기
+      <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 16, padding: "44px 24px", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
+        {/* 식탁 일러스트 */}
+        <svg viewBox="0 0 200 140" style={{ width: 160, height: 112, margin: "0 auto 20px", display: "block" }} xmlns="http://www.w3.org/2000/svg">
+          <rect width="200" height="140" fill="#F5F0E4" rx="12"/>
+          {/* 테이블 상판 */}
+          <rect x="20" y="70" width="160" height="14" rx="5" fill="#C8A87A"/>
+          <rect x="20" y="72" width="160" height="6" rx="3" fill="#D4B88C"/>
+          {/* 테이블 다리 */}
+          <rect x="34" y="84" width="10" height="36" rx="3" fill="#B08A5A"/>
+          <rect x="156" y="84" width="10" height="36" rx="3" fill="#B08A5A"/>
+          {/* 빈 접시 */}
+          <ellipse cx="100" cy="62" rx="38" ry="26" fill="#EEDCC0" stroke="#C9C0A8" strokeWidth="1.5"/>
+          <ellipse cx="100" cy="62" rx="28" ry="19" fill="#F8F3EA" stroke="#C9C0A8" strokeWidth="1"/>
+          {/* 포크 */}
+          <rect x="52" y="46" width="2.5" height="38" rx="1.2" fill="#8B7A5A"/>
+          <rect x="48" y="46" width="1.8" height="14" rx="0.9" fill="#8B7A5A"/>
+          <rect x="52" y="46" width="1.8" height="14" rx="0.9" fill="#8B7A5A"/>
+          <rect x="56" y="46" width="1.8" height="14" rx="0.9" fill="#8B7A5A"/>
+          {/* 나이프 */}
+          <rect x="145" y="46" width="2.5" height="38" rx="1.2" fill="#8B7A5A"/>
+          <path d="M147.5 46 L152 56 L147.5 58 Z" fill="#8B7A5A"/>
+          {/* 접시 위 물음표 장식 */}
+          <text x="100" y="68" textAnchor="middle" fontFamily="serif" fontSize="20" fill="#C9C0A8" opacity="0.6">?</text>
+        </svg>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: TOKENS.ink, marginBottom: 8, fontWeight: 600 }}>
+          아직 등록한 딜이 없어요
+        </div>
+        <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: 24, lineHeight: 1.6 }}>
+          원하는 식자재 조건을 공고하면<br />농가들이 최적의 가격을 제안합니다
+        </div>
+        <button onClick={() => onTabChange?.("create")} style={{ padding: "10px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "-0.01em" }}>
+          첫 딜 만들기 →
         </button>
       </div>
     );
@@ -5334,7 +5406,7 @@ function LoginScreen({ onLogin }) {
 
       {/* 왼쪽 브랜드 패널 (데스크톱) */}
       {!isMobile && (
-        <div style={{ flex: "0 0 auto", maxWidth: 300, textAlign: "center" }}>
+        <div style={{ flex: "0 0 auto", maxWidth: 320, textAlign: "center" }}>
           <div style={{
             width: 76, height: 76, borderRadius: 22,
             background: `linear-gradient(145deg, ${TOKENS.moss}, #2E4A28)`,
@@ -5347,9 +5419,63 @@ function LoginScreen({ onLogin }) {
           <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 34, margin: "0 0 10px", color: TOKENS.ink, letterSpacing: "-0.02em" }}>
             Farm-to-Table
           </h1>
-          <p style={{ fontSize: 14, color: TOKENS.inkSoft, margin: "0 0 28px", lineHeight: 1.7 }}>
+          <p style={{ fontSize: 14, color: TOKENS.inkSoft, margin: "0 0 24px", lineHeight: 1.7 }}>
             셰프가 원하는 식자재를 공고하면<br />농가가 가격과 조건을 제안하는<br />역경매 방식 선주문 플랫폼
           </p>
+
+          {/* 팜-투-테이블 일러스트 */}
+          <svg viewBox="0 0 300 180" style={{ width: "100%", maxWidth: 300, marginBottom: 24, display: "block", margin: "0 auto 24px" }} xmlns="http://www.w3.org/2000/svg">
+            {/* 배경 하늘 */}
+            <rect width="300" height="180" fill="#F5F0E4" rx="16"/>
+            {/* 언덕 */}
+            <ellipse cx="60" cy="170" rx="100" ry="55" fill="#7A9B6E" opacity="0.55"/>
+            <ellipse cx="240" cy="175" rx="110" ry="60" fill="#5B7553" opacity="0.45"/>
+            <ellipse cx="150" cy="180" rx="180" ry="60" fill="#4A7A44" opacity="0.3"/>
+            {/* 태양 */}
+            <circle cx="248" cy="36" r="22" fill="#E8B84B" opacity="0.85"/>
+            <line x1="248" y1="7" x2="248" y2="1" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+            <line x1="266" y1="18" x2="270" y2="14" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+            <line x1="276" y1="36" x2="282" y2="36" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+            <line x1="266" y1="54" x2="270" y2="58" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+            <line x1="230" y1="18" x2="226" y2="14" stroke="#E8B84B" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+            {/* 농가 */}
+            <rect x="30" y="100" width="48" height="36" fill="#C8A87A" rx="2"/>
+            <polygon points="54,78 18,104 90,104" fill="#BB4A2E" opacity="0.85"/>
+            <rect x="48" y="114" width="12" height="22" fill="#8B6A3E" rx="1"/>
+            <rect x="34" y="106" width="10" height="9" fill="#E8D4A8" rx="1"/>
+            <rect x="56" y="106" width="10" height="9" fill="#E8D4A8" rx="1"/>
+            {/* 나무 */}
+            <rect x="95" y="118" width="5" height="20" fill="#8B6A3E"/>
+            <ellipse cx="97" cy="108" rx="14" ry="16" fill="#5B7553"/>
+            <ellipse cx="92" cy="113" rx="9" ry="11" fill="#7A9B6E"/>
+            {/* 밭 이랑 */}
+            <path d="M120 155 Q150 148 180 155" stroke="#4A7A44" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            <path d="M118 163 Q150 156 182 163" stroke="#4A7A44" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            {/* 토마토 */}
+            <circle cx="138" cy="150" r="6" fill="#BB4A2E"/>
+            <path d="M136 144 L138 141 L140 144" fill="#5B7553"/>
+            <circle cx="160" cy="148" r="6" fill="#BB4A2E"/>
+            <path d="M158 142 L160 139 L162 142" fill="#5B7553"/>
+            {/* 허브 */}
+            <path d="M200 145 Q198 135 200 125" stroke="#7A9B6E" strokeWidth="1.5" fill="none"/>
+            <ellipse cx="196" cy="130" rx="5" ry="3" fill="#7A9B6E" transform="rotate(-30 196 130)"/>
+            <ellipse cx="204" cy="133" rx="5" ry="3" fill="#5B7553" transform="rotate(25 204 133)"/>
+            <ellipse cx="198" cy="138" rx="5" ry="3" fill="#7A9B6E" transform="rotate(-10 198 138)"/>
+            {/* 밀 이삭 */}
+            <path d="M230 140 L230 110" stroke="#C9A84C" strokeWidth="1.5" fill="none"/>
+            <ellipse cx="230" cy="108" rx="3" ry="6" fill="#C9A84C"/>
+            <ellipse cx="227" cy="114" rx="3" ry="5" fill="#C9A84C" transform="rotate(-20 227 114)"/>
+            <ellipse cx="233" cy="116" rx="3" ry="5" fill="#C9A84C" transform="rotate(20 233 116)"/>
+            <path d="M245 143 L245 116" stroke="#C9A84C" strokeWidth="1.5" fill="none"/>
+            <ellipse cx="245" cy="114" rx="3" ry="6" fill="#C9A84C"/>
+            <ellipse cx="242" cy="120" rx="3" ry="5" fill="#C9A84C" transform="rotate(-20 242 120)"/>
+            <ellipse cx="248" cy="122" rx="3" ry="5" fill="#C9A84C" transform="rotate(20 248 122)"/>
+            {/* 구름 */}
+            <ellipse cx="110" cy="45" rx="22" ry="12" fill="#fff" opacity="0.75"/>
+            <ellipse cx="126" cy="42" rx="16" ry="11" fill="#fff" opacity="0.75"/>
+            <ellipse cx="96" cy="48" rx="14" ry="9" fill="#fff" opacity="0.75"/>
+          </svg>
+
           <div style={{ display: "flex", gap: 10 }}>
             {[
               { icon: "🍳", label: "셰프", desc: "딜 등록·제안 선택" },
@@ -6566,13 +6692,30 @@ export default function FarmToTableApp() {
       <div style={{ maxWidth: 980, margin: "0 auto", paddingTop: 3 }}>
         {/* 헤더 */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${TOKENS.line}`, gap: 12 }}>
-          <div>
-            <span style={{ fontSize: 10, letterSpacing: "0.12em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
-              역경매 방식 선주문 플랫폼
-            </span>
-            <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 22 : 30, margin: "4px 0 0", letterSpacing: "-0.01em" }}>
-              Farm-to-Table
-            </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* 헤더 보타니컬 장식 */}
+            {!isMobile && (
+              <svg viewBox="0 0 48 64" style={{ width: 36, height: 48, flexShrink: 0, opacity: 0.82 }} xmlns="http://www.w3.org/2000/svg">
+                {/* 밀 이삭 중앙 */}
+                <line x1="24" y1="62" x2="24" y2="10" stroke="#C9A84C" strokeWidth="1.8" strokeLinecap="round"/>
+                <ellipse cx="24" cy="8" rx="4" ry="8" fill="#C9A84C"/>
+                <ellipse cx="19" cy="16" rx="3.5" ry="7" fill="#C9A84C" transform="rotate(-22 19 16)"/>
+                <ellipse cx="29" cy="18" rx="3.5" ry="7" fill="#C9A84C" transform="rotate(22 29 18)"/>
+                <ellipse cx="19" cy="27" rx="3" ry="6" fill="#D4B55A" transform="rotate(-18 19 27)"/>
+                <ellipse cx="29" cy="29" rx="3" ry="6" fill="#D4B55A" transform="rotate(18 29 29)"/>
+                {/* 잎사귀 */}
+                <path d="M24 50 Q14 42 10 32 Q18 35 24 46" fill="#7A9B6E" opacity="0.9"/>
+                <path d="M24 50 Q34 42 38 32 Q30 35 24 46" fill="#5B7553" opacity="0.9"/>
+              </svg>
+            )}
+            <div>
+              <span style={{ fontSize: 10, letterSpacing: "0.12em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
+                역경매 방식 선주문 플랫폼
+              </span>
+              <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: isMobile ? 22 : 30, margin: "4px 0 0", letterSpacing: "-0.01em" }}>
+                Farm-to-Table
+              </h1>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexShrink: 0 }}>
             <span style={chipBadge(isChef ? TOKENS.rustSoft : TOKENS.mossSoft, isChef ? TOKENS.rust : TOKENS.moss)}>
