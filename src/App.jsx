@@ -99,6 +99,13 @@ const TOKENS = {
   card: "#FBFAF5",
 };
 
+const getFavFarms = (uid) => {
+  try { return JSON.parse(localStorage.getItem(`fav-farms-${uid}`) || "[]"); } catch { return []; }
+};
+const saveFavFarms = (uid, farms) => {
+  localStorage.setItem(`fav-farms-${uid}`, JSON.stringify(farms));
+};
+
 const CROPS = {
   토마토: { unit: "kg" },
   딸기: { unit: "kg" },
@@ -1100,7 +1107,7 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null, userId = "" }) {
+function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null, userId = "", cropPriceRef = {} }) {
   const isEditing = !!editingDeal;
   const isCloning = !!cloningFrom;
   const blank = {
@@ -1372,6 +1379,13 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
               <FieldLabel required>희망 단가 (원/kg)</FieldLabel>
               <input type="number" min={0} placeholder="예: 23000" value={data.targetPrice} onChange={(e) => update("targetPrice", e.target.value)} style={inputStyle} />
               {errors.targetPrice && <ErrorText text={errors.targetPrice} />}
+              {cropPriceRef[data.crop] && (
+                <div style={{ marginTop: 5, fontSize: 11, color: TOKENS.moss, display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ background: TOKENS.mossSoft, borderRadius: 4, padding: "2px 7px", fontFamily: "'IBM Plex Mono', monospace" }}>
+                    참고 · {data.crop} 최근 평균 거래가 {cropPriceRef[data.crop].toLocaleString()}원/kg
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <FieldLabel>추가 요청사항 (선택)</FieldLabel>
@@ -4147,7 +4161,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {} }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {}, userId = "", onNextCycle }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -4157,6 +4171,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
   const [detailProposal, setDetailProposal] = useState(null);
   const [farmProfileModal, setFarmProfileModal] = useState(null);
   const [compareIds, setCompareIds] = useState([]);
+  const [favFarms, setFavFarms] = useState(() => getFavFarms(userId));
   useEffect(() => { setCompareIds([]); }, [expandedId]);
 
   if (detailProposal) {
@@ -4495,7 +4510,33 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                       >
                         계약서
                       </button>
+                      {(() => {
+                        const isFav = favFarms.some((f) => f.farmName === selectedProposal.farmName);
+                        return (
+                          <button
+                            onClick={() => {
+                              const farm = { farmName: selectedProposal.farmName, region: selectedProposal.region, cert: selectedProposal.cert, photoURL: selectedProposal.photoURL };
+                              const next = isFav
+                                ? favFarms.filter((f) => f.farmName !== farm.farmName)
+                                : [...favFarms, farm];
+                              saveFavFarms(userId, next);
+                              setFavFarms(next);
+                            }}
+                            style={{ padding: "10px 14px", background: isFav ? TOKENS.goldSoft : "#fff", color: isFav ? "#7A5C20" : TOKENS.inkSoft, border: `1px solid ${isFav ? TOKENS.gold + "44" : TOKENS.line}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+                          >
+                            {isFav ? "★ 즐겨찾기" : "☆ 즐겨찾기"}
+                          </button>
+                        );
+                      })()}
                     </div>
+                    {deal.status === "done" && deal.cycle && deal.cycle !== "단발성(1회)" && (
+                      <button
+                        onClick={() => onNextCycle?.(deal)}
+                        style={{ width: "100%", padding: "10px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                      >
+                        ↻ 다음 회차 딜 만들기 ({deal.cycle})
+                      </button>
+                    )}
                     {deal.status === "done" && (
                       selectedProposal.ratedAt ? (
                         <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: 14 }}>
@@ -4674,6 +4715,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
+  const [favFarms, setFavFarms] = useState(() => getFavFarms(userId));
   const isMobile = useIsMobile();
 
   const update = (key, value) => { setData((d) => ({ ...d, [key]: value })); setSaved(false); };
@@ -4767,6 +4809,29 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
         onChange={(e) => update("description", e.target.value)}
         style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
       />
+
+      {favFarms.length > 0 && (
+        <div style={{ marginTop: 20, background: TOKENS.card, border: `1px solid ${TOKENS.gold}33`, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
+            ★ 즐겨찾기 농가 ({favFarms.length})
+          </div>
+          {favFarms.map((farm, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: i > 0 ? `1px solid ${TOKENS.line}` : "none" }}>
+              {farm.photoURL && <img src={farm.photoURL} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>{farm.farmName}</div>
+                <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{farm.region}{farm.cert && farm.cert !== "인증 없음" ? ` · ${farm.cert}` : ""}</div>
+              </div>
+              <button
+                onClick={() => { const next = favFarms.filter((_, j) => j !== i); saveFavFarms(userId, next); setFavFarms(next); }}
+                style={{ fontSize: 11, color: TOKENS.rust, background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <button onClick={handleSave} style={{ padding: "12px 28px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 10px rgba(32,40,31,0.18)", letterSpacing: "-0.01em" }}>
@@ -6027,6 +6092,33 @@ export default function FarmToTableApp() {
   const handleCancelEdit = () => { setEditingDeal(null); setTab("mydeals"); };
   const handleCloneDeal = (deal) => { setCloningDeal(deal); setEditingDeal(null); setTab("create"); };
   const handleCancelClone = () => { setCloningDeal(null); setTab("mydeals"); };
+  const handleNextCycleDeal = (deal) => {
+    const cycleDays = { "주 1회": 7, "주 2회": 4, "격주": 14 };
+    const days = cycleDays[deal.cycle] ?? 7;
+    const base = deal.deliveryDate && deal.deliveryDate > new Date().toISOString().slice(0, 10)
+      ? new Date(deal.deliveryDate) : new Date();
+    const next = new Date(base.getTime() + days * 86400000).toISOString().slice(0, 10);
+    setCloningDeal({ ...deal, deliveryDate: next });
+    setEditingDeal(null);
+    setTab("create");
+  };
+
+  const cropPriceRef = (() => {
+    const acc = {};
+    deals.forEach((d) => {
+      if ((d.status === "matched" || d.status === "done") && d.selectedProposalId) {
+        const sel = d.proposals?.find((p) => p.id === d.selectedProposalId);
+        if (sel?.price) {
+          if (!acc[d.crop]) acc[d.crop] = { sum: 0, count: 0 };
+          acc[d.crop].sum += sel.price;
+          acc[d.crop].count += 1;
+        }
+      }
+    });
+    const result = {};
+    Object.keys(acc).forEach((k) => { result[k] = Math.round(acc[k].sum / acc[k].count); });
+    return result;
+  })();
   const handleUpdateDeal = (updated) => {
     setDeals((prev) => prev.map((d) => d.id === updated.id ? updated : d));
     persistDeal(updated);
@@ -6417,10 +6509,10 @@ export default function FarmToTableApp() {
           />
         ) : (
           <>
-            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} />}
+            {tab === "create" && <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} />}
             {tab === "browse" && <DealBrowseScreen deals={deals} onSubmitProposal={handleSubmitProposal} farmProfile={farm} userName={user.name} />}
             {tab === "myproposals" && <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} chatUnreads={chatUnreads} />}
-            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} />}
+            {tab === "mydeals" && <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} />}
             {tab === "farm" && <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "chefprofile" && <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />}
             {tab === "dashboard" && <DashboardScreen deals={deals} user={user} onTabChange={handleTabClick} />}
