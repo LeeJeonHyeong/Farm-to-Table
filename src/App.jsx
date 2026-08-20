@@ -1345,9 +1345,15 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
         </div>
       )}
       {isCloning && (
-        <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 13, color: TOKENS.moss }}>
-          ⎘ <strong>{cloningFrom.crop}</strong> 딜 복제 중 — 내용을 확인 후 제출하세요
-        </div>
+        cloningFrom._isNextCycle ? (
+          <div style={{ background: "#EAF4FB", border: "1px solid #5B9EC944", borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 13, color: "#2E6D9E" }}>
+            ↻ <strong>{cloningFrom.crop}</strong> 다음 회차 딜 — 납품일이 자동 계산됐습니다
+          </div>
+        ) : (
+          <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 13, color: TOKENS.moss }}>
+            ⎘ <strong>{cloningFrom.crop}</strong> 딜 복제 중 — 내용을 확인 후 제출하세요
+          </div>
+        )
       )}
       <StepIndicator step={step} />
 
@@ -5433,7 +5439,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
 /* ---------- 4. 내 농가 등록 ---------- */
 
 function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "", onShowOnboarding }) {
-  const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "" };
+  const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "", notifyNewDeals: false };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
@@ -5612,7 +5618,20 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
         style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
       />
 
-      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, borderRadius: 10 }}>
+        <div
+          onClick={() => update("notifyNewDeals", !data.notifyNewDeals)}
+          style={{ width: 38, height: 22, borderRadius: 11, background: data.notifyNewDeals ? TOKENS.moss : TOKENS.line, position: "relative", flexShrink: 0, transition: "background 0.18s", cursor: "pointer" }}
+        >
+          <div style={{ position: "absolute", top: 3, left: data.notifyNewDeals ? 18 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.18)", transition: "left 0.18s" }} />
+        </div>
+        <div style={{ cursor: "pointer" }} onClick={() => update("notifyNewDeals", !data.notifyNewDeals)}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>관심 품목 새 딜 알림</div>
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginTop: 2 }}>위에서 선택한 주요 재배 품목에 새 딜이 등록되면 알림을 받습니다</div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <button onClick={handleSave} style={{ padding: "12px 28px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 10px rgba(32,40,31,0.18)", letterSpacing: "-0.01em" }}>
           저장하기
         </button>
@@ -6313,9 +6332,11 @@ export default function FarmToTableApp() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [contractTarget, setContractTarget] = useState(null);
   const userRef = useRef(null);
+  const farmRef = useRef(null);
   const prevDealsRef = useRef(null);
   const prevChatsRef = useRef(null);
   useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { farmRef.current = farm; }, [farm]);
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
@@ -6402,7 +6423,12 @@ export default function FarmToTableApp() {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
+          let profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
+          if (!profileResult?.value) {
+            // 신규 가입 직후 auth 이벤트가 프로필 쓰기보다 먼저 도착할 수 있음 — 짧게 대기 후 재시도
+            await new Promise((r) => setTimeout(r, 900));
+            profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
+          }
           if (profileResult?.value) {
             const { role, displayName } = JSON.parse(profileResult.value);
             const userData = { uid: firebaseUser.uid, email: firebaseUser.email, role, name: displayName };
@@ -6561,6 +6587,21 @@ export default function FarmToTableApp() {
         } else {
           newDeals.forEach((deal) => {
             const old = prev.find((d) => d.id === deal.id);
+            // 품목 구독 알림 — 새 딜 등록 시 관심 품목과 매칭되면 알림
+            if (!old && deal.status === "open") {
+              const fp = farmRef.current;
+              if (fp?.notifyNewDeals && (fp.specialty || []).includes(deal.crop)) {
+                const dedupKey = `notified-deal-${deal.id}`;
+                if (!localStorage.getItem(dedupKey)) {
+                  localStorage.setItem(dedupKey, "1");
+                  showPushNotification(
+                    `🌾 새 딜 등록 — ${deal.crop}`,
+                    `${deal.chefName}이(가) ${deal.crop} 딜을 올렸습니다. 지금 제안해보세요.`,
+                    "browse"
+                  );
+                }
+              }
+            }
             if (!old) return;
             // 문의 답변 도착 알림 (농가) — 제안 상태와 무관하게 항상 체크
             (deal.inquiries || []).forEach((inq) => {
@@ -6878,7 +6919,8 @@ export default function FarmToTableApp() {
     const base = deal.deliveryDate && deal.deliveryDate > new Date().toISOString().slice(0, 10)
       ? new Date(deal.deliveryDate) : new Date();
     const next = new Date(base.getTime() + days * 86400000).toISOString().slice(0, 10);
-    setCloningDeal({ ...deal, deliveryDate: next });
+    const { crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion } = deal;
+    setCloningDeal({ crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryDate: next, _isNextCycle: true, _prevDealId: deal.id });
     setEditingDeal(null);
     setTab("create");
   };

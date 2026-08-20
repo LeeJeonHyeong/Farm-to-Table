@@ -208,6 +208,7 @@ allow delete: if request.auth != null
 | v2.17~v2.19 E2E 테스트 | Playwright E2E 테스트 26종 전체 통과 — 딜 전 문의·결제 영수증·농가 성과 배지·UX 개선 6종 자동 검증 |
 | v2.20 | 관심 딜 북마크 (농가) — 딜 카드 🔖 버튼으로 나중에 제안할 딜 저장, "저장한 딜" 탭 토글·건수 뱃지, localStorage `farm-bookmarks-{uid}` 영구 저장, Playwright E2E 16/16 통과 |
 | v2.21 | 전체 화면 SVG 일러스트 UI 장식 — 로그인 화면 다채로운 농장 장면 일러스트 교체, 딜 만들기·딜 찾기·내 제안·내 거래·내 농가·내 레스토랑·대시보드 7개 화면 좌우 사이드 SVG 패널 추가 (인라인 SVG, 데스크톱 전용, `!isMobile` 조건부 렌더링) |
+| v2.22 | UX #5 자동 연장 흐름 + 품목 구독 알림 — `handleNextCycleDeal` 이력 필드 제외 명시적 pick·`_isNextCycle` 플래그·납품일 자동 계산, 위저드 배너 분기("다음 회차 딜" vs "복제 중"), 농가 프로필 관심 품목 새 딜 알림 토글, Firestore 실시간 구독으로 품목 일치 신규 딜 알림·localStorage dedup, `onAuthStateChanged` 신규 가입 race condition 수정 (900ms 재시도), Playwright E2E 14/14 통과 |
 
 ### v1.6 상세 내역
 
@@ -789,6 +790,45 @@ allow delete: if request.auth != null
 - 내 제안 · 대시보드(농가): 언덕+이랑+해바라기·토마토·가지·태양·구름
 - 내 레스토랑: 포크(3갈래)+나이프+허브·미슐랭 별·접시 타원
 - 내 농가: 3겹 언덕+새싹+더 작은 새싹 2개·황금 태양+후광+광선·핑크 나비
+
+### v2.22 상세 내역
+
+**UX #5: 자동 연장 흐름 + 품목 구독 알림**
+
+**자동 연장 흐름 (`handleNextCycleDeal`)**
+- `handleNextCycleDeal`: 트랜잭션 이력 필드(`contractSignedChefAt`, `depositPaidAt`, `shippedAt` 등) 제외 — `...deal` 스프레드 대신 `crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion` 명시적 pick
+- `_isNextCycle: true` + `_prevDealId: deal.id` 플래그 부착
+- 납품일 자동 계산: `cycle`에서 주기(일) 추출 → 이전 납품일 또는 오늘 기준 자동 계산
+- 위저드 배너 분기: `cloningFrom._isNextCycle ? "↻ 다음 회차 딜 — 납품일이 자동 계산됐습니다" : "⎘ 복제 중 — 내용을 확인 후 제출하세요"`
+
+**품목 구독 알림 (농가)**
+- `farmRef = useRef(null)` + `useEffect(() => { farmRef.current = farm; }, [farm])` — 클로저 stale 방지
+- Firestore `onSnapshot` farmer 브랜치: `!old && deal.status === "open"` 조건으로 신규 딜 감지
+- `farmRef.current.notifyNewDeals && farmRef.current.specialty.includes(deal.crop)` 매칭 시 `showPushNotification`
+- `localStorage["notified-deal-{id}"]` dedup — 동일 딜 중복 알림 방지
+- 농가 프로필(`FarmProfileScreen`)에 토글 UI 추가: 토글 ON/OFF → `notifyNewDeals` 저장
+
+**버그 수정**
+- `onAuthStateChanged` 신규 가입 race condition: `createUserWithEmailAndPassword` 직후 auth 이벤트가 Firestore 프로필 쓰기보다 먼저 도착해 `signOut` 호출 → 900ms 대기 후 재시도로 수정
+
+**E2E 테스트 (`test_v2_ux5_nextcycle_subscribe.cjs`) — 14/14 통과**
+
+| # | 테스트 항목 |
+|---|---|
+| 1 | `handleNextCycleDeal` — `_isNextCycle:true` + `_prevDealId` 플래그 설정 (코드 검증) |
+| 2 | `handleNextCycleDeal` — 이력 필드 제외 (spread 없이 명시적 pick) (코드 검증) |
+| 3 | 위저드 배너 분기 — `_isNextCycle` 조건 + '다음 회차 딜' 메시지 (코드 검증) |
+| 4 | 복제 딜 배너 — '⎘ ... 복제 중' 표시 |
+| 5 | 복제 딜 배너 — '다음 회차' 문구 없음 |
+| 6 | 복제 딜 제출 후 새 카드 추가됨 |
+| 7 | 타 탭 이동 후 create 재진입 시 배너 없음 (cloningDeal 없을 때) |
+| 8 | 농가 프로필 — '관심 품목 새 딜 알림' 토글 존재 |
+| 9 | 토글 ON 후 저장 — '저장됐습니다' 표시 |
+| 10 | 알림 ON + 품목 일치(토마토) → '새 딜 등록' 알림 수신 |
+| 11 | 알림 OFF (기본값) → 새 딜 알림 미수신 |
+| 12 | 알림 패널에 항목 표시 |
+| 13 | 알림 클릭 후 browse 탭 이동 |
+| 14 | localStorage dedup 코드 확인 (코드 검증) |
 
 ## 향후 과제
 
