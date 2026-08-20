@@ -2157,8 +2157,8 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
         <ChefProfileMiniCard chefData={chefData} deal={deal} />
       )}
 
-      {/* 딜 전 문의 (제안 전 단계, 농가 전용) */}
-      {!myProposal && (
+      {/* 딜 전 문의 — 답변 있으면 제안 후에도 표시, 미답변·신규 문의는 제안 전만 */}
+      {(myInquiry || !myProposal) && (
         <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 16, padding: isMobile ? 18 : 24, boxShadow: "0 2px 12px rgba(32,40,31,0.05)", marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>딜 전 문의</div>
           {myInquiry ? (
@@ -2174,7 +2174,7 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
                 <div style={{ fontSize: 12, color: TOKENS.gold }}>셰프가 답변 중입니다...</div>
               )}
             </div>
-          ) : showInqForm ? (
+          ) : !myProposal && showInqForm ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <textarea
                 rows={2} value={inqText} onChange={(e) => setInqText(e.target.value)}
@@ -2195,14 +2195,14 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
                 <button onClick={() => { setShowInqForm(false); setInqText(""); }} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, color: TOKENS.inkSoft, fontSize: 13, cursor: "pointer" }}>취소</button>
               </div>
             </div>
-          ) : (
+          ) : !myProposal ? (
             <button
               onClick={() => setShowInqForm(true)}
               style={{ width: "100%", padding: "10px 0", background: "transparent", color: TOKENS.inkSoft, border: `1px solid ${TOKENS.line}`, borderRadius: 10, fontSize: 13, cursor: "pointer" }}
             >
               💬 제안 전 셰프에게 문의하기
             </button>
-          )}
+          ) : null}
         </div>
       )}
 
