@@ -4895,40 +4895,93 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                           const maxQty = Math.max(...cps.map((p) => p.availableQty));
                           const minDate = [...cps.map((p) => p.availableDate)].filter(Boolean).sort()[0];
                           const rows = [
-                            { label: "단가", vals: cps.map((p) => ({ v: `${p.price.toLocaleString()}원/kg`, best: p.price === minPrice })) },
+                            {
+                              label: "단가",
+                              vals: cps.map((p) => {
+                                const diff = deal.targetPrice ? Math.round((p.price - deal.targetPrice) / deal.targetPrice * 100) : null;
+                                const diffStr = diff !== null ? (diff > 0 ? ` (+${diff}%)` : ` (${diff}%)`) : "";
+                                return { v: `${p.price.toLocaleString()}원/kg`, sub: diffStr, best: p.price === minPrice };
+                              }),
+                            },
                             { label: "AI점수", vals: cps.map((p) => ({ v: `${p._score?.total ?? "-"}점`, best: (p._score?.total ?? 0) === maxScore })) },
                             { label: "납품가능일", vals: cps.map((p) => ({ v: p.availableDate || "-", best: p.availableDate === minDate })) },
                             { label: "수량", vals: cps.map((p) => ({ v: `${p.availableQty}kg`, best: p.availableQty === maxQty })) },
-                            { label: "인증", vals: cps.map((p) => ({ v: p.cert, best: false })) },
+                            { label: "인증", vals: cps.map((p) => ({ v: p.cert || "없음", best: false })) },
                           ];
                           return (
-                            <div style={{ background: "#fff", border: `1px solid ${TOKENS.moss}44`, borderRadius: 10, padding: 12, marginBottom: 2 }}>
-                              <div style={{ fontSize: 11, color: TOKENS.moss, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
-                                제안 비교 ({cps.length}건)
+                            <div style={{ background: "#fff", border: `2px solid ${TOKENS.moss}55`, borderRadius: 12, padding: "14px 12px 10px", marginBottom: 4, boxShadow: `0 2px 8px ${TOKENS.moss}11` }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                                <span style={{ fontSize: 11, color: TOKENS.moss, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                  제안 비교 {cps.length}건
+                                </span>
+                                <span style={{ fontSize: 10, color: TOKENS.inkSoft, marginLeft: 4 }}>— 최저가·최고점 강조</span>
                               </div>
                               <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
                                   <thead>
                                     <tr>
-                                      <th style={{ width: 64, textAlign: "left", color: TOKENS.inkSoft, fontWeight: 400, paddingBottom: 6 }} />
-                                      {cps.map((p) => (
-                                        <th key={p.id} style={{ textAlign: "center", fontFamily: "'Fraunces', serif", fontSize: 13, fontWeight: 600, color: TOKENS.ink, paddingBottom: 6 }}>
-                                          {p.farmName}
-                                        </th>
-                                      ))}
+                                      <th style={{ width: 62, textAlign: "left", color: TOKENS.inkSoft, fontWeight: 400, paddingBottom: 8, fontSize: 10 }} />
+                                      {cps.map((p) => {
+                                        const isBestPrice = p.price === minPrice;
+                                        const isBestScore = (p._score?.total ?? 0) === maxScore;
+                                        return (
+                                          <th key={p.id} style={{ textAlign: "center", paddingBottom: 8, width: `${Math.floor(100 / cps.length)}%` }}>
+                                            <div style={{
+                                              display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 3,
+                                              background: isBestPrice || isBestScore ? TOKENS.mossSoft : "transparent",
+                                              borderRadius: 8, padding: "4px 8px",
+                                            }}>
+                                              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 13, fontWeight: 700, color: TOKENS.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 90 }}>
+                                                {p.farmName}
+                                              </span>
+                                              {(isBestPrice || isBestScore) && (
+                                                <span style={{ fontSize: 9, color: TOKENS.moss, fontFamily: "'IBM Plex Mono', monospace" }}>
+                                                  {isBestPrice && isBestScore ? "🏆 최저가·최고점" : isBestPrice ? "💰 최저가" : "⭐ 최고점"}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </th>
+                                        );
+                                      })}
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {rows.map(({ label, vals }) => (
                                       <tr key={label} style={{ borderTop: `1px solid ${TOKENS.line}` }}>
-                                        <td style={{ padding: "6px 0", color: TOKENS.inkSoft, fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>{label}</td>
+                                        <td style={{ padding: "7px 0", color: TOKENS.inkSoft, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.02em" }}>{label}</td>
                                         {vals.map((cell, i) => (
-                                          <td key={i} style={{ textAlign: "center", padding: "6px 4px", color: cell.best ? TOKENS.moss : TOKENS.ink, fontWeight: cell.best ? 700 : 400 }}>
-                                            {cell.v}
+                                          <td key={i} style={{
+                                            textAlign: "center", padding: "7px 4px",
+                                            background: cell.best ? `${TOKENS.gold}18` : "transparent",
+                                            borderRadius: 4,
+                                          }}>
+                                            <span style={{ color: cell.best ? "#7A5C20" : TOKENS.ink, fontWeight: cell.best ? 700 : 400, fontSize: 12 }}>
+                                              {cell.best && "✓ "}{cell.v}
+                                            </span>
+                                            {cell.sub && (
+                                              <span style={{ fontSize: 10, color: cell.sub.includes("+") ? TOKENS.rust : TOKENS.moss, display: "block" }}>
+                                                {cell.sub}
+                                              </span>
+                                            )}
                                           </td>
                                         ))}
                                       </tr>
                                     ))}
+                                    {deal.status === "open" && (
+                                      <tr style={{ borderTop: `1px solid ${TOKENS.line}` }}>
+                                        <td style={{ padding: "8px 0", color: TOKENS.inkSoft, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }}>선택</td>
+                                        {cps.map((p) => (
+                                          <td key={p.id} style={{ textAlign: "center", padding: "8px 4px" }}>
+                                            <button
+                                              onClick={() => onSelectProposal(deal.id, p.id)}
+                                              style={{ padding: "5px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", background: TOKENS.moss, color: "#fff", border: "none", whiteSpace: "nowrap" }}
+                                            >
+                                              이 농가 선택
+                                            </button>
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    )}
                                   </tbody>
                                 </table>
                               </div>
@@ -6493,11 +6546,34 @@ export default function FarmToTableApp() {
                 "dashboard"
               );
             }
+            // 새 농가 문의 도착 알림 (셰프)
+            const oldInqCount = (old.inquiries || []).length;
+            const newInqCount = (deal.inquiries || []).length;
+            if (newInqCount > oldInqCount) {
+              const newInq = deal.inquiries[deal.inquiries.length - 1];
+              showPushNotification(
+                `💬 새 농가 문의 — ${deal.crop}`,
+                `${newInq.farmName || newInq.farmerName}에서 문의를 보냈습니다.`,
+                "mydeals"
+              );
+            }
           });
         } else {
           newDeals.forEach((deal) => {
             const old = prev.find((d) => d.id === deal.id);
             if (!old) return;
+            // 문의 답변 도착 알림 (농가) — 제안 상태와 무관하게 항상 체크
+            (deal.inquiries || []).forEach((inq) => {
+              if (inq.farmerName !== cu.name) return;
+              const oldInq = (old.inquiries || []).find((q) => q.id === inq.id);
+              if (oldInq && !oldInq.answer && inq.answer) {
+                showPushNotification(
+                  `✅ 문의 답변 도착 — ${deal.crop}`,
+                  `${deal.chefName}이(가) 문의에 답변했습니다. 확인 후 제안을 보내보세요.`,
+                  "browse"
+                );
+              }
+            });
             if (!deal.selectedProposalId || deal.selectedProposalId === old.selectedProposalId) {
               if (deal.selectedProposalId) {
                 const mine = deal.proposals.find((p) => p.farmerName === cu.name && p.id === deal.selectedProposalId);
