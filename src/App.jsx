@@ -1891,31 +1891,31 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
                 )}
               </div>
             )}
+            <div style={{ display: "flex", gap: 8, marginBottom: isSelected ? 8 : 0 }} onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => onOpenChat({ dealId: deal.id, proposalId: proposal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
+                style={{ flex: 1, padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+              >
+                💬 {deal.chefName}과 채팅
+                {(chatUnreads[deal.id] || 0) > 0 && (
+                  <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
+                    {chatUnreads[deal.id]}
+                  </span>
+                )}
+              </button>
+              {isSelected && (
+                <button
+                  onClick={() => onViewContract(deal, proposal)}
+                  style={{ padding: "9px 16px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  계약서
+                </button>
+              )}
+            </div>
             {isSelected && (
-              <>
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  <button
-                    onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
-                    style={{ flex: 1, padding: "9px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-                  >
-                    💬 {deal.chefName}과 채팅
-                    {(chatUnreads[deal.id] || 0) > 0 && (
-                      <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>
-                        {chatUnreads[deal.id]}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => onViewContract(deal, proposal)}
-                    style={{ padding: "9px 16px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-                  >
-                    계약서
-                  </button>
-                </div>
-                <div onClick={(e) => e.stopPropagation()}>
-                  <DeliveryTracker deal={deal} userRole="farmer" onShip={() => setShipTarget({ dealId: deal.id })} />
-                </div>
-              </>
+              <div onClick={(e) => e.stopPropagation()}>
+                <DeliveryTracker deal={deal} userRole="farmer" onShip={() => setShipTarget({ dealId: deal.id })} />
+              </div>
             )}
           </div>
         );
@@ -2053,17 +2053,17 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
             <button onClick={() => setCancellingId(proposal.id)} style={{ padding: "10px 18px", background: "transparent", border: `1px solid ${TOKENS.rustSoft}`, borderRadius: 8, fontSize: 13, color: TOKENS.rust, cursor: "pointer" }}>제안 취소</button>
           )
         )}
+        <button
+          onClick={() => onOpenChat({ dealId: deal.id, proposalId: proposal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
+          style={{ flex: 1, minWidth: 120, padding: "12px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+        >
+          💬 {deal.chefName}과 채팅
+          {(chatUnreads[deal.id] || 0) > 0 && (
+            <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{chatUnreads[deal.id]}</span>
+          )}
+        </button>
         {isSelected && (
           <>
-            <button
-              onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: proposal.farmName })}
-              style={{ flex: 1, minWidth: 120, padding: "12px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-            >
-              💬 {deal.chefName}과 채팅
-              {(chatUnreads[deal.id] || 0) > 0 && (
-                <span style={{ marginLeft: 8, background: TOKENS.rust, color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{chatUnreads[deal.id]}</span>
-              )}
-            </button>
             <button onClick={() => onViewContract(deal, proposal)} style={{ padding: "12px 18px", background: TOKENS.goldSoft, color: "#7A5C20", border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>계약서</button>
           </>
         )}
@@ -5042,6 +5042,12 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                                 onClick={() => setDetailProposal({ proposal: p, deal })}
                                 onViewProfile={(pp) => setFarmProfileModal(pp)}
                               />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onOpenChat({ dealId: deal.id, proposalId: p.id, crop: deal.crop, chefName: deal.chefName, farmName: p.farmName }); }}
+                                style={{ width: "100%", padding: "7px 0", marginTop: 6, background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+                              >
+                                💬 {p.farmName}과 채팅
+                              </button>
                             </div>
                           );
                         })}
@@ -5057,7 +5063,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                     <SettlementCard deal={deal} proposal={selectedProposal} userRole="chef" onTossPayment={(type) => onTossPayment?.(deal, selectedProposal, type)} />
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
-                        onClick={() => onOpenChat({ dealId: deal.id, crop: deal.crop, chefName: deal.chefName, farmName: selectedProposal.farmName })}
+                        onClick={() => onOpenChat({ dealId: deal.id, proposalId: selectedProposal.id, crop: deal.crop, chefName: deal.chefName, farmName: selectedProposal.farmName })}
                         style={{ flex: 1, minWidth: 120, padding: "10px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", position: "relative" }}
                       >
                         💬 {selectedProposal.farmName}과 채팅
@@ -6920,8 +6926,9 @@ export default function FarmToTableApp() {
   };
 
   const handleOpenChat = (target) => {
-    setChatTarget(target);
-    const updated = { ...lastChatRead, [target.dealId]: Date.now() };
+    const chatId = `${target.dealId}__${target.proposalId}`;
+    setChatTarget({ ...target, chatId });
+    const updated = { ...lastChatRead, [chatId]: Date.now() };
     setLastChatRead(updated);
     localStorage.setItem("last-chat-read", JSON.stringify(updated));
   };
@@ -7055,13 +7062,13 @@ export default function FarmToTableApp() {
       }).length
     : 0;
 
-  const chatUnreads = Object.fromEntries(
-    Object.entries(chats).map(([dealId, msgs]) => {
-      const lastRead = lastChatRead[dealId] || 0;
-      const count = msgs.filter((m) => m.ts > lastRead && m.senderName !== user.name).length;
-      return [dealId, count];
-    })
-  );
+  const chatUnreads = {};
+  Object.entries(chats).forEach(([chatId, msgs]) => {
+    const dealId = chatId.includes("__") ? chatId.split("__")[0] : chatId;
+    const lastRead = lastChatRead[chatId] || 0;
+    const count = msgs.filter((m) => m.ts > lastRead && m.senderName !== user.name).length;
+    chatUnreads[dealId] = (chatUnreads[dealId] || 0) + count;
+  });
   const totalUnreadChats = Object.values(chatUnreads).reduce((s, n) => s + n, 0);
 
   const handleTabClick = (key) => {
@@ -7383,8 +7390,8 @@ export default function FarmToTableApp() {
             dealInfo={chatTarget}
             userName={user.name}
             userRole={user.role}
-            messages={chats[chatTarget.dealId] || []}
-            onSend={(payload) => handleSendMessage(chatTarget.dealId, payload)}
+            messages={chats[chatTarget.chatId] || []}
+            onSend={(payload) => handleSendMessage(chatTarget.chatId, payload)}
             onBack={() => setChatTarget(null)}
           />
         ) : (
