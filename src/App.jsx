@@ -85,6 +85,16 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
   );
 }
 
+function PhotoLightbox({ src, onClose }) {
+  if (!src) return null;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <img src={src} alt="" style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: 10, objectFit: "contain", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()} />
+      <button onClick={onClose} style={{ position: "fixed", top: 16, right: 16, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", borderRadius: "50%", width: 40, height: 40, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>✕</button>
+    </div>
+  );
+}
+
 const TOKENS = {
   bg: "#F3F1E7",
   ink: "#20281F",
@@ -1663,6 +1673,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
     availableDate: "",
     cert: farmProfile?.cert || lastProposal?.cert || "인증 없음",
     message: "",
+    cropPhotoURL: "",
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -1692,6 +1703,8 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
         createdAt: Date.now(),
         photoURL: farmProfile?.photoURL || null,
         specialty: farmProfile?.specialty || [],
+        certPhotoURL: farmProfile?.certPhotoURL || null,
+        cropPhotoURL: data.cropPhotoURL || null,
       });
     }
   };
@@ -1745,6 +1758,10 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
         value={data.message} onChange={(e) => update("message", e.target.value)}
         style={{ ...inputStyle, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
       />
+      <div style={{ marginTop: 12 }}>
+        <FieldLabel>작물 사진 첨부 (선택)</FieldLabel>
+        <ImageUpload value={data.cropPhotoURL} onChange={(v) => update("cropPhotoURL", v)} label="작물 사진 추가" shape="square" size={80} />
+      </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button type="button" onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: "10px 0", background: submitting ? TOKENS.inkSoft : TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: submitting ? "default" : "pointer" }}>
           {submitting ? "전송 중…" : "제안 보내기"}
@@ -2955,6 +2972,7 @@ function InquiryAnswerCard({ inquiry, onAnswer }) {
 
 function FarmProfileDetailCard({ proposal, allDeals = [] }) {
   const isMobile = useIsMobile();
+  const [certLightbox, setCertLightbox] = useState(false);
 
   const reviews = allDeals
     .flatMap((d) => (d.proposals || []).map((p) => ({ ...p, dealCrop: d.crop })))
@@ -2981,7 +2999,13 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
           {proposal.region && <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginBottom: 6 }}>{proposal.region}</div>}
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {proposal.cert && proposal.cert !== "인증 없음" && (
-              <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{proposal.cert}</span>
+              <span
+                style={{ ...chipBadge(TOKENS.mossSoft, TOKENS.moss), cursor: proposal.certPhotoURL ? "pointer" : "default", display: "inline-flex", alignItems: "center", gap: 3 }}
+                onClick={proposal.certPhotoURL ? () => setCertLightbox(true) : undefined}
+                title={proposal.certPhotoURL ? "인증서 사진 보기" : undefined}
+              >
+                {proposal.cert}{proposal.certPhotoURL && <span style={{ color: TOKENS.moss, fontSize: 11 }}>✓</span>}
+              </span>
             )}
             {(proposal.specialty || []).map((c) => (
               <span key={c} style={chipBadge("#E8F0E4", TOKENS.moss)}>{c}</span>
@@ -3092,6 +3116,7 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
           </div>
         );
       })()}
+      {certLightbox && <PhotoLightbox src={proposal.certPhotoURL} onClose={() => setCertLightbox(false)} />}
     </div>
   );
 }
@@ -3099,6 +3124,8 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
 function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score, onClick, onViewProfile }) {
   const priceDiff = proposal.price - deal.targetPrice;
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [certLightbox, setCertLightbox] = useState(false);
+  const [cropLightbox, setCropLightbox] = useState(false);
   const [aiComment, setAiComment] = useState(null);
   const [commentLoading, setCommentLoading] = useState(false);
 
@@ -3167,7 +3194,13 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score,
             <span style={{ marginLeft: 4 }}>({priceDiff > 0 ? "+" : ""}{priceDiff.toLocaleString()})</span>
           )}
         </span>
-        <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{proposal.cert}</span>
+        <span
+          style={{ ...chipBadge(TOKENS.mossSoft, TOKENS.moss), cursor: proposal.certPhotoURL ? "pointer" : "default", display: "inline-flex", alignItems: "center", gap: 3 }}
+          onClick={proposal.certPhotoURL ? (e) => { e.stopPropagation(); setCertLightbox(true); } : undefined}
+          title={proposal.certPhotoURL ? "인증서 사진 보기" : undefined}
+        >
+          {proposal.cert}{proposal.certPhotoURL && <span style={{ fontSize: 10 }}>✓</span>}
+        </span>
         <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>납품가능일 {proposal.availableDate || "-"}</span>
         <span style={chipBadge(TOKENS.line, TOKENS.inkSoft)}>가능수량 {proposal.availableQty}kg</span>
         {proposal.ratedAt && (
@@ -3202,6 +3235,19 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score,
       {proposal.message && (
         <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10, lineHeight: 1.5 }}>"{proposal.message}"</p>
       )}
+      {proposal.cropPhotoURL && (
+        <div style={{ marginBottom: 10 }}>
+          <img
+            src={proposal.cropPhotoURL}
+            alt="작물 사진"
+            onClick={(e) => { e.stopPropagation(); setCropLightbox(true); }}
+            style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, cursor: "pointer", border: `1px solid ${TOKENS.line}` }}
+            title="작물 사진 크게 보기"
+          />
+        </div>
+      )}
+      {certLightbox && <PhotoLightbox src={proposal.certPhotoURL} onClose={() => setCertLightbox(false)} />}
+      {cropLightbox && <PhotoLightbox src={proposal.cropPhotoURL} onClose={() => setCropLightbox(false)} />}
       {selectable && (
         <button
           onClick={() => onSelect(proposal.id)}
@@ -5711,7 +5757,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
 /* ---------- 4. 내 농가 등록 ---------- */
 
 function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "", onShowOnboarding }) {
-  const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "", notifyNewDeals: false };
+  const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "", certPhotoURL: "", notifyNewDeals: false };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
@@ -5865,6 +5911,13 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
           <Chip key={c} label={c} active={data.cert === c} onClick={() => update("cert", c)} />
         ))}
       </div>
+      {data.cert && data.cert !== "인증 없음" && (
+        <div style={{ marginTop: 10 }}>
+          <FieldLabel>인증서 사진 첨부 (선택)</FieldLabel>
+          <ImageUpload value={data.certPhotoURL || ""} onChange={(v) => update("certPhotoURL", v)} label="인증서 사진 추가" shape="square" size={80} />
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginTop: 4 }}>사진을 첨부하면 셰프에게 인증서 확인 표시(✓)가 보입니다</div>
+        </div>
+      )}
 
       <FieldLabel>주요 재배 품목 (복수 선택 가능)</FieldLabel>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
