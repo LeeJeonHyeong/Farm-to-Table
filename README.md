@@ -209,6 +209,13 @@ allow delete: if request.auth != null
 | v2.20 | 관심 딜 북마크 (농가) — 딜 카드 🔖 버튼으로 나중에 제안할 딜 저장, "저장한 딜" 탭 토글·건수 뱃지, localStorage `farm-bookmarks-{uid}` 영구 저장, Playwright E2E 16/16 통과 |
 | v2.21 | 전체 화면 SVG 일러스트 UI 장식 — 로그인 화면 다채로운 농장 장면 일러스트 교체, 딜 만들기·딜 찾기·내 제안·내 거래·내 농가·내 레스토랑·대시보드 7개 화면 좌우 사이드 SVG 패널 추가 (인라인 SVG, 데스크톱 전용, `!isMobile` 조건부 렌더링) |
 | v2.22 | UX #5 자동 연장 흐름 + 품목 구독 알림 — `handleNextCycleDeal` 이력 필드 제외 명시적 pick·`_isNextCycle` 플래그·납품일 자동 계산, 위저드 배너 분기("다음 회차 딜" vs "복제 중"), 농가 프로필 관심 품목 새 딜 알림 토글, Firestore 실시간 구독으로 품목 일치 신규 딜 알림·localStorage dedup, `onAuthStateChanged` 신규 가입 race condition 수정 (900ms 재시도), Playwright E2E 14/14 통과 |
+| UX #2/#3/#4 | 상호 리뷰(`handleRateChef`, `chefRating`/`chefRatedAt`), 제안 단계 채팅(`chatId = dealId__proposalId`), 역제안(`CounterOfferModal`, `handleSendCounterOffer`/`handleRespondCounterOffer`) |
+| UX #2/#3/#4/#6 E2E | `test_v2_ux2346.cjs` — 23/23 통과 (정적 심볼 검증 14종 + 브라우저 UI 9종) |
+| v2.25 | UX #6 제철 식재료 추천 — `SEASONAL_CROPS` 12개월별 정의, `SeasonalBanner` 월별 배너+칩 클릭 필터, 딜 만들기 Step 1 제철 힌트 표시 |
+| v2.26 | 농가 이력 공개 — `FarmProfileDetailCard` 통계 칩(제안수·선택률·완료건), 최근 선택 거래 이력 테이블(최대 5건), `FarmProfileScreen` 실시간 미리보기, `computeFarmBadges` 성과 배지 |
+| v2.27 | 인증 뱃지 사진첨부 — `PhotoLightbox` 전체화면 뷰어, `certPhotoURL`(인증서 ✓ 표시·클릭 확대), `cropPhotoURL`(작물 사진 72px 썸네일·클릭 확대), `FarmProfileScreen`/`ProposalForm` 업로드 UI |
+| Bug fix | `FarmProfileDetailCard` `React.useState` → `useState` named import 수정 (앱 크래시 수정) |
+| v2.26/27 E2E | `test_v2_26_27.cjs` — 18/18 통과 (정적 5+8종 + 브라우저 UI 3+2종) |
 
 ### v1.6 상세 내역
 
@@ -829,6 +836,108 @@ allow delete: if request.auth != null
 | 12 | 알림 패널에 항목 표시 |
 | 13 | 알림 클릭 후 browse 탭 이동 |
 | 14 | localStorage dedup 코드 확인 (코드 검증) |
+
+### UX #2/#3/#4/#6 상세 내역
+
+**UX #2: 상호 리뷰 — 농가→셰프 평가**
+- 거래 완료 후 농가가 셰프에게 별점 + 후기를 남길 수 있는 `handleRateChef` 핸들러 추가
+- `chefRating`, `chefRatedAt` 필드를 deal에 저장, 셰프 프로필에 "농가가 남긴 평가" 섹션 표시
+
+**UX #3: 제안 단계 채팅**
+- 채팅 ID 구조를 `dealId__proposalId` 형식으로 변경 → 동일 딜 내 제안별 독립 채팅 스레드 지원
+- `handleOpenChat` 에 `proposalId` 필드 포함 → 제안 선택 전 단계에서도 채팅 가능
+
+**UX #4: 역제안 (CounterOffer)**
+- 셰프가 내 거래에서 마음에 드는 농가에게 역제안 단가를 제시할 수 있는 `CounterOfferModal` 컴포넌트 추가
+- `handleSendCounterOffer` (셰프), `handleRespondCounterOffer` (농가) 핸들러 구현
+- 역제안 도착 · 수락됨 · 거절됨 3종 앱 내 알림 연동
+
+**E2E 테스트 (`test_v2_ux2346.cjs`) — 23/23 통과**
+
+| # | 테스트 항목 |
+|---|---|
+| 1~14 | 정적 코드 검증 (handleRateChef, CounterOfferModal, SEASONAL_CROPS 등 14개 핵심 심볼) |
+| 15 | UX #6 — 농가 딜 찾기 "8월 제철 식재료" 배너 표시 |
+| 16 | UX #6 — 제철 칩 클릭 후 활성 스타일 적용 |
+| 17 | UX #6 — 셰프 딜 만들기 1단계 제철 힌트 표시 |
+| 18 | UX #3 — 셰프 내 거래 오픈 딜 제안 카드에 채팅 버튼 존재 |
+| 19 | UX #4 — 역제안 버튼 존재 |
+| 20 | UX #4 — 역제안 버튼 클릭 시 CounterOfferModal 표시 |
+| 21 | UX #4 — 농가 역제안 수신 배너 문자열 |
+| +2b | 보조 검증 (제철 칩 활성, 역제안 모달 입력 필드) |
+
+---
+
+### v2.25 상세 내역
+
+**UX #6: 제철 식재료 배너 (`SeasonalBanner`) + 딜 만들기 힌트**
+
+- `SEASONAL_CROPS` 객체 — 12개월별 제철 식재료 목록 정의
+- `SeasonalBanner` 컴포넌트 — 딜 찾기 화면 상단에 "N월 제철 식재료" 배너 자동 표시
+  - 월별 제철 품목을 칩 버튼으로 나열, 클릭 시 해당 품목으로 딜 필터 자동 적용
+  - 배경: goldSoft, 아이콘 🌼
+- 딜 만들기 Step 1 품목 선택 시 "N월 제철 — 클릭하면 바로 선택돼요" 힌트 텍스트 표시
+  - 현재 제철 품목에만 힌트 표시, 비제철 품목은 힌트 없음
+
+---
+
+### v2.26 상세 내역
+
+**농가 이력 공개 (`FarmProfileDetailCard` 고도화 + `FarmProfileScreen` 미리보기)**
+
+**FarmProfileDetailCard 통계 칩**
+- 셰프가 농가 프로필을 열면 총 제안 수·선택률(%)·완료 거래 수를 3개 칩으로 요약 표시
+- `allDeals` 기반 실시간 계산: `farmProps`, `selectedProps`, `doneCount`, `selRate`
+
+**최근 선택 거래 이력 테이블**
+- 선택된 제안 최대 5건을 품목·셰프명·상태(완료/진행 중)·날짜로 테이블 표시 (`selectedAt` 기준 내림차순)
+- 데이터 없으면 자동 숨김
+
+**FarmProfileScreen "셰프에게 이렇게 보여요" 미리보기**
+- 내 농가 탭에서 농가명 또는 전문품목 입력 시 하단에 실시간 `FarmProfileDetailCard` 미리보기 자동 표시
+- 셰프 시점 공개 프로필을 저장 전에 바로 확인 가능
+
+**농가 성과 배지 (`computeFarmBadges`)**
+- 딜 데이터 + 인증 정보를 분석해 동적으로 배지를 계산하는 `computeFarmBadges(allDeals, farmerName, cert)` 함수 추가
+- 내 농가 탭 + FarmProfileDetailCard 양쪽에서 동일 로직으로 배지 렌더링
+
+---
+
+### v2.27 상세 내역
+
+**인증 뱃지 및 사진첨부**
+
+**PhotoLightbox 공용 컴포넌트 (신규)**
+- 이미지 클릭 시 전체화면 오버레이로 확대 표시 (position: fixed, zIndex: 2000)
+- 배경 클릭 또는 ✕ 버튼으로 닫기, 이미지 자체 클릭은 닫힘 방지
+
+**인증서 사진 (`certPhotoURL`)**
+- `FarmProfileScreen` 인증 칩 선택 시 "인증서 사진 첨부 (선택)" `ImageUpload` 위젯 동적 표시
+- 업로드 후 `certPhotoURL`을 farm 프로필에 저장
+- `FarmProfileDetailCard` / `ProposalCard` 인증 칩에 ✓ 마크 추가 — 클릭 시 PhotoLightbox로 원본 확인
+
+**작물 사진 (`cropPhotoURL`)**
+- `ProposalForm`에 "작물 사진 첨부 (선택)" `ImageUpload` 추가 — 제안 제출 시 `cropPhotoURL` 포함
+- `ProposalCard`에 72px 썸네일 표시 — 클릭 시 PhotoLightbox로 확대
+
+**데이터 확장**
+- `certPhotoURL`: 인증서 사진 base64 URL (farm profile + 제안서)
+- `cropPhotoURL`: 작물 사진 base64 URL (제안서)
+
+**E2E 테스트 (`test_v2_26_27.cjs`) — 18/18 통과**
+
+| # | 테스트 항목 |
+|---|---|
+| 1~5 | v2.26 정적 코드 검증 (computeFarmBadges, 통계 칩, 이력 테이블, 미리보기, 계산 로직) |
+| 6~8 | v2.26 브라우저 UI (내 농가 탭 진입, 미리보기 렌더링, 농가명 표시) |
+| 9~16 | v2.27 정적 코드 검증 (PhotoLightbox, certPhotoURL, cropPhotoURL, ✓ 표시, blank state 등) |
+| 17 | v2.27 인증 선택 후 인증서 사진 업로드 UI 표시 |
+| 18 | v2.27 제안 폼 내 작물 사진 첨부 UI 표시 |
+
+**버그 수정**
+- `FarmProfileDetailCard`에서 `React.useState` 사용으로 인한 런타임 크래시 수정 (`useState` named import 방식으로 교체) — 파일 상단이 named import 전용이라 `React` 객체 미노출
+
+---
 
 ## 향후 과제
 
