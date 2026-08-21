@@ -1697,7 +1697,7 @@ const SORT_OPTIONS = [
   { value: "proposals", label: "제안 많은순" },
 ];
 
-function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, chatUnreads = {} }) {
+function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, onRateChef, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
@@ -1722,6 +1722,7 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
         onOpenChat={onOpenChat}
         onViewContract={onViewContract}
         onShipDeal={onShipDeal}
+        onRateChef={onRateChef}
         chatUnreads={chatUnreads}
       />
     );
@@ -1923,7 +1924,7 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
   );
 }
 
-function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, onViewContract, onShipDeal, chatUnreads = {} }) {
+function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, onViewContract, onShipDeal, onRateChef, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const [showShipModal, setShowShipModal] = useState(false);
@@ -2073,6 +2074,25 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
           <ShipModal onClose={() => setShowShipModal(false)} onConfirm={(info) => { onShipDeal?.(deal.id, info); setShowShipModal(false); }} />
         )}
       </div>
+
+      {/* 농가 → 쉐프 평가 */}
+      {deal.status === "done" && isSelected && (
+        <div style={{ marginTop: 14 }}>
+          {deal.chefRatedAt ? (
+            <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 11, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                내가 남긴 평가 · {deal.chefName}
+              </div>
+              <StarRating value={deal.chefRating} size={16} />
+              {deal.chefReview && (
+                <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "6px 0 0", fontStyle: "italic" }}>"{deal.chefReview}"</p>
+              )}
+            </div>
+          ) : (
+            <RatingPanel farmName={deal.chefName} onSubmit={(rating, review) => onRateChef?.(deal.id, rating, review)} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -5081,22 +5101,35 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                       </button>
                     )}
                     {deal.status === "done" && (
-                      selectedProposal.ratedAt ? (
-                        <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: 14 }}>
-                          <div style={{ fontSize: 11, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
-                            내가 남긴 평가 · {selectedProposal.farmName}
+                      <>
+                        {selectedProposal.ratedAt ? (
+                          <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: 14 }}>
+                            <div style={{ fontSize: 11, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                              내가 남긴 평가 · {selectedProposal.farmName}
+                            </div>
+                            <StarRating value={selectedProposal.rating} size={16} />
+                            {selectedProposal.review && (
+                              <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "6px 0 0", fontStyle: "italic" }}>"{selectedProposal.review}"</p>
+                            )}
                           </div>
-                          <StarRating value={selectedProposal.rating} size={16} />
-                          {selectedProposal.review && (
-                            <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "6px 0 0", fontStyle: "italic" }}>"{selectedProposal.review}"</p>
-                          )}
-                        </div>
-                      ) : (
-                        <RatingPanel
-                          farmName={selectedProposal.farmName}
-                          onSubmit={(rating, review) => onRateProposal(deal.id, selectedProposal.id, rating, review)}
-                        />
-                      )
+                        ) : (
+                          <RatingPanel
+                            farmName={selectedProposal.farmName}
+                            onSubmit={(rating, review) => onRateProposal(deal.id, selectedProposal.id, rating, review)}
+                          />
+                        )}
+                        {deal.chefRatedAt && (
+                          <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}44`, borderRadius: 10, padding: 14, marginTop: 10 }}>
+                            <div style={{ fontSize: 11, color: TOKENS.moss, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                              농가가 남긴 평가 · {selectedProposal.farmName}
+                            </div>
+                            <StarRating value={deal.chefRating} size={16} />
+                            {deal.chefReview && (
+                              <p style={{ fontSize: 13, color: TOKENS.inkSoft, margin: "6px 0 0", fontStyle: "italic" }}>"{deal.chefReview}"</p>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -6976,6 +7009,14 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
+  const handleRateChef = (dealId, rating, review) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = { ...deal, chefRating: rating, chefReview: review, chefRatedAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
   if (!authChecked || loadState === "loading") {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
@@ -7707,7 +7748,7 @@ export default function FarmToTableApp() {
                     <circle cx="53" cy="186" r="5" fill="#8B5C10"/>
                   </svg>
                 )}
-                <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} chatUnreads={chatUnreads} />
+                <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} onRateChef={handleRateChef} chatUnreads={chatUnreads} />
               </div>
             )}
             {/* ── 내 거래 ── */}
