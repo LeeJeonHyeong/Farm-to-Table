@@ -1878,6 +1878,31 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
           </svg>
         </div>
       )}
+      {/* 내 거래 이력 통계 */}
+      {(() => {
+        const selectedCount = myItems.filter(({ deal, proposal }) => deal.selectedProposalId === proposal.id).length;
+        const doneCount = myItems.filter(({ deal, proposal }) => deal.status === "done" && deal.selectedProposalId === proposal.id).length;
+        const ratedItems = myItems.filter(({ proposal }) => proposal.ratedAt);
+        const avgRating = ratedItems.length > 0
+          ? (ratedItems.reduce((s, { proposal }) => s + proposal.rating, 0) / ratedItems.length).toFixed(1)
+          : null;
+        const statItems = [
+          { label: "총 제안", value: `${myItems.length}건` },
+          { label: "선택됨", value: `${selectedCount}건` },
+          { label: "완료 거래", value: `${doneCount}건` },
+          { label: "평균 평점", value: avgRating ? `★ ${avgRating}` : "—" },
+        ];
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: 8, marginBottom: 10 }}>
+            {statItems.map(({ label, value }) => (
+              <div key={label} style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace" }}>{value}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginBottom: 2 }}>
         총 {myItems.length}건의 제안
       </div>
@@ -2982,6 +3007,32 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
         </div>
       )}
 
+      {/* 이력 통계 요약 */}
+      {(() => {
+        const farmProps = allDeals
+          .flatMap((d) => (d.proposals || []).map((p) => ({ ...p, _deal: d })))
+          .filter((p) => p.farmerName === proposal.farmerName);
+        if (farmProps.length === 0) return null;
+        const selectedProps = farmProps.filter((p) => p._deal.selectedProposalId === p.id);
+        const doneCount = farmProps.filter((p) => p._deal.status === "done" && p._deal.selectedProposalId === p.id).length;
+        const selRate = Math.round((selectedProps.length / farmProps.length) * 100);
+        const statItems = [
+          { label: "총 제안", value: `${farmProps.length}건` },
+          { label: "선택률", value: `${selRate}%` },
+          { label: "완료 거래", value: `${doneCount}건` },
+        ];
+        return (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            {statItems.map(({ label, value }) => (
+              <div key={label} style={{ background: "#fff", border: `1px solid ${TOKENS.moss}22`, borderRadius: 8, padding: "6px 14px", textAlign: "center", minWidth: 70 }}>
+                <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 3 }}>{label}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: TOKENS.moss, fontFamily: "'IBM Plex Mono', monospace" }}>{value}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {reviews.length > 0 && (
         <div style={{ paddingTop: 12, borderTop: `1px solid ${TOKENS.moss}22` }}>
           <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
@@ -3010,6 +3061,37 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
           아직 평가 이력이 없습니다.
         </div>
       )}
+
+      {/* 최근 선택 거래 이력 */}
+      {(() => {
+        const selectedHistory = allDeals
+          .flatMap((d) => (d.proposals || []).map((p) => ({ ...p, _deal: d })))
+          .filter((p) => p.farmerName === proposal.farmerName && p._deal.selectedProposalId === p.id)
+          .sort((a, b) => (b._deal.selectedAt || 0) - (a._deal.selectedAt || 0))
+          .slice(0, 5);
+        if (selectedHistory.length === 0) return null;
+        return (
+          <div style={{ paddingTop: 12, marginTop: 12, borderTop: `1px solid ${TOKENS.moss}22` }}>
+            <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+              최근 선택 거래
+            </div>
+            {selectedHistory.map((p, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: i < selectedHistory.length - 1 ? `1px solid ${TOKENS.moss}10` : "none" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: TOKENS.ink, minWidth: 52 }}>{p._deal.crop}</span>
+                <span style={{ fontSize: 11, color: TOKENS.inkSoft, flex: 1 }}>{p._deal.chefName}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: p._deal.status === "done" ? TOKENS.moss : "#B45309" }}>
+                  {p._deal.status === "done" ? "✓ 완료" : "진행 중"}
+                </span>
+                {p._deal.selectedAt && (
+                  <span style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+                    {new Date(p._deal.selectedAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -5834,28 +5916,21 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
       </div>
 
       {(data.farmName || data.specialty.length > 0) && (
-        <div style={{ marginTop: 24, background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 16, boxShadow: "0 1px 6px rgba(32,40,31,0.05)" }}>
-          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
-            미리보기
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12 }}>
+            👁️ 셰프에게 이렇게 보여요
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            {data.photoURL && <img src={data.photoURL} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />}
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flex: 1 }}>
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: TOKENS.ink }}>
-                {data.farmName || "—"}
-              </span>
-              <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TOKENS.inkSoft }}>{data.region}</span>
-              {avgRating !== null && (
-                <span style={{ fontSize: 12, color: "#7A5C20", marginLeft: "auto" }}>★ {avgRating.toFixed(1)} ({ratedProposals.length}건)</span>
-              )}
-            </div>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: data.description ? 8 : 0 }}>
-            {data.cert && data.cert !== "인증 없음" && <span style={chipBadge(TOKENS.mossSoft, TOKENS.moss)}>{data.cert}</span>}
-            {data.specialty.map((c) => <span key={c} style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>{c}</span>)}
-            {data.leadTimeDays && <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>리드타임 {data.leadTimeDays}일</span>}
-          </div>
-          {data.description && <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.6 }}>"{data.description}"</p>}
+          <FarmProfileDetailCard
+            proposal={{
+              farmName: data.farmName || "농가명 미입력",
+              farmerName: userName,
+              region: data.region,
+              cert: data.cert,
+              specialty: data.specialty,
+              photoURL: data.photoURL,
+            }}
+            allDeals={deals}
+          />
         </div>
       )}
       </div>
