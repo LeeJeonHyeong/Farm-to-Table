@@ -149,6 +149,21 @@ const CROPS = {
 };
 const CROP_OPTIONS = Object.keys(CROPS);
 
+const SEASONAL_CROPS = {
+  1:  ["시금치", "비트", "케일"],
+  2:  ["시금치", "케일", "로메인"],
+  3:  ["딸기", "로메인", "루꼴라"],
+  4:  ["딸기", "로메인", "루꼴라", "바질"],
+  5:  ["딸기", "토마토", "루꼴라", "바질", "파슬리"],
+  6:  ["토마토", "블루베리", "파프리카", "깻잎", "바질"],
+  7:  ["토마토", "블루베리", "복숭아", "파프리카", "깻잎", "애호박"],
+  8:  ["복숭아", "무화과", "토마토", "파프리카", "가지", "고수"],
+  9:  ["무화과", "파프리카", "가지", "표고버섯"],
+  10: ["무화과", "표고버섯", "시금치", "비트"],
+  11: ["시금치", "비트", "표고버섯", "케일"],
+  12: ["시금치", "비트", "케일", "로메인"],
+};
+
 const RIPENESS_STAGES = {
   토마토: ["그린(미숙)", "브레이커", "터닝", "핑크", "라이트레드", "레드(완숙)"],
   딸기: ["화이트(미숙)", "핑크", "레드 70%", "완숙(레드 100%)"],
@@ -667,6 +682,37 @@ function StarRating({ value, onChange, size = 18 }) {
           ★
         </button>
       ))}
+    </div>
+  );
+}
+
+function SeasonalBanner({ onSelectCrop, activeCrop }) {
+  const month = new Date().getMonth() + 1;
+  const crops = SEASONAL_CROPS[month] || [];
+  const SEASON_ICONS = { 1:"❄️", 2:"❄️", 3:"🌸", 4:"🌸", 5:"🌿", 6:"☀️", 7:"☀️", 8:"☀️", 9:"🍂", 10:"🍂", 11:"🍂", 12:"❄️" };
+  return (
+    <div style={{ background: `linear-gradient(135deg, ${TOKENS.mossSoft}80, ${TOKENS.goldSoft}70)`, border: `1px solid ${TOKENS.moss}33`, borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <span style={{ fontSize: 16 }}>{SEASON_ICONS[month]}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: TOKENS.ink }}>{month}월 제철 식재료</span>
+        <span style={{ fontSize: 11, color: TOKENS.inkSoft, marginLeft: 4 }}>지금 제철인 딜을 먼저 확인해보세요</span>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {crops.map((crop) => (
+          <button
+            key={crop}
+            onClick={() => onSelectCrop(activeCrop === crop ? "전체" : crop)}
+            style={{
+              padding: "5px 14px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 0.12s",
+              background: activeCrop === crop ? TOKENS.moss : "#fff",
+              color: activeCrop === crop ? "#fff" : TOKENS.moss,
+              border: `1px solid ${TOKENS.moss}55`,
+            }}
+          >
+            {crop}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1370,6 +1416,28 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
           <select value={data.crop} onChange={(e) => handleCropChange(e.target.value)} style={inputStyle}>
             {CROP_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+          {(() => {
+            const month = new Date().getMonth() + 1;
+            const seasonal = SEASONAL_CROPS[month] || [];
+            if (seasonal.length === 0) return null;
+            return (
+              <div style={{ marginTop: 10, background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, borderRadius: 8, padding: "8px 12px" }}>
+                <div style={{ fontSize: 11, color: TOKENS.moss, fontWeight: 500, marginBottom: 6 }}>🌿 {month}월 제철 — 클릭하면 바로 선택돼요</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {seasonal.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => handleCropChange(c)}
+                      style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer", border: `1px solid ${TOKENS.moss}55`, background: data.crop === c ? TOKENS.moss : "#fff", color: data.crop === c ? "#fff" : TOKENS.moss, fontWeight: data.crop === c ? 600 : 400 }}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </Section>
       )}
 
@@ -2473,6 +2541,9 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
           </button>
         </div>
       )}
+
+      {/* 제철 식재료 추천 배너 */}
+      {!showBookmarks && !specialtyOnly && <SeasonalBanner onSelectCrop={setCropFilter} activeCrop={cropFilter} />}
 
       {/* 빠른 필터 토글 행: 내 전문품목만 + 저장한 딜 */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
