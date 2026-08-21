@@ -1697,7 +1697,7 @@ const SORT_OPTIONS = [
   { value: "proposals", label: "제안 많은순" },
 ];
 
-function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, onRateChef, chatUnreads = {} }) {
+function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, onRateChef, onRespondCounterOffer, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
@@ -1723,6 +1723,7 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
         onViewContract={onViewContract}
         onShipDeal={onShipDeal}
         onRateChef={onRateChef}
+        onRespondCounterOffer={onRespondCounterOffer}
         chatUnreads={chatUnreads}
       />
     );
@@ -1924,7 +1925,7 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
   );
 }
 
-function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, onViewContract, onShipDeal, onRateChef, chatUnreads = {} }) {
+function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, onViewContract, onShipDeal, onRateChef, onRespondCounterOffer, chatUnreads = {} }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const [showShipModal, setShowShipModal] = useState(false);
@@ -2011,6 +2012,27 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
           </div>
         )}
       </div>
+
+      {/* 역제안 수신 배너 */}
+      {proposal.counterOffer && (
+        <div style={{ background: proposal.counterOffer.status === "pending" ? TOKENS.rustSoft : TOKENS.line, border: `1px solid ${proposal.counterOffer.status === "pending" ? TOKENS.rust : TOKENS.line}44`, borderRadius: 14, padding: isMobile ? 16 : 20, marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: proposal.counterOffer.status === "pending" ? TOKENS.rust : TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+            {proposal.counterOffer.status === "pending" ? "💱 셰프가 역제안을 보냈습니다" : proposal.counterOffer.status === "accepted" ? "✅ 역제안 수락됨" : "역제안 거절됨"}
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace", marginBottom: 10 }}>
+            {proposal.counterOffer.price.toLocaleString()}원/kg
+            <span style={{ fontSize: 12, fontWeight: 400, color: TOKENS.inkSoft, marginLeft: 10 }}>
+              (내 제안 {proposal.price.toLocaleString()}원 대비 {proposal.counterOffer.price < proposal.price ? `${(proposal.price - proposal.counterOffer.price).toLocaleString()}원 낮음` : `${(proposal.counterOffer.price - proposal.price).toLocaleString()}원 높음`})
+            </span>
+          </div>
+          {proposal.counterOffer.status === "pending" && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => onRespondCounterOffer?.(deal.id, proposal.id, true)} style={{ flex: 1, padding: "10px 0", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>수락 — 계약 진행</button>
+              <button onClick={() => onRespondCounterOffer?.(deal.id, proposal.id, false)} style={{ flex: 1, padding: "10px 0", background: "transparent", border: `1px solid ${TOKENS.rust}`, borderRadius: 10, fontSize: 13, color: TOKENS.rust, cursor: "pointer" }}>거절</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* AI 매칭 점수 */}
       {score && (
@@ -3066,6 +3088,41 @@ const getTrackingURL = (courier, trackingNo) => {
   };
   return map[courier] || null;
 };
+
+function CounterOfferModal({ proposal, dealTargetPrice, onClose, onSubmit }) {
+  const [price, setPrice] = useState(dealTargetPrice || proposal.price);
+  const isValid = price > 0 && price !== proposal.price;
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: TOKENS.card, borderRadius: 16, padding: 24, width: "100%", maxWidth: 380, boxShadow: "0 8px 40px rgba(32,40,31,0.18)" }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: TOKENS.ink, marginBottom: 4 }}>역제안 보내기</div>
+        <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 18 }}>{proposal.farmName} · 현재 제안가 {proposal.price.toLocaleString()}원/kg</div>
+        <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 6 }}>역제안 단가 (원/kg)</div>
+        <input
+          type="number"
+          value={price}
+          onChange={(e) => setPrice(Number(e.target.value))}
+          style={{ ...inputStyle, width: "100%", fontSize: 18, fontWeight: 600, textAlign: "center", marginBottom: 10 }}
+        />
+        {price > 0 && price !== proposal.price && (
+          <div style={{ fontSize: 12, color: price < proposal.price ? TOKENS.moss : TOKENS.rust, marginBottom: 14, textAlign: "center" }}>
+            {price < proposal.price ? `농가 제안가보다 ${(proposal.price - price).toLocaleString()}원 낮음` : `농가 제안가보다 ${(price - proposal.price).toLocaleString()}원 높음`}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 10, fontSize: 13, color: TOKENS.inkSoft, cursor: "pointer" }}>취소</button>
+          <button
+            onClick={() => isValid && onSubmit(price)}
+            disabled={!isValid}
+            style={{ flex: 2, padding: "11px 0", background: isValid ? TOKENS.ink : TOKENS.line, color: isValid ? TOKENS.bg : TOKENS.inkSoft, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: isValid ? "pointer" : "not-allowed" }}
+          >
+            역제안 전송
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ShipModal({ onClose, onConfirm }) {
   const [courier, setCourier] = useState(COURIERS[0]);
@@ -4588,7 +4645,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {}, userId = "", onNextCycle, onAnswerInquiry }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {}, userId = "", onNextCycle, onAnswerInquiry, onSendCounterOffer }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -4599,6 +4656,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
   const [farmProfileModal, setFarmProfileModal] = useState(null);
   const [compareIds, setCompareIds] = useState([]);
   const [favFarms, setFavFarms] = useState(() => getFavFarms(userId));
+  const [counterTarget, setCounterTarget] = useState(null);
   useEffect(() => { setCompareIds([]); }, [expandedId]);
   const isMobile = useIsMobile();
 
@@ -4670,6 +4728,14 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
           proposal={farmProfileModal}
           allDeals={deals}
           onClose={() => setFarmProfileModal(null)}
+        />
+      )}
+      {counterTarget && (
+        <CounterOfferModal
+          proposal={counterTarget.proposal}
+          dealTargetPrice={counterTarget.dealTargetPrice}
+          onClose={() => setCounterTarget(null)}
+          onSubmit={(price) => { onSendCounterOffer?.(counterTarget.dealId, counterTarget.proposal.id, price); setCounterTarget(null); }}
         />
       )}
       {/* 내 거래 데코 배너 */}
@@ -5042,12 +5108,26 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                                 onClick={() => setDetailProposal({ proposal: p, deal })}
                                 onViewProfile={(pp) => setFarmProfileModal(pp)}
                               />
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onOpenChat({ dealId: deal.id, proposalId: p.id, crop: deal.crop, chefName: deal.chefName, farmName: p.farmName }); }}
-                                style={{ width: "100%", padding: "7px 0", marginTop: 6, background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer" }}
-                              >
-                                💬 {p.farmName}과 채팅
-                              </button>
+                              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); onOpenChat({ dealId: deal.id, proposalId: p.id, crop: deal.crop, chefName: deal.chefName, farmName: p.farmName }); }}
+                                  style={{ flex: 1, padding: "7px 0", background: TOKENS.mossSoft, color: TOKENS.moss, border: `1px solid ${TOKENS.moss}44`, borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+                                >
+                                  💬 채팅
+                                </button>
+                                {p.counterOffer?.status === "pending" ? (
+                                  <span style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: TOKENS.gold, fontWeight: 600, border: `1px solid ${TOKENS.gold}44`, borderRadius: 8, padding: "7px 0", background: TOKENS.goldSoft }}>
+                                    역제안 대기중
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setCounterTarget({ dealId: deal.id, proposal: p, dealTargetPrice: deal.targetPrice }); }}
+                                    style={{ flex: 1, padding: "7px 0", background: TOKENS.rustSoft, color: TOKENS.rust, border: `1px solid ${TOKENS.rust}44`, borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+                                  >
+                                    💱 역제안
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -6611,6 +6691,17 @@ export default function FarmToTableApp() {
                 "dashboard"
               );
             }
+            // 역제안 수락/거절 알림 (셰프)
+            deal.proposals.forEach((p) => {
+              const oldP = old.proposals.find((pp) => pp.id === p.id);
+              if (!oldP) return;
+              if (oldP.counterOffer?.status === "pending" && p.counterOffer?.status === "accepted") {
+                showPushNotification("✅ 역제안 수락됨", `${p.farmName}이(가) ${p.counterOffer.price.toLocaleString()}원/kg 역제안을 수락하고 계약을 진행합니다.`, "mydeals");
+              }
+              if (oldP.counterOffer?.status === "pending" && p.counterOffer?.status === "declined") {
+                showPushNotification("❌ 역제안 거절됨", `${p.farmName}이(가) 역제안을 거절했습니다.`, "mydeals");
+              }
+            });
             // 새 농가 문의 도착 알림 (셰프)
             const oldInqCount = (old.inquiries || []).length;
             const newInqCount = (deal.inquiries || []).length;
@@ -6642,6 +6733,14 @@ export default function FarmToTableApp() {
               }
             }
             if (!old) return;
+            // 역제안 도착 알림 (농가)
+            deal.proposals.forEach((p) => {
+              if (p.farmerName !== cu.name) return;
+              const oldP = old.proposals?.find((pp) => pp.id === p.id);
+              if (!oldP?.counterOffer && p.counterOffer?.status === "pending") {
+                showPushNotification("💱 역제안 도착", `${deal.chefName}이(가) ${deal.crop} 딜에서 ${p.counterOffer.price.toLocaleString()}원/kg으로 역제안을 보냈습니다.`, "myproposals");
+              }
+            });
             // 문의 답변 도착 알림 (농가) — 제안 상태와 무관하게 항상 체크
             (deal.inquiries || []).forEach((inq) => {
               if (inq.farmerName !== cu.name) return;
@@ -7020,6 +7119,53 @@ export default function FarmToTableApp() {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal) return;
     const updated = { ...deal, chefRating: rating, chefReview: review, chefRatedAt: Date.now() };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
+  const handleSendCounterOffer = (dealId, proposalId, counterPrice) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const updated = {
+      ...deal,
+      proposals: deal.proposals.map((p) =>
+        p.id === proposalId
+          ? { ...p, counterOffer: { price: counterPrice, sentAt: Date.now(), status: "pending" } }
+          : p
+      ),
+    };
+    setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
+    persistDeal(updated);
+  };
+
+  const handleRespondCounterOffer = (dealId, proposalId, accept) => {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+    const proposal = deal.proposals.find((p) => p.id === proposalId);
+    if (!proposal?.counterOffer) return;
+    let updated;
+    if (accept) {
+      updated = {
+        ...deal,
+        selectedProposalId: proposalId,
+        status: "matched",
+        selectedAt: Date.now(),
+        proposals: deal.proposals.map((p) =>
+          p.id === proposalId
+            ? { ...p, price: p.counterOffer.price, counterOffer: { ...p.counterOffer, status: "accepted" } }
+            : p
+        ),
+      };
+    } else {
+      updated = {
+        ...deal,
+        proposals: deal.proposals.map((p) =>
+          p.id === proposalId
+            ? { ...p, counterOffer: { ...p.counterOffer, status: "declined" } }
+            : p
+        ),
+      };
+    }
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
   };
@@ -7755,7 +7901,7 @@ export default function FarmToTableApp() {
                     <circle cx="53" cy="186" r="5" fill="#8B5C10"/>
                   </svg>
                 )}
-                <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} onRateChef={handleRateChef} chatUnreads={chatUnreads} />
+                <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} onRateChef={handleRateChef} onRespondCounterOffer={handleRespondCounterOffer} chatUnreads={chatUnreads} />
               </div>
             )}
             {/* ── 내 거래 ── */}
@@ -7876,7 +8022,7 @@ export default function FarmToTableApp() {
                     <rect x="54" y="211" width="52" height="9" rx="3" fill="#B44A28"/>
                   </svg>
                 )}
-                <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} onAnswerInquiry={handleAnswerInquiry} />
+                <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} onAnswerInquiry={handleAnswerInquiry} onSendCounterOffer={handleSendCounterOffer} />
               </div>
             )}
             {/* ── 내 농가 ── */}
