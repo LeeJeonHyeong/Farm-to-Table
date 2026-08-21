@@ -2972,7 +2972,7 @@ function InquiryAnswerCard({ inquiry, onAnswer }) {
 
 function FarmProfileDetailCard({ proposal, allDeals = [] }) {
   const isMobile = useIsMobile();
-  const [certLightbox, setCertLightbox] = React.useState(false);
+  const [certLightbox, setCertLightbox] = useState(false);
 
   const reviews = allDeals
     .flatMap((d) => (d.proposals || []).map((p) => ({ ...p, dealCrop: d.crop })))
