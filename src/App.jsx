@@ -3517,21 +3517,37 @@ function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
     const label = type === "deposit" ? "선급금" : "잔금";
     const paidAt = type === "deposit" ? deal.depositPaidAt : deal.balancePaidAt;
     const paidStr = paidAt ? new Date(paidAt).toLocaleString("ko-KR") : "-";
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>거래 영수증</title>
-<style>body{font-family:'Apple SD Gothic Neo',Arial,sans-serif;max-width:380px;margin:40px auto;color:#20281F}h2{font-size:20px;margin-bottom:4px}hr{border:none;border-top:1px solid #D8D2C0;margin:14px 0}.row{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px}.label{color:#5B6358}.value{font-weight:600}.total{font-size:16px;color:#5B7553}.footer{font-size:11px;color:#5B6358;margin-top:20px;text-align:center}</style>
+    const dealNo = (deal.id || "").slice(0, 10).toUpperCase();
+    const supplyAmt = Math.round(amount / 1.1);
+    const vatAmt = amount - supplyAmt;
+    const deliveredStr = deal.deliveredAt ? new Date(deal.deliveredAt).toLocaleDateString("ko-KR") : new Date().toLocaleDateString("ko-KR");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>거래명세서</title>
+<style>body{font-family:'Apple SD Gothic Neo',Arial,sans-serif;max-width:480px;margin:40px auto;color:#20281F;font-size:14px}h2{font-size:22px;margin-bottom:2px;letter-spacing:-0.5px}hr{border:none;border-top:1px solid #D8D2C0;margin:14px 0}.row{display:flex;justify-content:space-between;margin-bottom:7px}.label{color:#5B6358}.value{font-weight:600}.total{font-size:16px;color:#5B7553}.vat{font-size:12px;color:#5B6358;margin-top:2px}.footer{font-size:11px;color:#5B6358;margin-top:24px;padding-top:14px;border-top:1px solid #D8D2C0;line-height:1.7}.badge{display:inline-block;background:#F0EDE0;border:1px solid #D8D2C0;border-radius:4px;padding:2px 8px;font-size:11px;color:#5B6358;margin-bottom:14px}</style>
 </head><body>
-<h2>거래 영수증</h2><p style="font-size:12px;color:#5B6358">Farm-to-Table 플랫폼</p>
+<h2>거래명세서</h2>
+<p style="font-size:12px;color:#5B6358;margin:4px 0 12px">Farm-to-Table 플랫폼 · 역경매 방식 선주문</p>
+<div class="badge">거래번호 ${dealNo} · ${label} 결제</div>
 <hr>
-<div class="row"><span class="label">구분</span><span class="value">${label} 결제</span></div>
-<div class="row"><span class="label">품목</span><span class="value">${deal.crop} ${deal.quantity}kg</span></div>
-<div class="row"><span class="label">셰프</span><span class="value">${deal.chefName}</span></div>
-<div class="row"><span class="label">농가</span><span class="value">${proposal.farmName}</span></div>
+<div class="row"><span class="label">공급자 (농가)</span><span class="value">${proposal.farmName}</span></div>
+<div class="row"><span class="label">공급받는 자 (셰프)</span><span class="value">${deal.chefName}${deal.chefRegion ? " · " + deal.chefRegion : ""}</span></div>
+<div class="row"><span class="label">작성일</span><span class="value">${new Date().toLocaleDateString("ko-KR")}</span></div>
+<div class="row"><span class="label">납품일</span><span class="value">${deliveredStr}</span></div>
+<hr>
+<div class="row"><span class="label">품목</span><span class="value">${deal.crop}${deal.grade ? " (" + deal.grade + ")" : ""}</span></div>
+<div class="row"><span class="label">수량</span><span class="value">${deal.quantity}kg</span></div>
 <div class="row"><span class="label">단가</span><span class="value">${proposal.price.toLocaleString()}원/kg</span></div>
+<div class="row"><span class="label">계약 총액</span><span class="value">${total.toLocaleString()}원</span></div>
 <hr>
-<div class="row total"><span class="label">결제금액</span><span class="value">${amount.toLocaleString()}원</span></div>
+<div class="row total"><span class="label">공급가액 (VAT 별도 추정)</span><span class="value">${supplyAmt.toLocaleString()}원</span></div>
+<div class="row"><span class="label">부가세 (10% 추정)</span><span class="value">${vatAmt.toLocaleString()}원</span></div>
+<div class="row total" style="margin-top:4px"><span class="label" style="font-weight:700">${label} 결제금액</span><span class="value" style="font-size:17px;color:#5B7553">${amount.toLocaleString()}원</span></div>
 <div class="row"><span class="label">결제일시</span><span class="value">${paidStr}</span></div>
-${type === "balance" ? `<div class="row"><span class="label">수수료(10%)</span><span class="value">-${fee.toLocaleString()}원</span></div><div class="row total"><span class="label">농가 실수령액</span><span class="value">${(total - fee).toLocaleString()}원</span></div>` : ""}
-<p class="footer">본 영수증은 임시 증빙용이며 정식 세금계산서를 대체하지 않습니다.</p>
+${type === "balance" ? `<hr><div class="row"><span class="label">플랫폼 수수료 (10%)</span><span class="value">-${fee.toLocaleString()}원</span></div><div class="row total"><span class="label">농가 실수령액</span><span class="value">${(total - fee).toLocaleString()}원</span></div>` : ""}
+<div class="footer">
+  ⚠️ 본 거래명세서는 참고용 증빙 서류입니다.<br>
+  법적 효력을 갖는 <strong>전자세금계산서</strong>는 거래 당사자 간 협의 후<br>
+  <strong>국세청 홈택스(hometax.go.kr)</strong>에서 직접 발행하시기 바랍니다.
+</div>
 <script>window.print();window.close();</script></body></html>`;
     const w = window.open("", "_blank");
     w.document.write(html);
@@ -3663,14 +3679,25 @@ ${type === "balance" ? `<div class="row"><span class="label">수수료(10%)</spa
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           {depositPaid && (
             <button onClick={() => printReceipt("deposit")} style={{ flex: 1, padding: "7px 0", fontSize: 12, color: TOKENS.inkSoft, background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 7, cursor: "pointer" }}>
-              🖨 선급금 영수증
+              🖨 선급금 거래명세서
             </button>
           )}
           {balancePaid && (
             <button onClick={() => printReceipt("balance")} style={{ flex: 1, padding: "7px 0", fontSize: 12, color: TOKENS.inkSoft, background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 7, cursor: "pointer" }}>
-              🖨 잔금 영수증
+              🖨 잔금 거래명세서
             </button>
           )}
+        </div>
+      )}
+      {(depositPaid || balancePaid) && (
+        <div style={{ marginTop: 10, background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 8, padding: "10px 12px", fontSize: 11, color: TOKENS.inkSoft, lineHeight: 1.7 }}>
+          <span style={{ fontWeight: 600, color: TOKENS.ink }}>📄 세금계산서 안내</span><br />
+          위 거래명세서는 참고용입니다. 법적 효력을 갖는 전자세금계산서는{" "}
+          <a href="https://www.hometax.go.kr" target="_blank" rel="noopener noreferrer"
+            style={{ color: TOKENS.moss, fontWeight: 600, textDecoration: "none" }}>
+            국세청 홈택스
+          </a>
+          에서 거래 당사자 간 직접 발행하시기 바랍니다.
         </div>
       )}
     </div>
