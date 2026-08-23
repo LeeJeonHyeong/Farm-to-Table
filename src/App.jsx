@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from "react";
-import { storage, db, auth } from "./firebase";
+import { storage, db, auth, fbStorage } from "./firebase";
+import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
 import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
@@ -13,7 +14,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-function ImageUpload({ value, onChange, label = "사진 추가", shape = "square", size = 96 }) {
+function ImageUpload({ value, onChange, label = "사진 추가", shape = "square", size = 96, storagePath }) {
   const [compressing, setCompressing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const fileRef = useRef(null);
@@ -23,7 +24,7 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
     setCompressing(true);
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
+    img.onload = async () => {
       const MAX = 900;
       let { width, height } = img;
       if (width > MAX || height > MAX) {
@@ -34,7 +35,19 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
       canvas.width = width; canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      onChange(canvas.toDataURL("image/jpeg", 0.82));
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      if (storagePath) {
+        try {
+          const sRef = storageRef(fbStorage, storagePath);
+          await uploadString(sRef, dataUrl, "data_url");
+          const downloadUrl = await getDownloadURL(sRef);
+          onChange(downloadUrl);
+        } catch {
+          onChange(dataUrl);
+        }
+      } else {
+        onChange(dataUrl);
+      }
       setCompressing(false);
     };
     img.onerror = () => setCompressing(false);
@@ -231,6 +244,7 @@ const TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq";
 const BALANCE_DUE_DAYS = 7;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
+const bookmarkKey = (uid) => `farm-bookmarks-${uid}`;
 const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
@@ -1686,7 +1700,7 @@ function ChefProfileMiniCard({ chefData, deal }) {
   );
 }
 
-function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastProposal }) {
+function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastProposal, userId }) {
   const preFilled = lastProposal != null;
   const [data, setData] = useState({
     farmName: farmProfile?.farmName || farmerName || "",
@@ -1783,7 +1797,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
       />
       <div style={{ marginTop: 12 }}>
         <FieldLabel>작물 사진 첨부 (선택)</FieldLabel>
-        <ImageUpload value={data.cropPhotoURL} onChange={(v) => update("cropPhotoURL", v)} label="작물 사진 추가" shape="square" size={80} />
+        <ImageUpload value={data.cropPhotoURL} onChange={(v) => update("cropPhotoURL", v)} label="작물 사진 추가" shape="square" size={80} storagePath={userId ? `images/${userId}/crop_${deal.id}` : undefined} />
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button type="button" onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: "10px 0", background: submitting ? TOKENS.inkSoft : TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: submitting ? "default" : "pointer" }}>
@@ -2407,6 +2421,7 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
             farmProfile={farmProfile}
             farmerName={userName}
             lastProposal={lastProposal}
+            userId={userId}
           />
         ) : (
           <button
@@ -2454,12 +2469,27 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
     try { return new Set(JSON.parse(localStorage.getItem(`farm-bookmarks-${userId}`) || "[]")); } catch { return new Set(); }
   });
   const [showBookmarks, setShowBookmarks] = useState(false);
+
+  // Firestore에서 북마크 로드 (기기 간 동기화)
+  useEffect(() => {
+    if (!userId) return;
+    storage.get(bookmarkKey(userId)).then((result) => {
+      if (result?.value) {
+        const saved = JSON.parse(result.value);
+        setBookmarks(new Set(saved));
+        localStorage.setItem(`farm-bookmarks-${userId}`, JSON.stringify(saved));
+      }
+    }).catch(() => {});
+  }, [userId]);
+
   const toggleBookmark = (dealId, e) => {
     e.stopPropagation();
     setBookmarks((prev) => {
       const next = new Set(prev);
       if (next.has(dealId)) next.delete(dealId); else next.add(dealId);
-      localStorage.setItem(`farm-bookmarks-${userId}`, JSON.stringify([...next]));
+      const arr = [...next];
+      localStorage.setItem(`farm-bookmarks-${userId}`, JSON.stringify(arr));
+      storage.set(bookmarkKey(userId), JSON.stringify(arr)).catch(() => {});
       return next;
     });
   };
@@ -5667,6 +5697,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
           label="로고·사진"
           shape="circle"
           size={76}
+          storagePath={userId ? `images/${userId}/chef_profile` : undefined}
         />
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>레스토랑 사진</div>
@@ -5870,6 +5901,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
           label="농가·사진"
           shape="circle"
           size={76}
+          storagePath={userId ? `images/${userId}/farm_profile` : undefined}
         />
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>농가 사진</div>
@@ -5937,7 +5969,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
       {data.cert && data.cert !== "인증 없음" && (
         <div style={{ marginTop: 10 }}>
           <FieldLabel>인증서 사진 첨부 (선택)</FieldLabel>
-          <ImageUpload value={data.certPhotoURL || ""} onChange={(v) => update("certPhotoURL", v)} label="인증서 사진 추가" shape="square" size={80} />
+          <ImageUpload value={data.certPhotoURL || ""} onChange={(v) => update("certPhotoURL", v)} label="인증서 사진 추가" shape="square" size={80} storagePath={userId ? `images/${userId}/cert` : undefined} />
           <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginTop: 4 }}>사진을 첨부하면 셰프에게 인증서 확인 표시(✓)가 보입니다</div>
         </div>
       )}
