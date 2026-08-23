@@ -245,6 +245,7 @@ const BALANCE_DUE_DAYS = 7;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
 const bookmarkKey = (uid) => `farm-bookmarks-${uid}`;
+const notifHistoryKey = (uid) => `notif-history-${uid}`;
 const NOTIFIED_DEALS_KEY = "notified-deals-v1";
 const getNotifiedDeals = () => {
   try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_DEALS_KEY) || "[]")); }
@@ -6492,7 +6493,7 @@ function ContractModal({ deal, proposal, onClose, userRole, onSign }) {
         @media print{@page{margin:15mm}body{padding:0}}
       </style></head><body>${content}</body></html>`);
     win.document.close();
-    setTimeout(() => win.print(), 600);
+    win.onload = () => win.print();
   };
 
   const row = (k, v, bold) => (
@@ -6726,12 +6727,29 @@ export default function FarmToTableApp() {
     _recordNotif = (notif) => {
       setNotifHistory((prev) => {
         const next = [notif, ...prev].slice(0, 50);
-        localStorage.setItem("notif-history", JSON.stringify(next));
+        const raw = JSON.stringify(next);
+        localStorage.setItem("notif-history", raw);
+        const uid = userRef.current?.uid;
+        if (uid) storage.set(notifHistoryKey(uid), raw).catch(() => {});
         return next;
       });
     };
     return () => { _recordNotif = null; };
   }, []);
+
+  // user 로그인 시 Firestore 알림 내역으로 동기화
+  useEffect(() => {
+    if (!user) return;
+    storage.get(notifHistoryKey(user.uid)).then((result) => {
+      if (!result?.value) return;
+      try {
+        const fsHistory = JSON.parse(result.value);
+        if (!Array.isArray(fsHistory) || fsHistory.length === 0) return;
+        setNotifHistory(fsHistory);
+        localStorage.setItem("notif-history", result.value);
+      } catch {}
+    }).catch(() => {});
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -6861,9 +6879,11 @@ export default function FarmToTableApp() {
         try {
           let profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
           if (!profileResult?.value) {
-            // 신규 가입 직후 auth 이벤트가 프로필 쓰기보다 먼저 도착할 수 있음 — 짧게 대기 후 재시도
-            await new Promise((r) => setTimeout(r, 900));
-            profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
+            // 신규 가입 직후 auth 이벤트가 프로필 쓰기보다 먼저 도착할 수 있음 — 최대 5회 재시도
+            for (let attempt = 0; attempt < 5 && !profileResult?.value; attempt++) {
+              await new Promise((r) => setTimeout(r, 300));
+              profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
+            }
           }
           if (profileResult?.value) {
             const { role, displayName } = JSON.parse(profileResult.value);
@@ -7724,7 +7744,9 @@ export default function FarmToTableApp() {
                   if (!notifOpen) {
                     setNotifHistory((prev) => {
                       const next = prev.map((n) => ({ ...n, read: true }));
-                      localStorage.setItem("notif-history", JSON.stringify(next));
+                      const raw = JSON.stringify(next);
+                      localStorage.setItem("notif-history", raw);
+                      if (user?.uid) storage.set(notifHistoryKey(user.uid), raw).catch(() => {});
                       return next;
                     });
                   }
@@ -7743,7 +7765,7 @@ export default function FarmToTableApp() {
                   <div style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: TOKENS.ink }}>알림</span>
                     {notifHistory.length > 0 && (
-                      <button onClick={() => { setNotifHistory([]); localStorage.removeItem("notif-history"); }} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: "none", cursor: "pointer", padding: 0 }}>모두 지우기</button>
+                      <button onClick={() => { setNotifHistory([]); localStorage.removeItem("notif-history"); if (user?.uid) storage.set(notifHistoryKey(user.uid), "[]").catch(() => {}); }} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: "none", cursor: "pointer", padding: 0 }}>모두 지우기</button>
                     )}
                   </div>
                   {notifHistory.length === 0 ? (
