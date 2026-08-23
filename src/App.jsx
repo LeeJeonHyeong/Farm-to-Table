@@ -245,6 +245,18 @@ const BALANCE_DUE_DAYS = 7;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
 const bookmarkKey = (uid) => `farm-bookmarks-${uid}`;
+const NOTIFIED_DEALS_KEY = "notified-deals-v1";
+const getNotifiedDeals = () => {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_DEALS_KEY) || "[]")); }
+  catch { return new Set(); }
+};
+const addNotifiedDeal = (id) => {
+  const s = getNotifiedDeals();
+  s.add(id);
+  const arr = [...s];
+  if (arr.length > 300) arr.splice(0, arr.length - 300);
+  localStorage.setItem(NOTIFIED_DEALS_KEY, JSON.stringify(arr));
+};
 const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
@@ -6777,25 +6789,42 @@ export default function FarmToTableApp() {
     }
   }, []);
 
-  // 데이터 로드 완료 후 미처리 결제 반영
+  // user 로드 직후 — localStorage 결제 대기 정보를 Firestore에 백업 (브라우저 크래시 대비)
   useEffect(() => {
-    if (loadState !== "ready") return;
+    if (!user) return;
     const raw = localStorage.getItem("pending-toss-payment");
     if (!raw) return;
-    localStorage.removeItem("pending-toss-payment");
-    try {
-      const { orderId, paymentKey, amount } = JSON.parse(raw);
-      const isDeposit = orderId.startsWith("dep-");
-      const dealId = orderId.slice(4);
-      if (isDeposit) {
-        handleDepositPaid(dealId, { paymentKey, amount });
-        showPushNotification("💰 선급금 결제 완료", `${Number(amount).toLocaleString()}원이 결제됐습니다.`, "mydeals");
-      } else {
-        handleBalancePaid(dealId, { paymentKey, amount });
-        showPushNotification("💰 잔금 결제 완료", `${Number(amount).toLocaleString()}원이 결제됐습니다.`, "mydeals");
+    storage.set(`pending-toss-${user.uid}`, raw).catch(() => {});
+  }, [user]);
+
+  // 데이터 로드 완료 후 미처리 결제 반영 (localStorage 우선, Firestore 폴백)
+  useEffect(() => {
+    if (loadState !== "ready") return;
+    const firestoreKey = user ? `pending-toss-${user.uid}` : null;
+    const process = async () => {
+      let raw = localStorage.getItem("pending-toss-payment");
+      if (!raw && firestoreKey) {
+        const fsResult = await storage.get(firestoreKey).catch(() => null);
+        if (fsResult?.value) raw = fsResult.value;
       }
-      setTab("mydeals");
-    } catch { /* ignore */ }
+      if (!raw) return;
+      localStorage.removeItem("pending-toss-payment");
+      if (firestoreKey) storage.set(firestoreKey, "").catch(() => {});
+      try {
+        const { orderId, paymentKey, amount } = JSON.parse(raw);
+        const isDeposit = orderId.startsWith("dep-");
+        const dealId = orderId.slice(4);
+        if (isDeposit) {
+          handleDepositPaid(dealId, { paymentKey, amount });
+          showPushNotification("💰 선급금 결제 완료", `${Number(amount).toLocaleString()}원이 결제됐습니다.`, "mydeals");
+        } else {
+          handleBalancePaid(dealId, { paymentKey, amount });
+          showPushNotification("💰 잔금 결제 완료", `${Number(amount).toLocaleString()}원이 결제됐습니다.`, "mydeals");
+        }
+        setTab("mydeals");
+      } catch { /* ignore */ }
+    };
+    process();
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 잔금 결제 기한 알림 (앱 로드 시 1회 체크)
@@ -7009,9 +7038,9 @@ export default function FarmToTableApp() {
             if (!old && deal.status === "open") {
               const fp = farmRef.current;
               if (fp?.notifyNewDeals && (fp.specialty || []).includes(deal.crop)) {
-                const dedupKey = `notified-deal-${deal.id}`;
-                if (!localStorage.getItem(dedupKey)) {
-                  localStorage.setItem(dedupKey, "1");
+                const _notified = getNotifiedDeals();
+                if (!_notified.has(deal.id)) {
+                  addNotifiedDeal(deal.id);
                   showPushNotification(
                     `🌾 새 딜 등록 — ${deal.crop}`,
                     `${deal.chefName}이(가) ${deal.crop} 딜을 올렸습니다. 지금 제안해보세요.`,
