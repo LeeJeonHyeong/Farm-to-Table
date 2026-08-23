@@ -95,6 +95,29 @@ function PhotoLightbox({ src, onClose }) {
   );
 }
 
+function Toast({ message, onClose }) {
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(onClose, 4500);
+    return () => clearTimeout(t);
+  }, [message, onClose]);
+  if (!message) return null;
+  return (
+    <div style={{
+      position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+      background: "rgba(32,40,31,0.93)", color: "#fff", borderRadius: 12,
+      padding: "13px 20px", fontSize: 14, lineHeight: 1.5,
+      boxShadow: "0 6px 28px rgba(32,40,31,0.28)", zIndex: 9999,
+      display: "flex", alignItems: "center", gap: 14, maxWidth: "min(90vw, 420px)",
+      backdropFilter: "blur(6px)", whiteSpace: "pre-line", fontFamily: "'IBM Plex Sans', sans-serif",
+      animation: "fadeSlideUp 0.2s ease",
+    }}>
+      <span style={{ flex: 1 }}>{message}</span>
+      <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.65)", cursor: "pointer", fontSize: 17, lineHeight: 1, flexShrink: 0, padding: 0 }}>✕</button>
+    </div>
+  );
+}
+
 const TOKENS = {
   bg: "#F3F1E7",
   ink: "#20281F",
@@ -1005,7 +1028,7 @@ let _recordNotif = null;
 function showPushNotification(title, body, tab) {
   _recordNotif?.({ id: Date.now(), title, body, ts: Date.now(), read: false, tab: tab || null });
   if (!("Notification" in window) || Notification.permission !== "granted") return;
-  const options = { body, icon: "/vite.svg", badge: "/vite.svg" };
+  const options = { body, icon: "/icon-192.png", badge: "/icon-192.png" };
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.ready.then((reg) => reg.showNotification(title, options)).catch(() => new Notification(title, options));
   } else {
@@ -6620,6 +6643,7 @@ export default function FarmToTableApp() {
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadNotifCount = notifHistory.filter((n) => !n.read).length;
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [toastMsg, setToastMsg] = useState(null);
 
   useEffect(() => {
     _recordNotif = (notif) => {
@@ -6684,7 +6708,7 @@ export default function FarmToTableApp() {
     if (params.get("pay") === "fail" || params.get("code")) {
       const msg = params.get("message") || "알 수 없는 오류가 발생했습니다.";
       window.history.replaceState({}, "", window.location.pathname);
-      setTimeout(() => alert(`❌ 결제 실패: ${msg}`), 500);
+      setTimeout(() => setToastMsg(`❌ 결제 실패: ${msg}`), 500);
     }
   }, []);
 
@@ -7174,7 +7198,7 @@ export default function FarmToTableApp() {
 
   const handleTossPayment = (deal, proposal, type) => {
     if (!window.TossPayments) {
-      alert("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
+      setToastMsg("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
     const total = proposal.price * deal.quantity;
@@ -7214,7 +7238,7 @@ export default function FarmToTableApp() {
       await setDoc(doc(db, "chats", dealId), { messages: updatedMsgs });
     } catch {
       setChats((c) => ({ ...c, [dealId]: prev }));
-      alert("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
+      setToastMsg("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
     }
   };
 
@@ -7484,6 +7508,7 @@ export default function FarmToTableApp() {
 
         /* ===== 화면 전환 애니메이션 ===== */
         @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeSlideUp { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
         .ftt-screen-enter { animation: fadeSlideIn 0.25s ease; }
 
         /* ===== 선택된 제안 하이라이트 ===== */
@@ -8578,6 +8603,7 @@ export default function FarmToTableApp() {
           </>
         )}
       </div>
+      <Toast message={toastMsg} onClose={() => setToastMsg(null)} />
     </div>
   );
 }
