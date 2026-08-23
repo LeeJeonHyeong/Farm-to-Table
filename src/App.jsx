@@ -3479,7 +3479,7 @@ function DeliveryTracker({ deal, userRole, onShip, onConfirmDelivery }) {
         </div>
       )}
       {shipped && deal.shippedPhotoURL && (
-        <img src={deal.shippedPhotoURL} alt="발송 사진" onClick={() => window.open(deal.shippedPhotoURL, "_blank")}
+        <img src={deal.shippedPhotoURL} alt="발송 사진" onClick={() => window.open(deal.shippedPhotoURL, "_blank", "noopener,noreferrer")}
           style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, cursor: "pointer", marginBottom: 8 }} />
       )}
       {!isChef && depositPaid && !shipped && (
@@ -3509,6 +3509,7 @@ function DeliveryTracker({ deal, userRole, onShip, onConfirmDelivery }) {
 
 function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
   const printReceipt = (type) => {
+    const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const total = proposal.price * deal.quantity;
     const deposit = Math.round(total * DEPOSIT_RATE);
     const balance = total - deposit;
@@ -3517,10 +3518,15 @@ function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
     const label = type === "deposit" ? "선급금" : "잔금";
     const paidAt = type === "deposit" ? deal.depositPaidAt : deal.balancePaidAt;
     const paidStr = paidAt ? new Date(paidAt).toLocaleString("ko-KR") : "-";
-    const dealNo = (deal.id || "").slice(0, 10).toUpperCase();
+    const dealNo = esc((deal.id || "").slice(0, 10).toUpperCase());
     const supplyAmt = Math.round(amount / 1.1);
     const vatAmt = amount - supplyAmt;
     const deliveredStr = deal.deliveredAt ? new Date(deal.deliveredAt).toLocaleDateString("ko-KR") : new Date().toLocaleDateString("ko-KR");
+    const farmName = esc(proposal.farmName);
+    const chefName = esc(deal.chefName);
+    const chefRegion = esc(deal.chefRegion);
+    const crop = esc(deal.crop);
+    const grade = esc(deal.grade);
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>거래명세서</title>
 <style>body{font-family:'Apple SD Gothic Neo',Arial,sans-serif;max-width:480px;margin:40px auto;color:#20281F;font-size:14px}h2{font-size:22px;margin-bottom:2px;letter-spacing:-0.5px}hr{border:none;border-top:1px solid #D8D2C0;margin:14px 0}.row{display:flex;justify-content:space-between;margin-bottom:7px}.label{color:#5B6358}.value{font-weight:600}.total{font-size:16px;color:#5B7553}.vat{font-size:12px;color:#5B6358;margin-top:2px}.footer{font-size:11px;color:#5B6358;margin-top:24px;padding-top:14px;border-top:1px solid #D8D2C0;line-height:1.7}.badge{display:inline-block;background:#F0EDE0;border:1px solid #D8D2C0;border-radius:4px;padding:2px 8px;font-size:11px;color:#5B6358;margin-bottom:14px}</style>
 </head><body>
@@ -3528,12 +3534,12 @@ function SettlementCard({ deal, proposal, userRole, onTossPayment }) {
 <p style="font-size:12px;color:#5B6358;margin:4px 0 12px">Farm-to-Table 플랫폼 · 역경매 방식 선주문</p>
 <div class="badge">거래번호 ${dealNo} · ${label} 결제</div>
 <hr>
-<div class="row"><span class="label">공급자 (농가)</span><span class="value">${proposal.farmName}</span></div>
-<div class="row"><span class="label">공급받는 자 (셰프)</span><span class="value">${deal.chefName}${deal.chefRegion ? " · " + deal.chefRegion : ""}</span></div>
+<div class="row"><span class="label">공급자 (농가)</span><span class="value">${farmName}</span></div>
+<div class="row"><span class="label">공급받는 자 (셰프)</span><span class="value">${chefName}${chefRegion ? " · " + chefRegion : ""}</span></div>
 <div class="row"><span class="label">작성일</span><span class="value">${new Date().toLocaleDateString("ko-KR")}</span></div>
 <div class="row"><span class="label">납품일</span><span class="value">${deliveredStr}</span></div>
 <hr>
-<div class="row"><span class="label">품목</span><span class="value">${deal.crop}${deal.grade ? " (" + deal.grade + ")" : ""}</span></div>
+<div class="row"><span class="label">품목</span><span class="value">${crop}${grade ? " (" + grade + ")" : ""}</span></div>
 <div class="row"><span class="label">수량</span><span class="value">${deal.quantity}kg</span></div>
 <div class="row"><span class="label">단가</span><span class="value">${proposal.price.toLocaleString()}원/kg</span></div>
 <div class="row"><span class="label">계약 총액</span><span class="value">${total.toLocaleString()}원</span></div>
@@ -5586,7 +5592,7 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
                     src={m.imageURL}
                     alt="첨부 이미지"
                     style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", cursor: "pointer", boxShadow: "0 2px 8px rgba(32,40,31,0.15)" }}
-                    onClick={() => window.open(m.imageURL, "_blank")}
+                    onClick={() => window.open(m.imageURL, "_blank", "noopener,noreferrer")}
                   />
                 )}
                 {m.text && (
