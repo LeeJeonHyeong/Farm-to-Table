@@ -145,6 +145,7 @@ const TOKENS = {
   card: "#FBFAF5",
 };
 
+// 셰프가 즐겨찾기한 농가 목록 (fav-farms-{uid}) — chef 전용
 const getFavFarms = (uid) => {
   try { return JSON.parse(localStorage.getItem(`fav-farms-${uid}`) || "[]"); } catch { return []; }
 };
@@ -244,6 +245,7 @@ const TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq";
 const BALANCE_DUE_DAYS = 7;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
+// 농가가 관심 딜을 저장한 북마크 (farm-bookmarks-{uid}) — farmer 전용, fav-farms와 별개 개념
 const bookmarkKey = (uid) => `farm-bookmarks-${uid}`;
 const notifHistoryKey = (uid) => `notif-history-${uid}`;
 const NOTIFIED_DEALS_KEY = "notified-deals-v1";
@@ -2203,22 +2205,7 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
               {score.total}점
             </span>
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {SCORE_BREAKDOWN_LABELS.map(({ key, label, max }) => {
-              const val = score.breakdown[key];
-              const pct = val / max;
-              const barColor = pct >= 0.8 ? TOKENS.moss : pct >= 0.5 ? TOKENS.gold : TOKENS.rust;
-              return (
-                <div key={key} style={{ flex: "1 1 80px", minWidth: 70 }}>
-                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 4 }}>{label}</div>
-                  <div style={{ height: 6, background: TOKENS.line, borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
-                    <div style={{ height: "100%", width: `${pct * 100}%`, background: barColor, borderRadius: 3 }} />
-                  </div>
-                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{val}/{max}</div>
-                </div>
-              );
-            })}
-          </div>
+          <ScoreBreakdown breakdown={score.breakdown} />
         </div>
       )}
 
@@ -2995,6 +2982,35 @@ const SCORE_BREAKDOWN_LABELS = [
   { key: "rating", label: "평점", max: 10 },
 ];
 
+function ScoreBreakdown({ breakdown, size, style }) {
+  const compact = size === "compact";
+  const gap = compact ? 8 : 10;
+  const minW = compact ? 55 : 70;
+  const flex = compact ? "1 1 60px" : "1 1 80px";
+  const barH = compact ? 4 : 6;
+  const radius = compact ? 2 : 3;
+  const fs = compact ? 10 : 11;
+  const mb = compact ? 3 : 4;
+  return (
+    <div style={{ display: "flex", gap, flexWrap: "wrap", ...style }}>
+      {SCORE_BREAKDOWN_LABELS.map(({ key, label, max }) => {
+        const val = breakdown[key];
+        const pct = val / max;
+        const barColor = pct >= 0.8 ? TOKENS.moss : pct >= 0.5 ? TOKENS.gold : TOKENS.rust;
+        return (
+          <div key={key} style={{ flex, minWidth: minW }}>
+            <div style={{ fontSize: fs, color: TOKENS.inkSoft, marginBottom: mb }}>{label}</div>
+            <div style={{ height: barH, background: TOKENS.line, borderRadius: radius, position: "relative", overflow: "hidden", marginBottom: compact ? 0 : 4 }}>
+              <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct * 100}%`, background: barColor, borderRadius: radius }} />
+            </div>
+            <div style={{ fontSize: fs, color: TOKENS.inkSoft, marginTop: compact ? 2 : 0, fontFamily: "'IBM Plex Mono', monospace" }}>{val}/{max}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function InquiryAnswerCard({ inquiry, onAnswer }) {
   const [answerText, setAnswerText] = useState(inquiry.answer || "");
   const [editing, setEditing] = useState(false);
@@ -3275,22 +3291,7 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score,
       </div>
       {showBreakdown && score && (
         <div style={{ background: TOKENS.bg, border: `1px solid ${TOKENS.line}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            {SCORE_BREAKDOWN_LABELS.map(({ key, label, max }) => {
-              const val = score.breakdown[key];
-              const pct = val / max;
-              const barColor = pct >= 0.8 ? TOKENS.moss : pct >= 0.5 ? TOKENS.gold : TOKENS.rust;
-              return (
-                <div key={key} style={{ flex: "1 1 60px", minWidth: 55 }}>
-                  <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginBottom: 3 }}>{label}</div>
-                  <div style={{ height: 4, background: TOKENS.line, borderRadius: 2, position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct * 100}%`, background: barColor, borderRadius: 2 }} />
-                  </div>
-                  <div style={{ fontSize: 10, color: TOKENS.inkSoft, marginTop: 2, fontFamily: "'IBM Plex Mono', monospace" }}>{val}/{max}</div>
-                </div>
-              );
-            })}
-          </div>
+          <ScoreBreakdown breakdown={score.breakdown} size="compact" style={{ marginBottom: 8 }} />
           {commentLoading ? (
             <p style={{ fontSize: 11, color: TOKENS.inkSoft, margin: 0, fontStyle: "italic" }}>AI 분석 중...</p>
           ) : aiComment ? (
@@ -3903,22 +3904,7 @@ function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBac
               {score.total}점
             </span>
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-            {SCORE_BREAKDOWN_LABELS.map(({ key, label, max }) => {
-              const val = score.breakdown[key];
-              const pct = val / max;
-              const barColor = pct >= 0.8 ? TOKENS.moss : pct >= 0.5 ? TOKENS.gold : TOKENS.rust;
-              return (
-                <div key={key} style={{ flex: "1 1 80px", minWidth: 70 }}>
-                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: 4 }}>{label}</div>
-                  <div style={{ height: 6, background: TOKENS.line, borderRadius: 3, position: "relative", overflow: "hidden", marginBottom: 4 }}>
-                    <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct * 100}%`, background: barColor, borderRadius: 3 }} />
-                  </div>
-                  <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{val}/{max}</div>
-                </div>
-              );
-            })}
-          </div>
+          <ScoreBreakdown breakdown={score.breakdown} style={{ marginBottom: 12 }} />
           {commentLoading ? (
             <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, fontStyle: "italic" }}>AI 분석 중...</p>
           ) : aiComment ? (
