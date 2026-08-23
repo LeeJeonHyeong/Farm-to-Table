@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from "react";
-import { storage, db, auth } from "./firebase";
+import { storage, db, auth, fbStorage } from "./firebase";
+import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
 import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
@@ -13,7 +14,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-function ImageUpload({ value, onChange, label = "사진 추가", shape = "square", size = 96 }) {
+function ImageUpload({ value, onChange, label = "사진 추가", shape = "square", size = 96, storagePath }) {
   const [compressing, setCompressing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const fileRef = useRef(null);
@@ -23,7 +24,7 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
     setCompressing(true);
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
+    img.onload = async () => {
       const MAX = 900;
       let { width, height } = img;
       if (width > MAX || height > MAX) {
@@ -34,7 +35,19 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
       canvas.width = width; canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      onChange(canvas.toDataURL("image/jpeg", 0.82));
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      if (storagePath) {
+        try {
+          const sRef = storageRef(fbStorage, storagePath);
+          await uploadString(sRef, dataUrl, "data_url");
+          const downloadUrl = await getDownloadURL(sRef);
+          onChange(downloadUrl);
+        } catch {
+          onChange(dataUrl);
+        }
+      } else {
+        onChange(dataUrl);
+      }
       setCompressing(false);
     };
     img.onerror = () => setCompressing(false);
@@ -91,6 +104,29 @@ function PhotoLightbox({ src, onClose }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <img src={src} alt="" style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: 10, objectFit: "contain", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()} />
       <button onClick={onClose} style={{ position: "fixed", top: 16, right: 16, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", borderRadius: "50%", width: 40, height: 40, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>✕</button>
+    </div>
+  );
+}
+
+function Toast({ message, onClose }) {
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(onClose, 4500);
+    return () => clearTimeout(t);
+  }, [message, onClose]);
+  if (!message) return null;
+  return (
+    <div style={{
+      position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+      background: "rgba(32,40,31,0.93)", color: "#fff", borderRadius: 12,
+      padding: "13px 20px", fontSize: 14, lineHeight: 1.5,
+      boxShadow: "0 6px 28px rgba(32,40,31,0.28)", zIndex: 9999,
+      display: "flex", alignItems: "center", gap: 14, maxWidth: "min(90vw, 420px)",
+      backdropFilter: "blur(6px)", whiteSpace: "pre-line", fontFamily: "'IBM Plex Sans', sans-serif",
+      animation: "fadeSlideUp 0.2s ease",
+    }}>
+      <span style={{ flex: 1 }}>{message}</span>
+      <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.65)", cursor: "pointer", fontSize: 17, lineHeight: 1, flexShrink: 0, padding: 0 }}>✕</button>
     </div>
   );
 }
@@ -208,6 +244,7 @@ const TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq";
 const BALANCE_DUE_DAYS = 7;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
+const bookmarkKey = (uid) => `farm-bookmarks-${uid}`;
 const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
@@ -1005,7 +1042,7 @@ let _recordNotif = null;
 function showPushNotification(title, body, tab) {
   _recordNotif?.({ id: Date.now(), title, body, ts: Date.now(), read: false, tab: tab || null });
   if (!("Notification" in window) || Notification.permission !== "granted") return;
-  const options = { body, icon: "/vite.svg", badge: "/vite.svg" };
+  const options = { body, icon: "/icon-192.png", badge: "/icon-192.png" };
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.ready.then((reg) => reg.showNotification(title, options)).catch(() => new Notification(title, options));
   } else {
@@ -1663,7 +1700,7 @@ function ChefProfileMiniCard({ chefData, deal }) {
   );
 }
 
-function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastProposal }) {
+function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastProposal, userId }) {
   const preFilled = lastProposal != null;
   const [data, setData] = useState({
     farmName: farmProfile?.farmName || farmerName || "",
@@ -1760,7 +1797,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
       />
       <div style={{ marginTop: 12 }}>
         <FieldLabel>작물 사진 첨부 (선택)</FieldLabel>
-        <ImageUpload value={data.cropPhotoURL} onChange={(v) => update("cropPhotoURL", v)} label="작물 사진 추가" shape="square" size={80} />
+        <ImageUpload value={data.cropPhotoURL} onChange={(v) => update("cropPhotoURL", v)} label="작물 사진 추가" shape="square" size={80} storagePath={userId ? `images/${userId}/crop_${deal.id}` : undefined} />
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button type="button" onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: "10px 0", background: submitting ? TOKENS.inkSoft : TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: submitting ? "default" : "pointer" }}>
@@ -2384,6 +2421,7 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
             farmProfile={farmProfile}
             farmerName={userName}
             lastProposal={lastProposal}
+            userId={userId}
           />
         ) : (
           <button
@@ -2431,12 +2469,27 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
     try { return new Set(JSON.parse(localStorage.getItem(`farm-bookmarks-${userId}`) || "[]")); } catch { return new Set(); }
   });
   const [showBookmarks, setShowBookmarks] = useState(false);
+
+  // Firestore에서 북마크 로드 (기기 간 동기화)
+  useEffect(() => {
+    if (!userId) return;
+    storage.get(bookmarkKey(userId)).then((result) => {
+      if (result?.value) {
+        const saved = JSON.parse(result.value);
+        setBookmarks(new Set(saved));
+        localStorage.setItem(`farm-bookmarks-${userId}`, JSON.stringify(saved));
+      }
+    }).catch(() => {});
+  }, [userId]);
+
   const toggleBookmark = (dealId, e) => {
     e.stopPropagation();
     setBookmarks((prev) => {
       const next = new Set(prev);
       if (next.has(dealId)) next.delete(dealId); else next.add(dealId);
-      localStorage.setItem(`farm-bookmarks-${userId}`, JSON.stringify([...next]));
+      const arr = [...next];
+      localStorage.setItem(`farm-bookmarks-${userId}`, JSON.stringify(arr));
+      storage.set(bookmarkKey(userId), JSON.stringify(arr)).catch(() => {});
       return next;
     });
   };
@@ -5644,6 +5697,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
           label="로고·사진"
           shape="circle"
           size={76}
+          storagePath={userId ? `images/${userId}/chef_profile` : undefined}
         />
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>레스토랑 사진</div>
@@ -5847,6 +5901,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
           label="농가·사진"
           shape="circle"
           size={76}
+          storagePath={userId ? `images/${userId}/farm_profile` : undefined}
         />
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>농가 사진</div>
@@ -5914,7 +5969,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
       {data.cert && data.cert !== "인증 없음" && (
         <div style={{ marginTop: 10 }}>
           <FieldLabel>인증서 사진 첨부 (선택)</FieldLabel>
-          <ImageUpload value={data.certPhotoURL || ""} onChange={(v) => update("certPhotoURL", v)} label="인증서 사진 추가" shape="square" size={80} />
+          <ImageUpload value={data.certPhotoURL || ""} onChange={(v) => update("certPhotoURL", v)} label="인증서 사진 추가" shape="square" size={80} storagePath={userId ? `images/${userId}/cert` : undefined} />
           <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginTop: 4 }}>사진을 첨부하면 셰프에게 인증서 확인 표시(✓)가 보입니다</div>
         </div>
       )}
@@ -6620,6 +6675,7 @@ export default function FarmToTableApp() {
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadNotifCount = notifHistory.filter((n) => !n.read).length;
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [toastMsg, setToastMsg] = useState(null);
 
   useEffect(() => {
     _recordNotif = (notif) => {
@@ -6684,7 +6740,7 @@ export default function FarmToTableApp() {
     if (params.get("pay") === "fail" || params.get("code")) {
       const msg = params.get("message") || "알 수 없는 오류가 발생했습니다.";
       window.history.replaceState({}, "", window.location.pathname);
-      setTimeout(() => alert(`❌ 결제 실패: ${msg}`), 500);
+      setTimeout(() => setToastMsg(`❌ 결제 실패: ${msg}`), 500);
     }
   }, []);
 
@@ -7174,7 +7230,7 @@ export default function FarmToTableApp() {
 
   const handleTossPayment = (deal, proposal, type) => {
     if (!window.TossPayments) {
-      alert("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
+      setToastMsg("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
     const total = proposal.price * deal.quantity;
@@ -7214,7 +7270,7 @@ export default function FarmToTableApp() {
       await setDoc(doc(db, "chats", dealId), { messages: updatedMsgs });
     } catch {
       setChats((c) => ({ ...c, [dealId]: prev }));
-      alert("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
+      setToastMsg("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
     }
   };
 
@@ -7484,6 +7540,7 @@ export default function FarmToTableApp() {
 
         /* ===== 화면 전환 애니메이션 ===== */
         @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeSlideUp { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
         .ftt-screen-enter { animation: fadeSlideIn 0.25s ease; }
 
         /* ===== 선택된 제안 하이라이트 ===== */
@@ -8578,6 +8635,7 @@ export default function FarmToTableApp() {
           </>
         )}
       </div>
+      <Toast message={toastMsg} onClose={() => setToastMsg(null)} />
     </div>
   );
 }
