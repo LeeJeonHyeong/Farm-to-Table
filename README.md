@@ -216,6 +216,19 @@ allow delete: if request.auth != null
 | v2.27 | 인증 뱃지 사진첨부 — `PhotoLightbox` 전체화면 뷰어, `certPhotoURL`(인증서 ✓ 표시·클릭 확대), `cropPhotoURL`(작물 사진 72px 썸네일·클릭 확대), `FarmProfileScreen`/`ProposalForm` 업로드 UI |
 | Bug fix | `FarmProfileDetailCard` `React.useState` → `useState` named import 수정 (앱 크래시 수정) |
 | v2.26/27 E2E | `test_v2_26_27.cjs` — 18/18 통과 (정적 5+8종 + 브라우저 UI 3+2종) |
+| v2.28 | `alert()` → 인앱 Toast 컴포넌트 교체 (결제 실패·결제 모듈 미로드·채팅 전송 실패 3곳), 푸시 알림 아이콘 `/vite.svg` → `icon-192.png` 교체 |
+| v2.29 | 관심 딜 북마크 Firestore 동기화 (`farm-bookmarks-{uid}`, 기기 간 공유), 이미지 업로드 Firebase Storage 연동 (`fbStorage`, `storagePath` prop, base64 폴백) |
+| v2.28/29 E2E | `test_v2_28_29.cjs` — 20/20 통과 (Toast·아이콘·북마크 Firestore·Firebase Storage 검증) |
+| v2.30 | 거래명세서 강화 — 버튼 레이블 "선급금/잔금 거래명세서", 거래번호·공급가액·부가세(10%) 분리 출력, 납품일·공급자/공급받는자·홈택스 안내 포함, 인라인 세금계산서 안내 패널 |
+| v2.30 E2E | `test_v2_30.cjs` — 14/14 통과 (버튼 레이블·명세서 항목·세금계산서 패널·브라우저 UI 검증) |
+| v2.31 | XSS 방어 — `printReceipt()` 사용자 입력값 `esc()` HTML escape 처리, `window.open` `noopener,noreferrer` 추가 (발송 사진·채팅 이미지 2곳) |
+| v2.31 E2E | `test_v2_31.cjs` — 10/10 통과 (esc 함수·6개 변수 escape·템플릿 직접 삽입 없음·noopener 검증) |
+| v2.32 | 알림 dedup 키 누적 방지 — `notified-deal-{id}` 개별 키 → `notified-deals-v1` 롤링 셋(cap 300) 교체, 결제 pending Firestore 병행 저장 (`pending-toss-{uid}`) — 브라우저 크래시 후 복구 |
+| v2.32 E2E | `test_v2_32.cjs` — 11/11 통과 (dedup 셋·cap 300·Firestore 백업·폴백 조회·클리어 검증) |
+| v2.33 | setTimeout 매직 넘버 제거 — `printReceipt` `setTimeout(600)` → `win.onload`, auth 재시도 `setTimeout(900)` → 최대 5회 300ms 간격 루프, 알림 내역 Firestore 연동 (`notif-history-{uid}`) — 기기 간 알림 공유 |
+| v2.33 E2E | `test_v2_33.cjs` — 10/10 통과 (onload 교체·재시도 루프·Firestore 저장·로드·동기화·클리어 검증) |
+| v2.34 | `ScoreBreakdown` 컴포넌트 추출 — `SCORE_BREAKDOWN_LABELS.map` 3중 복붙 → 단일 컴포넌트(`size="compact"` prop), `fav-farms-{uid}`(셰프 즐겨찾기 농가)·`farm-bookmarks-{uid}`(농가 딜 북마크) 키 혼용 주석 명확화 |
+| v2.34 E2E | `test_v2_34.cjs` — 10/10 통과 (컴포넌트 추출·map 1곳·사용 3곳·키 주석·셰프/농가 탭 진입 검증) |
 
 ### v1.6 상세 내역
 
@@ -936,6 +949,140 @@ allow delete: if request.auth != null
 
 **버그 수정**
 - `FarmProfileDetailCard`에서 `React.useState` 사용으로 인한 런타임 크래시 수정 (`useState` named import 방식으로 교체) — 파일 상단이 named import 전용이라 `React` 객체 미노출
+
+---
+
+### v2.28 상세 내역
+
+**`alert()` → 인앱 Toast 컴포넌트 교체**
+
+- `Toast` 함수형 컴포넌트 신규 추가 — `position: fixed` 하단 중앙, 4.5초 자동 소멸, ✕ 수동 닫기
+- `toastMsg` / `setToastMsg` state → 앱 JSX 하단에 `<Toast message={toastMsg} onClose=...>` 렌더
+- 교체 대상 3곳: 결제 실패 안내, 결제 모듈 미로드 안내, 채팅 메시지 전송 실패 안내
+- `alert()`을 완전 제거해 브라우저 기본 모달 차단 현상 해소
+
+**푸시 알림 아이콘 수정**
+
+- `showPushNotification` 내 `icon: "/vite.svg"` → `icon: "/icon-192.png"` 교체 (PWA 앱 아이콘과 통일)
+
+---
+
+### v2.29 상세 내역
+
+**관심 딜 북마크 Firestore 동기화**
+
+- `bookmarkKey(uid)` → `farm-bookmarks-{uid}` Firestore 키 정의
+- `DealBrowseScreen` 마운트 시 Firestore에서 북마크 목록 로드 → localStorage와 병합
+- `toggleBookmark`: localStorage + `storage.set(bookmarkKey)` 동시 저장 → 기기 변경·재설치 후에도 북마크 유지
+
+**이미지 업로드 Firebase Storage 연동 (`ImageUpload`)**
+
+- `firebase.js`에 `fbStorage = getStorage(app)` export 추가
+- `ImageUpload` 컴포넌트에 `storagePath` prop 추가 — 값이 있으면 Firebase Storage 업로드, 없으면 기존 base64 Firestore 저장
+- `uploadString(ref(fbStorage, path), dataUrl, "data_url")` → `getDownloadURL`로 공개 URL 획득
+- 적용: 농가 프로필 사진(`images/{uid}/farm_profile`), 인증서 사진(`images/{uid}/cert`)
+
+---
+
+### v2.30 상세 내역
+
+**거래명세서 강화**
+
+- 버튼 레이블: "선급금 영수증" → **"선급금 거래명세서"**, "잔금 영수증" → **"잔금 거래명세서"**
+- 명세서 항목 추가:
+  - `dealNo`: 주문번호 앞 10자 대문자 (거래 식별용)
+  - `supplyAmt` / `vatAmt`: 공급가액 / 부가세(10%) 분리 출력
+  - `deliveredStr`: 납품일 표기 (deliveredAt 또는 deliveryDate 기준)
+  - 공급자 / 공급받는 자 레이블 구분
+  - 홈택스 전자세금계산서 안내 문구 및 링크 (`hometax.go.kr`)
+  - 잔금 명세서에 농가 실수령액 (total - fee) 추가
+
+**인라인 세금계산서 안내 패널**
+
+- SettlementCard 내 선급금 또는 잔금 결제 완료 후 "세금계산서 안내" 패널 자동 표시
+- B2B 거래 시 홈택스 전자세금계산서 발행 방법 안내
+- `depositPaid || balancePaid` 조건부 렌더링
+
+---
+
+### v2.31 상세 내역
+
+**XSS 방어 (`printReceipt`)**
+
+- `esc(s)` HTML escape 함수 추가 — `&`, `<`, `>`, `"` 4종 치환
+- 사용자 입력 6개 값 모두 escape 처리: `proposal.farmName`, `deal.chefName`, `deal.chefRegion`, `deal.crop`, `deal.grade`, `deal.id`
+- HTML 템플릿 리터럴에 원본 변수 직접 삽입 제거 → escape된 변수만 사용
+
+**`window.open` 탭내핑 방지**
+
+- 발송 사진 열기: `window.open(deal.shippedPhotoURL, "_blank", "noopener,noreferrer")`
+- 채팅 이미지 열기: `window.open(m.imageURL, "_blank", "noopener,noreferrer")`
+- 앱 전체에서 외부 URL을 여는 `"_blank"` 단독 패턴 0건 확인
+
+---
+
+### v2.32 상세 내역
+
+**알림 dedup 키 누적 방지**
+
+- 기존: `notified-deal-{id}` 개별 localStorage 키를 딜마다 생성 → localStorage 무한 축적
+- 변경: `NOTIFIED_DEALS_KEY = "notified-deals-v1"` 단일 키에 JSON 배열로 관리
+- `getNotifiedDeals()` / `addNotifiedDeal(id)` 헬퍼 함수 추가 — 300개 초과 시 오래된 항목 자동 제거
+
+**결제 pending Firestore 병행 저장**
+
+- user 로그인 직후: localStorage의 `pending-toss-payment` 값을 `pending-toss-{uid}` 키로 Firestore 백업
+- `loadState === "ready"` 처리 시: localStorage 우선 확인 → 없으면 Firestore 폴백 조회
+- 처리 완료 후 localStorage + Firestore 동시 클리어
+- 효과: 토스 리다이렉트 직후 브라우저 강제 종료 시에도 결제 정보 유실 방지
+
+---
+
+### v2.33 상세 내역
+
+**setTimeout 매직 넘버 제거**
+
+- `printReceipt`: `setTimeout(() => win.print(), 600)` → `win.onload = () => win.print()` — 실제 DOM 로드 완료 후 인쇄 (네트워크 속도 무관)
+- auth 재시도: `await new Promise(r => setTimeout(r, 900))` 단순 대기 1회 → `for (attempt < 5)` + `setTimeout(r, 300)` 재시도 루프 — 최대 1.5초, 성공 즉시 진행
+
+**알림 내역 Firestore 연동**
+
+- `notifHistoryKey(uid)` → `notif-history-{uid}` Firestore 키 정의
+- `_recordNotif`: 새 알림 발생 시 localStorage + `storage.set(notifHistoryKey(uid))` 동시 저장
+- user 로그인 시: Firestore 알림 내역 로드 → localStorage + state 동기화
+- 모두 읽음 처리: localStorage + Firestore 동기화
+- 모두 지우기: localStorage 삭제 + Firestore `"[]"` 저장
+- 효과: 모바일↔데스크탑 간 알림 내역 공유, localStorage 초기화 시에도 복구 가능
+
+---
+
+### v2.34 상세 내역
+
+**`ScoreBreakdown` 컴포넌트 추출**
+
+- `SCORE_BREAKDOWN_LABELS.map(...)` 바 차트 블록이 3개 컴포넌트에 복붙 → `ScoreBreakdown` 단일 컴포넌트로 추출
+- `size="compact"` prop: 딜 카드용 소형(10px 폰트, 4px 바, 60px 너비) / 상세 패널용 일반(11px 폰트, 6px 바, 80px 너비)
+- `style` prop으로 각 사용처의 외부 여백 유연하게 전달
+- `SCORE_BREAKDOWN_LABELS.map` 호출: 3개 → 1개 (항목 추가·변경 시 단일 지점 수정)
+
+**북마크 키 혼용 명확화**
+
+- `fav-farms-{uid}` (셰프가 즐겨찾기한 농가, chef 전용)과 `farm-bookmarks-{uid}` (농가가 저장한 딜 북마크, farmer 전용) 두 키에 역할 주석 추가
+- 동일 개념의 중복이 아닌 별개 개념임을 코드에서 명시
+
+---
+
+### v2.28~v2.34 E2E 테스트 요약
+
+| 파일 | 항목 수 | 결과 |
+|---|---|---|
+| `test_v2_28_29.cjs` | 20 | 20/20 ✅ |
+| `test_v2_30.cjs` | 14 | 14/14 ✅ |
+| `test_v2_31.cjs` | 10 | 10/10 ✅ |
+| `test_v2_32.cjs` | 11 | 11/11 ✅ |
+| `test_v2_33.cjs` | 10 | 10/10 ✅ |
+| `test_v2_34.cjs` | 10 | 10/10 ✅ |
+| **합계** | **75** | **75/75 ✅** |
 
 ---
 
