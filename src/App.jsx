@@ -2459,8 +2459,10 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [cycleFilter, setCycleFilter] = useState("전체");
+  const searchHistoryKey = userId ? `deal-search-history-${userId}` : null;
   const [searchHistory, setSearchHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("deal-search-history") || "[]"); } catch { return []; }
+    if (!userId) return [];
+    try { return JSON.parse(localStorage.getItem(`deal-search-history-${userId}`) || "[]"); } catch { return []; }
   });
   const [searchFocused, setSearchFocused] = useState(false);
   const isMobile = useIsMobile();
@@ -2546,7 +2548,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
     if (!q.trim()) return;
     setSearchHistory((prev) => {
       const next = [q.trim(), ...prev.filter((h) => h !== q.trim())].slice(0, 5);
-      localStorage.setItem("deal-search-history", JSON.stringify(next));
+      if (searchHistoryKey) localStorage.setItem(searchHistoryKey, JSON.stringify(next));
       return next;
     });
   };
@@ -2630,7 +2632,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
             </button>
           ))}
           <button
-            onMouseDown={(e) => { e.preventDefault(); setSearchHistory([]); localStorage.removeItem("deal-search-history"); }}
+            onMouseDown={(e) => { e.preventDefault(); setSearchHistory([]); if (searchHistoryKey) localStorage.removeItem(searchHistoryKey); }}
             style={{ fontSize: 10, color: TOKENS.rust, background: "none", border: "none", cursor: "pointer", marginLeft: 2 }}
           >
             지우기
@@ -3571,6 +3573,7 @@ ${type === "balance" ? `<hr><div class="row"><span class="label">플랫폼 수�
 </div>
 <script>window.print();window.close();</script></body></html>`;
     const w = window.open("", "_blank");
+    if (!w) { alert("팝업이 차단됐습니다. 브라우저 팝업 허용 후 다시 시도해주세요."); return; }
     w.document.write(html);
     w.document.close();
   };
@@ -3847,14 +3850,14 @@ function ProposalDetailView({ proposal, deal, onSelect, selectable, score, onBac
   const priceDiff = proposal.price - deal.targetPrice;
 
   useEffect(() => {
-    if (score && aiComment === null && !commentLoading) {
-      setCommentLoading(true);
-      getAIMatchComment(deal, proposal, score).then((c) => {
-        setAiComment(c);
-        setCommentLoading(false);
-      });
-    }
-  }, []);
+    setAiComment(null);
+    if (!score) return;
+    setCommentLoading(true);
+    getAIMatchComment(deal, proposal, score).then((c) => {
+      setAiComment(c);
+      setCommentLoading(false);
+    });
+  }, [score, deal?.id, proposal?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -4054,7 +4057,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
   const sectionLabel = { fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 };
 
   const fmtAmt = (n) => n >= 100000000 ? `${(n / 100000000).toFixed(1)}억` : n >= 10000 ? `${Math.floor(n / 10000).toLocaleString()}만` : `${n.toLocaleString()}`;
-  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "-";
+  const fmtShortDate = (ts) => ts ? new Date(ts).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "-";
 
   const handleConfirm = () => {
     if (!confirmAction) return;
@@ -4220,7 +4223,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
                           {selProp && <span style={{ color: TOKENS.moss }}> → {selProp.farmName} {dealAmt ? `(${fmtAmt(dealAmt)}원)` : ""}</span>}
                         </div>
                         <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 3 }}>
-                          등록 {fmtDate(deal.createdAt)} · 제안 {deal.proposals.length}건 · ID {deal.id.slice(-6).toUpperCase()}
+                          등록 {fmtShortDate(deal.createdAt)} · 제안 {deal.proposals.length}건 · ID {deal.id.slice(-6).toUpperCase()}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
@@ -4342,7 +4345,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
                           <td style={td}>{r.farmName}</td>
                           <td style={{ ...td, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace" }}>{r.total.toLocaleString()}원</td>
                           <td style={{ ...td, textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss, fontWeight: 600 }}>{r.fee.toLocaleString()}원</td>
-                          <td style={{ ...td, color: TOKENS.inkSoft }}>{fmtDate(r.completedAt)}</td>
+                          <td style={{ ...td, color: TOKENS.inkSoft }}>{fmtShortDate(r.completedAt)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -4522,7 +4525,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
                     <span style={{ fontFamily: "'Fraunces', serif", color: TOKENS.ink, fontSize: 13 }}>{d.crop}</span>
                     <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{d.chefName} · {d.quantity}kg</span>
                   </div>
-                  <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>{fmtDate(d.createdAt)}</span>
+                  <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>{fmtShortDate(d.createdAt)}</span>
                 </div>
               ))}
               {recentCreated.length === 0 && <div style={{ fontSize: 13, color: TOKENS.inkSoft, textAlign: "center", padding: "16px 0" }}>딜이 없습니다</div>}
@@ -4543,7 +4546,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
                       <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{d.chefName} ↔ {p?.farmName || "-"}</span>
                     </div>
                     <span style={{ fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.moss, flexShrink: 0, fontWeight: 600 }}>{fmtAmt(amt)}원</span>
-                    <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>{fmtDate(d.completedAt)}</span>
+                    <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>{fmtShortDate(d.completedAt)}</span>
                   </div>
                 );
               })}
@@ -6467,6 +6470,7 @@ function ContractModal({ deal, proposal, onClose, userRole, onSign }) {
   const handlePrint = () => {
     const content = document.getElementById("ftt-contract-body").innerHTML;
     const win = window.open("", "_blank", "width=820,height=1000");
+    if (!win) { alert("팝업이 차단됐습니다. 브라우저 팝업 허용 후 다시 시도해주세요."); return; }
     win.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
       <title>계약서 ${contractNo}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -6702,9 +6706,7 @@ export default function FarmToTableApp() {
   const [deals, setDeals] = useState([]);
   const [farm, setFarm] = useState(null);
   const [chefProfile, setChefProfile] = useState(null);
-  const [notifHistory, setNotifHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("notif-history") || "[]"); } catch { return []; }
-  });
+  const [notifHistory, setNotifHistory] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadNotifCount = notifHistory.filter((n) => !n.read).length;
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -6715,25 +6717,32 @@ export default function FarmToTableApp() {
       setNotifHistory((prev) => {
         const next = [notif, ...prev].slice(0, 50);
         const raw = JSON.stringify(next);
-        localStorage.setItem("notif-history", raw);
         const uid = userRef.current?.uid;
-        if (uid) storage.set(notifHistoryKey(uid), raw).catch(() => {});
+        if (uid) {
+          localStorage.setItem(notifHistoryKey(uid), raw);
+          storage.set(notifHistoryKey(uid), raw).catch(() => {});
+        }
         return next;
       });
     };
     return () => { _recordNotif = null; };
   }, []);
 
-  // user 로그인 시 Firestore 알림 내역으로 동기화
+  // user 로그인 시 Firestore → uid별 localStorage 동기화, 이전 세션 공용 키 정리
   useEffect(() => {
     if (!user) return;
+    localStorage.removeItem("notif-history"); // 구버전 공용 키 정리
+    const localRaw = localStorage.getItem(notifHistoryKey(user.uid));
+    if (localRaw) {
+      try { const arr = JSON.parse(localRaw); if (Array.isArray(arr) && arr.length > 0) setNotifHistory(arr); } catch {}
+    }
     storage.get(notifHistoryKey(user.uid)).then((result) => {
       if (!result?.value) return;
       try {
         const fsHistory = JSON.parse(result.value);
         if (!Array.isArray(fsHistory) || fsHistory.length === 0) return;
         setNotifHistory(fsHistory);
-        localStorage.setItem("notif-history", result.value);
+        localStorage.setItem(notifHistoryKey(user.uid), result.value);
       } catch {}
     }).catch(() => {});
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -7733,8 +7742,10 @@ export default function FarmToTableApp() {
                     setNotifHistory((prev) => {
                       const next = prev.map((n) => ({ ...n, read: true }));
                       const raw = JSON.stringify(next);
-                      localStorage.setItem("notif-history", raw);
-                      if (user?.uid) storage.set(notifHistoryKey(user.uid), raw).catch(() => {});
+                      if (user?.uid) {
+                        localStorage.setItem(notifHistoryKey(user.uid), raw);
+                        storage.set(notifHistoryKey(user.uid), raw).catch(() => {});
+                      }
                       return next;
                     });
                   }
@@ -7753,7 +7764,7 @@ export default function FarmToTableApp() {
                   <div style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: TOKENS.ink }}>알림</span>
                     {notifHistory.length > 0 && (
-                      <button onClick={() => { setNotifHistory([]); localStorage.removeItem("notif-history"); if (user?.uid) storage.set(notifHistoryKey(user.uid), "[]").catch(() => {}); }} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: "none", cursor: "pointer", padding: 0 }}>모두 지우기</button>
+                      <button onClick={() => { setNotifHistory([]); if (user?.uid) { localStorage.removeItem(notifHistoryKey(user.uid)); storage.set(notifHistoryKey(user.uid), "[]").catch(() => {}); } }} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: "none", cursor: "pointer", padding: 0 }}>모두 지우기</button>
                     )}
                   </div>
                   {notifHistory.length === 0 ? (
