@@ -229,6 +229,12 @@ allow delete: if request.auth != null
 | v2.33 E2E | `test_v2_33.cjs` — 10/10 통과 (onload 교체·재시도 루프·Firestore 저장·로드·동기화·클리어 검증) |
 | v2.34 | `ScoreBreakdown` 컴포넌트 추출 — `SCORE_BREAKDOWN_LABELS.map` 3중 복붙 → 단일 컴포넌트(`size="compact"` prop), `fav-farms-{uid}`(셰프 즐겨찾기 농가)·`farm-bookmarks-{uid}`(농가 딜 북마크) 키 혼용 주석 명확화 |
 | v2.34 E2E | `test_v2_34.cjs` — 10/10 통과 (컴포넌트 추출·map 1곳·사용 3곳·키 주석·셰프/농가 탭 진입 검증) |
+| v2.35 | SEC-01 민감 키 env 이전 (`VITE_ADMIN_EMAIL`, `VITE_TOSS_CLIENT_KEY`), SEC-02 isAdmin 서버 검증 주석, UX-01 `DealDetailView`에 `userId` prop 전파, UX-02 `ShipModal` `finally { setLoading(false) }`, QUAL-01 `DealCreateScreen` Hooks 순서 수정 |
+| v2.35 E2E | `test_v2_35.cjs` — 10/10 통과 (env 이전·SEC-02 주석·userId prop·ShipModal finally·Hooks 순서·브라우저 UI 검증) |
+| v2.36 | DATA-01 `notifHistory` uid별 키 분리 (`notif-history-{uid}`), DATA-02 검색 히스토리 uid별 키 분리 (`deal-search-history-{uid}`), STAB-01 `window.open` null 가드 (팝업 차단 alert), QUAL-02 `ProposalDetailView` useEffect deps `[score, deal?.id, proposal?.id]`, QUAL-03 `AdminScreen` 내 `fmtDate` 이중 정의 → `fmtShortDate` 통일 |
+| v2.36 E2E | `test_v2_36.cjs` — 10/10 통과 (DATA-01/02 uid 분리·STAB-01 null 가드·QUAL-02 deps·QUAL-03 fmtShortDate·브라우저 UI 검증) |
+| v2.37 | DATA-03 `favFarms` Firestore 동기화 (`fav-farms-{uid}`), STAB-02 `cleanBalanceDueKeys` — 딜 완료·삭제·종료 시 `balance-due-notified-{dealId}-*` 키 자동 정리, PERF-01 `SAMPLE_DEALS` `import.meta.env.DEV` 조건 분기 (프로덕션 번들 제외), QUAL-04 `SECTION_LABEL_STYLE`·`sectionCardStyle` 공통 상수 추출 |
+| v2.37 E2E | `test_v2_37.cjs` — 10/10 통과 (DATA-03 Firestore·STAB-02 키 정리·PERF-01 DEV 분기·QUAL-04 공통 상수·브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1072,7 +1078,139 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.34 E2E 테스트 요약
+### v2.35 상세 내역
+
+**3차 감사 — 보안·UX·코드 품질 (SEC/UX/QUAL)**
+
+**SEC-01: 민감 키 환경변수 이전**
+- `ADMIN_EMAIL` 하드코딩 → `import.meta.env.VITE_ADMIN_EMAIL ?? ""` 참조
+- `TOSS_CLIENT_KEY` 하드코딩 → `import.meta.env.VITE_TOSS_CLIENT_KEY ?? ""` 참조
+- `.env.local`에 두 값 추가 (`.gitignore` 적용 — git 미업로드)
+
+**SEC-02: isAdmin 서버 검증 안내 주석**
+- 클라이언트 이메일 비교(`isAdmin`)는 UI 표시 전용임을 코드에 명시
+- 실 운영 시 Firebase Custom Claims 또는 Firestore 보안 규칙 서버 측 검증 필요 안내
+
+**UX-01: `DealDetailView` userId prop 전파**
+- `DealDetailView` 함수 시그니처에 `userId` prop 추가
+- `DealBrowseScreen`의 `DealDetailView` 렌더링 시 `userId={userId}` 전달 — 내부 사용자 식별 가능
+
+**UX-02: `ShipModal` finally 블록 추가**
+- 확인 버튼 `onClick` handler에 `try/catch/finally` 구조 적용
+- `finally { setLoading(false) }` — API 성공·실패 양쪽에서 로딩 상태 반드시 해제
+
+**QUAL-01: `DealCreateScreen` Hooks 순서 수정**
+- `const isMobile = useIsMobile()` 호출 위치를 `if (done) return ...` early return 이전으로 이동
+- React Rules of Hooks 준수 — 조건부 early return 이후 Hook 호출 금지
+
+**E2E 테스트 (`test_v2_35.cjs`) — 10/10 통과**
+
+| # | 테스트 항목 |
+|---|---|
+| 1 | VITE_ADMIN_EMAIL env 참조 + 하드코딩 제거 |
+| 2 | VITE_TOSS_CLIENT_KEY env 참조 + 하드코딩 제거 |
+| 3 | isAdmin 근처 SEC-02 주석 존재 |
+| 4 | DealDetailView 시그니처에 userId prop 포함 |
+| 5 | DealBrowseScreen 렌더에 userId={userId} 전달 |
+| 6 | ShipModal finally { setLoading(false) } 코드 존재 |
+| 7 | DealCreateScreen useIsMobile() 호출이 done return 이전에 존재 |
+| 8 | done return 이후 중복 useIsMobile 없음 |
+| 9 | 농가 로그인 → 딜 찾기 탭 정상 진입 |
+| 10 | 셰프 로그인 → 딜 만들기 탭 정상 진입 (Hooks 오류 없음) |
+
+---
+
+### v2.36 상세 내역
+
+**3차 감사 — 데이터 격리·안정성·코드 품질 (DATA/STAB/QUAL)**
+
+**DATA-01: 알림 내역 uid별 키 분리**
+- `notifHistory` 초기 state: 공용 키 `"notif-history"` 읽기 제거 → `useState([])`
+- `_recordNotif`: `localStorage.setItem(notifHistoryKey(uid), ...)` — uid별 격리 저장
+- 로그인 useEffect: uid별 localStorage 로드 → Firestore 폴백 → state 동기화
+- 로그인 시 구버전 공용 키 `"notif-history"` 자동 정리 (`localStorage.removeItem`)
+- 모두 지우기: `localStorage.removeItem(notifHistoryKey(user.uid))` uid별 삭제
+
+**DATA-02: 검색 히스토리 uid별 키 분리**
+- 고정 키 `"deal-search-history"` 제거
+- `searchHistoryKey = userId ? \`deal-search-history-${userId}\` : null` — uid별 격리
+- `searchHistory` 초기값: `userId` 없으면 빈 배열, 있으면 uid별 키로 localStorage 읽기
+- 저장: `if (searchHistoryKey) localStorage.setItem(searchHistoryKey, ...)` — uid 없을 때 기록 방지
+
+**STAB-01: `window.open` null 가드**
+- `printReceipt`: `const w = window.open(...); if (!w) { alert("팝업이 차단됐습니다. ..."); return; }`
+- `handlePrint`: `const win = window.open(...); if (!win) { alert("팝업이 차단됐습니다. ..."); return; }`
+- 브라우저 팝업 차단 시 안내 메시지 표시 후 함수 조기 종료
+
+**QUAL-02: `ProposalDetailView` useEffect deps 명시**
+- AI 매칭 코멘트 useEffect deps: `[score, deal?.id, proposal?.id]`
+- score 변경 시 `setAiComment(null)` + 재로드 — 이전 딜/제안 코멘트 잔존 방지
+
+**QUAL-03: `AdminScreen` 내 `fmtDate` 이중 정의 제거**
+- 전역 `fmtDate` 함수 외에 `AdminScreen` 내부에 동일 이름 재정의 존재 → 제거
+- `fmtShortDate` 로 이름 변경하여 전역 `fmtDate`와 명확히 구분, 4개 호출부 일괄 수정
+
+**E2E 테스트 (`test_v2_36.cjs`) — 10/10 통과**
+
+| # | 테스트 항목 |
+|---|---|
+| 1 | notifHistory 초기값 공용 키 사용 제거 (빈 배열) |
+| 2 | _recordNotif에서 uid별 notifHistoryKey로 localStorage 저장 |
+| 3 | 모두 지우기 시 uid별 notifHistoryKey로 localStorage 삭제 |
+| 4 | deal-search-history 고정 키 제거, uid별 searchHistoryKey 사용 |
+| 5 | searchHistoryKey 기반 localStorage 저장 코드 존재 |
+| 6 | printReceipt window.open null 가드 존재 |
+| 7 | handlePrint window.open null 가드 존재 |
+| 8 | ProposalDetailView useEffect deps [score, deal?.id, proposal?.id] |
+| 9 | AdminScreen 내 fmtDate 재정의 제거, fmtShortDate로 통일 |
+| 10 | 관리자 탭 진입 시 날짜 렌더 오류 없음 (fmtShortDate 정상 작동) |
+
+---
+
+### v2.37 상세 내역
+
+**3차 감사 — 데이터 동기화·안정성·성능·코드 품질 (DATA/STAB/PERF/QUAL)**
+
+**DATA-03: `favFarms` Firestore 동기화**
+- `favFarmsKey(uid)` 함수 추가 → `fav-farms-{uid}` Firestore 키 정의
+- `saveFavFarms`: localStorage 저장 + `storage.set(favFarmsKey(uid), ...)` Firestore 병행 저장
+- `MyDealsScreen` / `ChefProfileScreen` 마운트 useEffect: Firestore 로드 → localStorage + state 동기화
+- 효과: 기기 변경·localStorage 초기화 후에도 즐겨찾기 농가 목록 복구 가능
+
+**STAB-02: `cleanBalanceDueKeys` — 잔금 알림 키 자동 정리**
+- `cleanBalanceDueKeys(dealId)` 함수 추가 — `localStorage.keys()`에서 `balance-due-notified-{dealId}-*` 패턴 키를 모두 삭제
+- `handleCompleteDeal`, `handleDeleteDeal`, `handleCloseDeal` 세 곳에서 호출
+- 효과: 딜 종료 후 관련 알림 dedup 키가 localStorage에 무기한 축적되는 현상 방지
+
+**PERF-01: `SAMPLE_DEALS` DEV 전용 분기**
+- `const SAMPLE_DEALS = import.meta.env.DEV ? [...380줄 데모 데이터...] : []`
+- Vite 정적 분석이 프로덕션 빌드에서 DEV 브랜치 코드를 완전히 제거 (tree-shaking)
+- 효과: 프로덕션 번들에서 대용량 더미 데이터 배열 제외 → 번들 크기 감소
+
+**QUAL-04: `sectionStyle` 공통 상수 추출**
+- `SECTION_LABEL_STYLE` 모듈 레벨 상수 추출 — 섹션 레이블 공통 스타일 (IBM Plex Mono, uppercase, letterSpacing)
+- `sectionCardStyle(isMobile)` 모듈 레벨 함수 추출 — `isMobile` 여부에 따른 카드 패딩 분기
+- `AdminScreen` / `DashboardScreen` 양쪽에서 `const sectionStyle = sectionCardStyle(isMobile)` / `const sectionLabel = SECTION_LABEL_STYLE` 로 사용
+- 효과: 인라인 스타일 객체 중복 제거, 단일 지점 수정으로 일괄 반영
+
+**E2E 테스트 (`test_v2_37.cjs`) — 10/10 통과**
+
+| # | 테스트 항목 |
+|---|---|
+| 1 | favFarmsKey 함수 코드 존재 (`fav-farms-` 키) |
+| 2 | saveFavFarms에서 Firestore 동기화 코드 존재 |
+| 3 | favFarms Firestore 로드 useEffect 코드 존재 |
+| 4 | cleanBalanceDueKeys 함수 (startsWith 기반 키 정리) 존재 |
+| 5 | handleCompleteDeal에서 cleanBalanceDueKeys 호출 |
+| 6 | handleDeleteDeal, handleCloseDeal에서 cleanBalanceDueKeys 호출 |
+| 7 | SAMPLE_DEALS가 import.meta.env.DEV 조건으로 분기됨 |
+| 8 | SECTION_LABEL_STYLE 공통 상수 코드 존재 |
+| 9 | sectionCardStyle 함수 코드 존재 |
+| 10 | 셰프 내 거래 + 대시보드 탭 정상 진입 (리팩토링 후 앱 무결성) |
+
+---
+
+### v2.28~v2.37 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1082,7 +1220,10 @@ allow delete: if request.auth != null
 | `test_v2_32.cjs` | 11 | 11/11 ✅ |
 | `test_v2_33.cjs` | 10 | 10/10 ✅ |
 | `test_v2_34.cjs` | 10 | 10/10 ✅ |
-| **합계** | **75** | **75/75 ✅** |
+| `test_v2_35.cjs` | 10 | 10/10 ✅ |
+| `test_v2_36.cjs` | 10 | 10/10 ✅ |
+| `test_v2_37.cjs` | 10 | 10/10 ✅ |
+| **합계** | **105** | **105/105 ✅** |
 
 ---
 
