@@ -241,6 +241,8 @@ allow delete: if request.auth != null
 | v2.39 E2E | `test_v2_39.cjs` — 16/16 통과 (15개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.40 | DATA-01 `persistDeal` `{ merge: true }` (동시 쓰기 overwrite 방지), DATA-02 `handleSubmitProposal` `updateDoc` + `arrayUnion` (제안 동시 제출 경쟁 방지), SEC-01 `handleResetData` 함수 레벨 isAdmin 가드, SEC-02 `isAdmin` 코멘트에 함수 레벨 재확인 정책 명시 |
 | v2.40 E2E | `test_v2_40.cjs` — 6/6 통과 (5개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.41 | STAB-01 ChatScreen `mountedRef` 언마운트 안전, STAB-02 DealDetailView chef-profile fetch 취소 플래그, PERF-01 `onSnapshot` 채팅 셰프 필터, PERF-02 `chatUnreads` useMemo, PERF-03 `computeFarmBadges` useMemo (2곳), QUAL-01 `handleDepositPaid/BalancePaid` `dealsRef.current` stale closure 수정, UX-01 RatingPanel 더블클릭 방지 |
+| v2.41 E2E | `test_v2_41.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1383,7 +1385,40 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.40 E2E 테스트 요약
+### v2.41 상세 내역
+
+**STAB-01: ChatScreen `handleImageFile` mountedRef 언마운트 안전**
+- `img.onload` / `img.onerror` 내 `setState` 호출을 `if (mountedRef.current)` 로 감쌈
+- 효과: 채팅 화면 이탈 후 이미지 압축이 완료되어도 unmounted 컴포넌트에 setState하지 않음
+
+**STAB-02: DealDetailView chef-profile fetch 취소 플래그**
+- `let cancelled = false;` → cleanup `return () => { cancelled = true; }` 패턴 추가
+- dependency array `[deal.id]` → `[deal.id, deal.createdBy]` 수정
+- 효과: 딜 상세 화면 닫힌 뒤 `storage.get` 응답 도착 시 `setChefData` 호출 방지
+
+**PERF-01: onSnapshot 채팅 셰프 필터**
+- `onSnapshot(collection("chats"))` 핸들러에 `chefDealIds` Set 필터 추가
+- 효과: 초기 `getDocs`와 동일하게 셰프는 본인 딜 채팅만 실시간 수신
+
+**PERF-02: `chatUnreads` useMemo**
+- O(채팅수×메시지수) 재계산을 매 렌더에서 → deps `[chats, lastChatRead, user]` 변경 시에만
+- Rules of Hooks 준수: early return 이전 위치에 배치, null user guard 추가
+
+**PERF-03: `computeFarmBadges` useMemo (2곳)**
+- `FarmProfileDetailCard`: `useMemo(() => computeFarmBadges(...), [allDeals, proposal.farmerName, proposal.cert])`
+- `FarmProfileScreen`: IIFE 제거 → `farmBadges = useMemo(...)` 컴포넌트 레벨 호이스팅
+
+**QUAL-01: `handleDepositPaid` / `handleBalancePaid` stale closure 수정**
+- `deals.find(...)` → `dealsRef.current.find(...)` 로 변경
+- 효과: loadState 기반 effect에서 호출 시 deals 클로저가 stale해도 최신 deals 참조 보장
+
+**UX-01: RatingPanel 더블클릭 방지**
+- `const [submitting, setSubmitting] = useState(false)` + `disabled={submitting}` 추가
+- 효과: 평가 제출 버튼 중복 클릭 시 Firestore에 중복 평점 기록 방지
+
+---
+
+### v2.28~v2.41 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1399,7 +1434,8 @@ allow delete: if request.auth != null
 | `test_v2_38.cjs` | 14 | 14/14 ✅ |
 | `test_v2_39.cjs` | 16 | 16/16 ✅ |
 | `test_v2_40.cjs` | 6 | 6/6 ✅ |
-| **합계** | **141** | **141/141 ✅** |
+| `test_v2_41.cjs` | 9 | 9/9 ✅ |
+| **합계** | **150** | **150/150 ✅** |
 
 ---
 

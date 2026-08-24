@@ -825,6 +825,15 @@ function SeasonalBanner({ onSelectCrop, activeCrop }) {
 function RatingPanel({ farmName, onSubmit }) {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
+  // UX-01: 더블클릭 방지 — 중복 평가 Firestore 기록 방지
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = () => {
+    if (submitting || rating === 0) return;
+    setSubmitting(true);
+    onSubmit(rating, review);
+  };
+
   return (
     <div style={{ background: TOKENS.goldSoft, border: `1px solid ${TOKENS.gold}44`, borderRadius: 10, padding: 14 }}>
       <div style={{ fontSize: 11, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
@@ -844,8 +853,9 @@ function RatingPanel({ farmName, onSubmit }) {
             style={{ ...inputStyle, marginTop: 10, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif" }}
           />
           <button
-            onClick={() => onSubmit(rating, review)}
-            style={{ marginTop: 8, padding: "8px 18px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+            onClick={handleSubmit}
+            disabled={submitting}
+            style={{ marginTop: 8, padding: "8px 18px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1 }}
           >
             평가 제출
           </button>
@@ -2328,12 +2338,14 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
   const isMySpecialty = (farmProfile?.specialty ?? []).includes(deal.crop);
 
   useEffect(() => {
-    if (deal.createdBy) {
-      storage.get(chefProfileKey(deal.createdBy)).then((result) => {
-        if (result?.value) setChefData(JSON.parse(result.value));
-      }).catch(() => {});
-    }
-  }, [deal.id]);
+    if (!deal.createdBy) return;
+    // STAB-02: 언마운트 후 setChefData 방지 + createdBy 변경 시 재조회
+    let cancelled = false;
+    storage.get(chefProfileKey(deal.createdBy)).then((result) => {
+      if (!cancelled && result?.value) setChefData(JSON.parse(result.value));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [deal.id, deal.createdBy]);
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }} className="ftt-screen-enter">
@@ -3119,7 +3131,8 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
     ? (reviews.reduce((s, p) => s + p.rating, 0) / reviews.length).toFixed(1)
     : null;
 
-  const badges = computeFarmBadges(allDeals, proposal.farmerName, proposal.cert);
+  // PERF-03: 매 렌더마다 O(딜×제안) 재계산 방지
+  const badges = useMemo(() => computeFarmBadges(allDeals, proposal.farmerName, proposal.cert), [allDeals, proposal.farmerName, proposal.cert]);
 
   return (
     <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 18 }}>
@@ -5582,7 +5595,13 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
   const [compressing, setCompressing] = useState(false);
   const bottomRef = useRef(null);
   const imageRef = useRef(null);
+  // STAB-01: 언마운트 후 img.onload setState 방지
+  const mountedRef = useRef(true);
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -5604,10 +5623,12 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
       canvas.width = width; canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      setPendingImage(canvas.toDataURL("image/jpeg", 0.75));
-      setCompressing(false);
+      if (mountedRef.current) {
+        setPendingImage(canvas.toDataURL("image/jpeg", 0.75));
+        setCompressing(false);
+      }
     };
-    img.onerror = () => setCompressing(false);
+    img.onerror = () => { if (mountedRef.current) setCompressing(false); };
     img.src = url;
   };
 
@@ -5924,6 +5945,8 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
   const avgRating = ratedProposals.length > 0
     ? ratedProposals.reduce((sum, p) => sum + p.rating, 0) / ratedProposals.length
     : null;
+  // PERF-03: IIFE 인라인 호출 대신 useMemo로 호이스팅
+  const farmBadges = useMemo(() => computeFarmBadges(deals, userName, data.cert), [deals, userName, data.cert]);
 
   const update = (key, value) => { setData((d) => ({ ...d, [key]: value })); setSaved(false); };
   const toggleSpecialty = (crop) => {
@@ -6031,22 +6054,18 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
         </div>
       )}
 
-      {(() => {
-        const badges = computeFarmBadges(deals, userName, data.cert);
-        if (badges.length === 0) return null;
-        return (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>획득한 배지</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {badges.map((b) => (
-                <span key={b.id} style={{ fontSize: 12, padding: "4px 12px", borderRadius: 999, background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, color: TOKENS.moss, display: "flex", alignItems: "center", gap: 4 }}>
-                  {b.icon} {b.label}
-                </span>
-              ))}
-            </div>
+      {farmBadges.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>획득한 배지</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {farmBadges.map((b) => (
+              <span key={b.id} style={{ fontSize: 12, padding: "4px 12px", borderRadius: 999, background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, color: TOKENS.moss, display: "flex", alignItems: "center", gap: 4 }}>
+                {b.icon} {b.label}
+              </span>
+            ))}
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
         <div>
@@ -7240,10 +7259,19 @@ export default function FarmToTableApp() {
       setDeals(newDeals);
     });
     const unsubChats = onSnapshot(collection(db, "chats"), (snapshot) => {
-      const newChats = {};
-      snapshot.forEach((d) => { newChats[d.id] = d.data().messages || []; });
-      const prev = prevChatsRef.current;
       const cu = userRef.current;
+      // PERF-01: chef는 본인 딜 채팅만 수신 (getDocs와 동일한 필터 적용)
+      const chefDealIds = cu?.role === "chef"
+        ? new Set(dealsRef.current.filter((d) => d.createdBy === cu.uid).map((d) => d.id))
+        : null;
+      const newChats = {};
+      snapshot.forEach((d) => {
+        const dealId = d.id.split("__")[0];
+        if (!chefDealIds || chefDealIds.has(dealId)) {
+          newChats[d.id] = d.data().messages || [];
+        }
+      });
+      const prev = prevChatsRef.current;
       if (prev && cu) {
         Object.entries(newChats).forEach(([dealId, msgs]) => {
           const prevMsgs = prev[dealId] || [];
@@ -7407,7 +7435,8 @@ export default function FarmToTableApp() {
   };
 
   const handleDepositPaid = (dealId, paymentInfo = {}) => {
-    const deal = deals.find((d) => d.id === dealId);
+    // QUAL-01: deals 클로저 대신 dealsRef로 stale closure 방지 (loadState effect에서 호출)
+    const deal = dealsRef.current.find((d) => d.id === dealId);
     if (!deal) return;
     const updated = { ...deal, depositPaidAt: Date.now(), ...(paymentInfo.paymentKey && { depositPaymentKey: paymentInfo.paymentKey }) };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
@@ -7415,7 +7444,8 @@ export default function FarmToTableApp() {
   };
 
   const handleBalancePaid = (dealId, paymentInfo = {}) => {
-    const deal = deals.find((d) => d.id === dealId);
+    // QUAL-01: deals 클로저 대신 dealsRef로 stale closure 방지
+    const deal = dealsRef.current.find((d) => d.id === dealId);
     if (!deal) return;
     const updated = { ...deal, balancePaidAt: Date.now(), ...(paymentInfo.paymentKey && { balancePaymentKey: paymentInfo.paymentKey }) };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
@@ -7530,6 +7560,19 @@ export default function FarmToTableApp() {
     Object.keys(acc).forEach((k) => { result[k] = Math.round(acc[k].sum / acc[k].count); });
     return result;
   }, [deals]);
+
+  // PERF-02: useMemo로 매 렌더마다 O(채팅×메시지) 재계산 방지 — early return 이전에 배치 (Rules of Hooks)
+  const chatUnreads = useMemo(() => {
+    if (!user) return {};
+    const result = {};
+    Object.entries(chats).forEach(([chatId, msgs]) => {
+      const dealId = chatId.includes("__") ? chatId.split("__")[0] : chatId;
+      const lastRead = lastChatRead[chatId] || 0;
+      const count = msgs.filter((m) => m.ts > lastRead && m.senderName !== user.name).length;
+      result[dealId] = (result[dealId] || 0) + count;
+    });
+    return result;
+  }, [chats, lastChatRead, user]);
   const handleUpdateDeal = (updated) => {
     setDeals((prev) => prev.map((d) => d.id === updated.id ? updated : d));
     persistDeal(updated);
@@ -7660,13 +7703,6 @@ export default function FarmToTableApp() {
       }).length
     : 0;
 
-  const chatUnreads = {};
-  Object.entries(chats).forEach(([chatId, msgs]) => {
-    const dealId = chatId.includes("__") ? chatId.split("__")[0] : chatId;
-    const lastRead = lastChatRead[chatId] || 0;
-    const count = msgs.filter((m) => m.ts > lastRead && m.senderName !== user.name).length;
-    chatUnreads[dealId] = (chatUnreads[dealId] || 0) + count;
-  });
   const totalUnreadChats = Object.values(chatUnreads).reduce((s, n) => s + n, 0);
 
   const handleTabClick = (key) => {
