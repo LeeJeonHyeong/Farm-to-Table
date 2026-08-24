@@ -146,11 +146,14 @@ const TOKENS = {
 };
 
 // 셰프가 즐겨찾기한 농가 목록 (fav-farms-{uid}) — chef 전용
+const favFarmsKey = (uid) => `fav-farms-${uid}`;
 const getFavFarms = (uid) => {
-  try { return JSON.parse(localStorage.getItem(`fav-farms-${uid}`) || "[]"); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(favFarmsKey(uid)) || "[]"); } catch { return []; }
 };
 const saveFavFarms = (uid, farms) => {
-  localStorage.setItem(`fav-farms-${uid}`, JSON.stringify(farms));
+  const raw = JSON.stringify(farms);
+  localStorage.setItem(favFarmsKey(uid), raw);
+  storage.set(favFarmsKey(uid), raw).catch(() => {});
 };
 
 const FARM_BADGES = [
@@ -263,7 +266,8 @@ const addNotifiedDeal = (id) => {
 const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
-const SAMPLE_DEALS = [
+// DEV 전용 시연 데이터 — 프로덕션 빌드에서는 Vite가 정적 분석으로 제거
+const SAMPLE_DEALS = import.meta.env.DEV ? [
   {
     id: "d1",
     chefName: "테이블나인",
@@ -642,7 +646,11 @@ const SAMPLE_DEALS = [
     proposals: [],
     selectedProposalId: null,
   },
-];
+] : [];
+
+// AdminScreen·DashboardScreen 공통 섹션 스타일
+const SECTION_LABEL_STYLE = { fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 };
+const sectionCardStyle = (isMobile) => ({ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 14 });
 
 function chipBadge(bg, color) {
   return {
@@ -4053,8 +4061,8 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
   const cropCounts = deals.reduce((acc, d) => { acc[d.crop] = (acc[d.crop] || 0) + 1; return acc; }, {});
   const topCrops = Object.entries(cropCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
-  const sectionStyle = { background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 14 };
-  const sectionLabel = { fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 };
+  const sectionStyle = sectionCardStyle(isMobile);
+  const sectionLabel = SECTION_LABEL_STYLE;
 
   const fmtAmt = (n) => n >= 100000000 ? `${(n / 100000000).toFixed(1)}억` : n >= 10000 ? `${Math.floor(n / 10000).toLocaleString()}만` : `${n.toLocaleString()}`;
   const fmtShortDate = (ts) => ts ? new Date(ts).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "-";
@@ -4620,8 +4628,8 @@ function DashboardScreen({ deals, user, onTabChange }) {
   const recentProposals = [...allMyProposals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5);
 
   /* ── 렌더 ──────────────────────────────────── */
-  const sectionStyle = { background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 14 };
-  const sectionLabel = { fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 };
+  const sectionStyle = sectionCardStyle(isMobile);
+  const sectionLabel = SECTION_LABEL_STYLE;
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -4946,6 +4954,13 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
   const [favFarms, setFavFarms] = useState(() => getFavFarms(userId));
   const [counterTarget, setCounterTarget] = useState(null);
   useEffect(() => { setCompareIds([]); }, [expandedId]);
+  useEffect(() => {
+    if (!userId) return;
+    storage.get(favFarmsKey(userId)).then((result) => {
+      if (!result?.value) return;
+      try { const arr = JSON.parse(result.value); if (Array.isArray(arr)) { localStorage.setItem(favFarmsKey(userId), result.value); setFavFarms(arr); } } catch {}
+    }).catch(() => {});
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
   const isMobile = useIsMobile();
 
   if (detailProposal) {
@@ -5666,6 +5681,13 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
   const [favFarms, setFavFarms] = useState(() => getFavFarms(userId));
+  useEffect(() => {
+    if (!userId) return;
+    storage.get(favFarmsKey(userId)).then((result) => {
+      if (!result?.value) return;
+      try { const arr = JSON.parse(result.value); if (Array.isArray(arr)) { localStorage.setItem(favFarmsKey(userId), result.value); setFavFarms(arr); } } catch {}
+    }).catch(() => {});
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
   const isMobile = useIsMobile();
 
   const update = (key, value) => { setData((d) => ({ ...d, [key]: value })); setSaved(false); };
@@ -7250,12 +7272,19 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
+  const cleanBalanceDueKeys = (dealId) => {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(`balance-due-notified-${dealId}-`))
+      .forEach((k) => localStorage.removeItem(k));
+  };
+
   const handleCompleteDeal = (dealId) => {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal) return;
     const updated = { ...deal, status: "done", completedAt: Date.now() };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    cleanBalanceDueKeys(dealId);
   };
 
   const handleShipDeal = (dealId, { courier = "", trackingNumber = "", photoURL = null, memo = "" } = {}) => {
@@ -7422,6 +7451,7 @@ export default function FarmToTableApp() {
   const handleDeleteDeal = (dealId) => {
     setDeals((prev) => prev.filter((d) => d.id !== dealId));
     deleteDealDoc(dealId);
+    cleanBalanceDueKeys(dealId);
   };
 
   const handleCloseDeal = (dealId) => {
@@ -7430,6 +7460,7 @@ export default function FarmToTableApp() {
     const updated = { ...deal, status: "closed", closedAt: Date.now() };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    cleanBalanceDueKeys(dealId);
   };
 
   const handleCancelProposal = (dealId, proposalId) => {
