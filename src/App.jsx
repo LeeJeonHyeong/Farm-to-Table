@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, Fragment, Component } from "react";
 import { storage, db, auth, fbStorage } from "./firebase";
 import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
-import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch, arrayUnion } from "firebase/firestore";
+import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 function useIsMobile() {
@@ -7266,7 +7266,8 @@ export default function FarmToTableApp() {
   const persistDeal = async (deal) => {
     setSaveState("saving");
     try {
-      await setDoc(doc(db, "deals", deal.id), deal);
+      // DATA-01: merge:true로 동시 쓰기 시 타 필드 덮어쓰기 방지
+      await setDoc(doc(db, "deals", deal.id), deal, { merge: true });
       setSaveState("saved");
     } catch {
       setSaveState("error");
@@ -7323,6 +7324,8 @@ export default function FarmToTableApp() {
   };
 
   const handleResetData = async () => {
+    // SEC-01: UI 가드(isAdmin &&)만으로는 우회 가능 — 함수 레벨 권한 재확인
+    if (user?.email !== ADMIN_EMAIL) return;
     const batch = writeBatch(db);
     deals.forEach((d) => batch.delete(doc(db, "deals", d.id)));
     SAMPLE_DEALS.forEach((d) => batch.set(doc(db, "deals", d.id), d));
@@ -7340,9 +7343,11 @@ export default function FarmToTableApp() {
   const handleSubmitProposal = (dealId, proposal) => {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal) return;
+    // 낙관적 업데이트
     const updated = { ...deal, proposals: [...deal.proposals, proposal] };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
-    persistDeal(updated);
+    // DATA-02: arrayUnion으로 동시 제안 시 proposals 배열 overwrite 경쟁 방지
+    updateDoc(doc(db, "deals", dealId), { proposals: arrayUnion(proposal) }).catch(() => setSaveState("error"));
   };
 
   const handleSelectProposal = (dealId, proposalId) => {
@@ -7682,7 +7687,8 @@ export default function FarmToTableApp() {
     setTab(key);
   };
 
-  // SEC-02: 클라이언트 이메일 비교는 UI 표시 전용. 실 운영 시 Firebase Custom Claims 또는 Firestore 보안 규칙으로 서버 측 검증 필요
+  // SEC-02: 클라이언트 이메일 비교 — UI 표시 전용. 파괴적 admin 핸들러는 함수 레벨에서도 user?.email !== ADMIN_EMAIL 재확인.
+  // 실 운영 시 Firebase Custom Claims + Firestore 보안 규칙으로 서버 측 강제 필요.
   const isAdmin = user.email === ADMIN_EMAIL;
   const adminTab = isAdmin ? [{ key: "admin", label: "관리자" }] : [];
   const TABS = isChef
