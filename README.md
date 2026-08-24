@@ -239,6 +239,8 @@ allow delete: if request.auth != null
 | v2.38 E2E | `test_v2_38.cjs` — 14/14 통과 (13개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.39 | SEC-02 샘플 초기화 isAdmin 게이팅, SEC-01 `pendingTossKey(uid)` 결제 대기 키 uid 스코프, SEC-03 `balance-due-notified` uid 포함·`cleanBalanceDueKeys` 범용 필터, SEC-04 `orderId` 타임스탬프 suffix + `lastIndexOf` 파싱, DATA-01 `arrayUnion` + merge:true 채팅 전송, DATA-02 `setChats` 함수형 업데이터, STAB-01 `ErrorBoundary` 클래스 컴포넌트, STAB-02 `ProposalForm` `finally { setSubmitting(false) }`, STAB-03 `ImageUpload` `mountedRef` 언마운트 안전, DATA-03+PERF-01 데이터 로드 `[authChecked, user?.uid]` dep + chefDealIds 채팅 필터, UX-01 `DealCreateScreen` submitting 더블클릭 방지, A11Y-01 `ImageUpload` `role="button"` + `onKeyDown` |
 | v2.39 E2E | `test_v2_39.cjs` — 16/16 통과 (15개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.40 | DATA-01 `persistDeal` `{ merge: true }` (동시 쓰기 overwrite 방지), DATA-02 `handleSubmitProposal` `updateDoc` + `arrayUnion` (제안 동시 제출 경쟁 방지), SEC-01 `handleResetData` 함수 레벨 isAdmin 가드, SEC-02 `isAdmin` 코멘트에 함수 레벨 재확인 정책 명시 |
+| v2.40 E2E | `test_v2_40.cjs` — 6/6 통과 (5개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1359,7 +1361,29 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.39 E2E 테스트 요약
+### v2.40 상세 내역
+
+**DATA-01: `persistDeal` 동시 쓰기 overwrite 방지**
+- `setDoc(doc(db, "deals", deal.id), deal)` → `setDoc(..., deal, { merge: true })`
+- 효과: 두 탭/유저가 동시에 같은 딜을 수정해도 각자 변경한 필드만 덮어쓰고 나머지 필드는 보존
+
+**DATA-02: `handleSubmitProposal` 제안 동시 제출 경쟁 방지**
+- 기존: `proposals: [...deal.proposals, proposal]` 후 `persistDeal(updated)` (전체 배열 overwrite)
+- 변경: `updateDoc(doc(db, "deals", dealId), { proposals: arrayUnion(proposal) })` (원자적 추가)
+- `updateDoc` import 추가
+- 효과: 두 농가가 동시에 제안을 제출해도 먼저 제출한 제안이 유실되지 않음
+
+**SEC-01: `handleResetData` 함수 레벨 isAdmin 가드**
+- `if (user?.email !== ADMIN_EMAIL) return;` 추가
+- 효과: UI 조건(`!isMobile && isAdmin &&`) 우회 시에도 함수 내부에서 권한 재확인 — 실수로 호출해도 비admin은 실행 불가
+
+**SEC-02: `isAdmin` 클라이언트 비교 정책 명시**
+- 코멘트에 "파괴적 admin 핸들러는 함수 레벨에서도 user?.email !== ADMIN_EMAIL 재확인" 추가
+- 효과: 서버 측 강제(Firebase Custom Claims + Firestore 규칙) 도입 전까지 모든 admin 핸들러에 함수 레벨 가드를 두는 정책 문서화
+
+---
+
+### v2.28~v2.40 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1374,7 +1398,8 @@ allow delete: if request.auth != null
 | `test_v2_37.cjs` | 10 | 10/10 ✅ |
 | `test_v2_38.cjs` | 14 | 14/14 ✅ |
 | `test_v2_39.cjs` | 16 | 16/16 ✅ |
-| **합계** | **135** | **135/135 ✅** |
+| `test_v2_40.cjs` | 6 | 6/6 ✅ |
+| **합계** | **141** | **141/141 ✅** |
 
 ---
 
