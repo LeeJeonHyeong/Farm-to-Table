@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { storage, db, auth, fbStorage } from "./firebase";
 import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
 import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
@@ -116,7 +116,7 @@ function Toast({ message, onClose }) {
   }, [message, onClose]);
   if (!message) return null;
   return (
-    <div style={{
+    <div role="alert" aria-live="assertive" aria-atomic="true" style={{
       position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
       background: "rgba(32,40,31,0.93)", color: "#fff", borderRadius: 12,
       padding: "13px 20px", fontSize: 14, lineHeight: 1.5,
@@ -126,7 +126,7 @@ function Toast({ message, onClose }) {
       animation: "fadeSlideUp 0.2s ease",
     }}>
       <span style={{ flex: 1 }}>{message}</span>
-      <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.65)", cursor: "pointer", fontSize: 17, lineHeight: 1, flexShrink: 0, padding: 0 }}>✕</button>
+      <button onClick={onClose} aria-label="알림 닫기" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.65)", cursor: "pointer", fontSize: 17, lineHeight: 1, flexShrink: 0, padding: 0 }}>✕</button>
     </div>
   );
 }
@@ -251,18 +251,23 @@ const chefProfileKey = (uid) => `chef-profile-${uid}`;
 // 농가가 관심 딜을 저장한 북마크 (farm-bookmarks-{uid}) — farmer 전용, fav-farms와 별개 개념
 const bookmarkKey = (uid) => `farm-bookmarks-${uid}`;
 const notifHistoryKey = (uid) => `notif-history-${uid}`;
-const NOTIFIED_DEALS_KEY = "notified-deals-v1";
-const getNotifiedDeals = () => {
-  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_DEALS_KEY) || "[]")); }
+// DATA-04: uid별 격리 — 공유 기기에서 사용자 간 알림 dedup 키 혼용 방지
+const notifiedDealsKey = (uid) => `notified-deals-v1-${uid}`;
+const getNotifiedDeals = (uid) => {
+  try { return new Set(JSON.parse(localStorage.getItem(notifiedDealsKey(uid)) || "[]")); }
   catch { return new Set(); }
 };
-const addNotifiedDeal = (id) => {
-  const s = getNotifiedDeals();
+const addNotifiedDeal = (uid, id) => {
+  const s = getNotifiedDeals(uid);
   s.add(id);
   const arr = [...s];
   if (arr.length > 300) arr.splice(0, arr.length - 300);
-  localStorage.setItem(NOTIFIED_DEALS_KEY, JSON.stringify(arr));
+  localStorage.setItem(notifiedDealsKey(uid), JSON.stringify(arr));
 };
+// SEC-03: uid별 격리 — 공유 기기에서 사용자 간 방문 기록·채팅 읽음 상태 혼용 방지
+const lastMyDealsVisitKey = (uid) => `last-mydeals-visit-${uid}`;
+const seenSelectionsKey = (uid) => `seen-selections-${uid}`;
+const lastChatReadKey = (uid) => `last-chat-read-${uid}`;
 const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
@@ -1758,7 +1763,7 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
         availableQty: Number(data.availableQty),
         availableDate: data.availableDate,
         cert: data.cert,
-        rating: 4.0,
+        rating: null,
         message: data.message,
         createdAt: Date.now(),
         photoURL: farmProfile?.photoURL || null,
@@ -2029,8 +2034,8 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
             {proposal.ratedAt && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isSelected ? 10 : 0, background: TOKENS.goldSoft, borderRadius: 8, padding: "8px 12px" }}>
                 <span style={{ fontSize: 11, color: "#7A5C20" }}>받은 평점</span>
-                <StarRating value={proposal.rating} size={14} />
-                <span style={{ fontSize: 12, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating.toFixed(1)}</span>
+                <StarRating value={proposal.rating ?? 0} size={14} />
+                <span style={{ fontSize: 12, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating != null ? proposal.rating.toFixed(1) : "—"}</span>
                 {proposal.review && <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>· "{proposal.review}"</span>}
               </div>
             )}
@@ -2176,8 +2181,8 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
         {proposal.ratedAt && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: TOKENS.goldSoft, borderRadius: 8, padding: "8px 12px" }}>
             <span style={{ fontSize: 11, color: "#7A5C20" }}>받은 평점</span>
-            <StarRating value={proposal.rating} size={14} />
-            <span style={{ fontSize: 12, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating.toFixed(1)}</span>
+            <StarRating value={proposal.rating ?? 0} size={14} />
+            <span style={{ fontSize: 12, color: "#7A5C20", fontFamily: "'IBM Plex Mono', monospace" }}>{proposal.rating != null ? proposal.rating.toFixed(1) : "—"}</span>
             {proposal.review && <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>· "{proposal.review}"</span>}
           </div>
         )}
@@ -3296,7 +3301,7 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score,
         </span>
         <span style={chipBadge(TOKENS.rustSoft, TOKENS.rust)}>납품가능일 {proposal.availableDate || "-"}</span>
         <span style={chipBadge(TOKENS.line, TOKENS.inkSoft)}>가능수량 {proposal.availableQty}kg</span>
-        {proposal.ratedAt && (
+        {proposal.ratedAt && proposal.rating != null && (
           <span style={chipBadge(TOKENS.goldSoft, "#7A5C20")}>★ {proposal.rating.toFixed(1)}</span>
         )}
       </div>
@@ -6179,7 +6184,6 @@ function LoginScreen({ onLogin }) {
       fontFamily: "'IBM Plex Sans', sans-serif",
       gap: 52,
     }}>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
       <style>{`
         .ftt-login-card { animation: loginFadeIn 0.32s ease; }
         @keyframes loginFadeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
@@ -6769,6 +6773,20 @@ export default function FarmToTableApp() {
     }).catch(() => {});
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // SEC-03: user 로그인 시 uid별 localStorage에서 방문 기록·선택 확인·채팅 읽음 상태 로드
+  useEffect(() => {
+    if (!user?.uid) return;
+    const uid = user.uid;
+    // 구버전 공용 키 정리
+    localStorage.removeItem("last-mydeals-visit");
+    localStorage.removeItem("seen-selections");
+    localStorage.removeItem("last-chat-read");
+    const visit = Number(localStorage.getItem(lastMyDealsVisitKey(uid)) || 0);
+    if (visit) setLastMyDealsVisit(visit);
+    try { const sel = JSON.parse(localStorage.getItem(seenSelectionsKey(uid)) || "[]"); if (Array.isArray(sel)) setSeenSelections(sel); } catch {}
+    try { const cr = JSON.parse(localStorage.getItem(lastChatReadKey(uid)) || "{}"); if (cr && typeof cr === "object") setLastChatRead(cr); } catch {}
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!notifOpen) return;
     const close = (e) => { if (!e.target.closest("[data-notif-panel]")) setNotifOpen(false); };
@@ -6781,17 +6799,19 @@ export default function FarmToTableApp() {
   const [chatTarget, setChatTarget] = useState(null);
   const [editingDeal, setEditingDeal] = useState(null);
   const [cloningDeal, setCloningDeal] = useState(null);
-  const [lastMyDealsVisit, setLastMyDealsVisit] = useState(() => Number(localStorage.getItem("last-mydeals-visit") || 0));
-  const [seenSelections, setSeenSelections] = useState(() => { try { return JSON.parse(localStorage.getItem("seen-selections") || "[]"); } catch { return []; } });
-  const [lastChatRead, setLastChatRead] = useState(() => { try { return JSON.parse(localStorage.getItem("last-chat-read") || "{}"); } catch { return {}; } });
+  const [lastMyDealsVisit, setLastMyDealsVisit] = useState(0);
+  const [seenSelections, setSeenSelections] = useState([]);
+  const [lastChatRead, setLastChatRead] = useState({});
   const [installPrompt, setInstallPrompt] = useState(null);
   const [contractTarget, setContractTarget] = useState(null);
   const userRef = useRef(null);
   const farmRef = useRef(null);
+  const dealsRef = useRef([]);
   const prevDealsRef = useRef(null);
   const prevChatsRef = useRef(null);
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { farmRef.current = farm; }, [farm]);
+  useEffect(() => { dealsRef.current = deals; }, [deals]);
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
@@ -6865,12 +6885,13 @@ export default function FarmToTableApp() {
 
   // 잔금 결제 기한 알림 (앱 로드 시 1회 체크)
   useEffect(() => {
-    if (loadState !== "ready" || !user) return;
+    const cu = userRef.current;
+    if (loadState !== "ready" || !cu) return;
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const todayKey = todayStart.toISOString().slice(0, 10);
-    deals.forEach((deal) => {
+    dealsRef.current.forEach((deal) => {
       if (!deal.balanceDueAt || deal.balancePaidAt) return;
-      if (deal.createdBy !== user.uid) return;
+      if (deal.createdBy !== cu.uid) return;
       const notifyKey = `balance-due-notified-${deal.id}-${todayKey}`;
       if (localStorage.getItem(notifyKey)) return;
       const dueStart = new Date(deal.balanceDueAt); dueStart.setHours(0, 0, 0, 0);
@@ -6892,17 +6913,20 @@ export default function FarmToTableApp() {
 
   // Firebase Auth 상태 감지
   useEffect(() => {
+    let cancelled = false;
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
           let profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
           if (!profileResult?.value) {
             // 신규 가입 직후 auth 이벤트가 프로필 쓰기보다 먼저 도착할 수 있음 — 최대 5회 재시도
-            for (let attempt = 0; attempt < 5 && !profileResult?.value; attempt++) {
+            for (let attempt = 0; attempt < 5 && !profileResult?.value && !cancelled; attempt++) {
               await new Promise((r) => setTimeout(r, 300));
+              if (cancelled) return;
               profileResult = await storage.get(`user-profile-${firebaseUser.uid}`);
             }
           }
+          if (cancelled) return;
           if (profileResult?.value) {
             const { role, displayName } = JSON.parse(profileResult.value);
             const userData = { uid: firebaseUser.uid, email: firebaseUser.email, role, name: displayName };
@@ -6912,18 +6936,17 @@ export default function FarmToTableApp() {
               setShowOnboarding(true);
             }
           } else {
-            await signOut(auth);
-            setUser(null);
+            if (!cancelled) { await signOut(auth); setUser(null); }
           }
         } catch {
-          setUser(null);
+          if (!cancelled) setUser(null);
         }
       } else {
-        setUser(null);
+        if (!cancelled) setUser(null);
       }
-      setAuthChecked(true);
+      if (!cancelled) setAuthChecked(true);
     });
-    return () => unsub();
+    return () => { cancelled = true; unsub(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 공유 데이터 로드 (auth 확인 후)
@@ -6958,9 +6981,10 @@ export default function FarmToTableApp() {
 
   // 납품일 지난 모집중 딜 자동 마감
   useEffect(() => {
-    if (loadState !== "ready" || deals.length === 0) return;
+    if (loadState !== "ready" || dealsRef.current.length === 0) return;
     const today = new Date().toISOString().split("T")[0];
-    const expired = deals.filter((d) => d.status === "open" && d.deliveryDate && d.deliveryDate < today);
+    // SEC-05: 내 딜만 자동 종료 — 타인 딜에 대한 무권한 Firestore write 방지
+    const expired = dealsRef.current.filter((d) => d.status === "open" && d.deliveryDate && d.deliveryDate < today && d.createdBy === userRef.current?.uid);
     if (expired.length === 0) return;
     const closedDeals = expired.map((d) => ({ ...d, status: "closed", closedAt: Date.now(), closeReason: "expired" }));
     setDeals((prev) => prev.map((d) => { const c = closedDeals.find((x) => x.id === d.id); return c || d; }));
@@ -6970,15 +6994,16 @@ export default function FarmToTableApp() {
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (loadState !== "ready" || !user) return;
+    const cu = userRef.current;
+    if (loadState !== "ready" || !cu) return;
     const todayKey = new Date().toISOString().slice(0, 10);
-    const storageKey = `deadline-notif-${user.uid}-${todayKey}`;
+    const storageKey = `deadline-notif-${cu.uid}-${todayKey}`;
     if (localStorage.getItem(storageKey)) return;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const d3 = new Date(today); d3.setDate(d3.getDate() + 3);
-    const upcoming = deals.filter((d) => {
+    const upcoming = dealsRef.current.filter((d) => {
       if (d.status !== "open" && d.status !== "matched") return false;
-      if (user.role === "chef" && d.createdBy !== user.uid) return false;
+      if (cu.role === "chef" && d.createdBy !== cu.uid) return false;
       if (!d.deliveryDate) return false;
       const dl = new Date(d.deliveryDate);
       return dl >= today && dl <= d3;
@@ -6990,7 +7015,7 @@ export default function FarmToTableApp() {
         showPushNotification(
           `⚠️ 딜 마감 임박 — ${d.crop}`,
           `납품일까지 ${diff === 0 ? "오늘" : `${diff}일`} 남았습니다. (${d.deliveryDate})`,
-          user.role === "chef" ? "mydeals" : "myproposals"
+          cu.role === "chef" ? "mydeals" : "myproposals"
         );
       });
       localStorage.setItem(storageKey, "1");
@@ -7076,9 +7101,9 @@ export default function FarmToTableApp() {
             if (!old && deal.status === "open") {
               const fp = farmRef.current;
               if (fp?.notifyNewDeals && (fp.specialty || []).includes(deal.crop)) {
-                const _notified = getNotifiedDeals();
+                const _notified = getNotifiedDeals(cu.uid);
                 if (!_notified.has(deal.id)) {
-                  addNotifiedDeal(deal.id);
+                  addNotifiedDeal(cu.uid, deal.id);
                   showPushNotification(
                     `🌾 새 딜 등록 — ${deal.crop}`,
                     `${deal.chefName}이(가) ${deal.crop} 딜을 올렸습니다. 지금 제안해보세요.`,
@@ -7250,7 +7275,7 @@ export default function FarmToTableApp() {
   };
 
   const handleCreateDeal = (deal) => {
-    const newDeal = { ...deal, createdBy: user.uid || user.name };
+    const newDeal = { ...deal, createdBy: user.uid };
     setDeals((prev) => [newDeal, ...prev]);
     persistDeal(newDeal);
     setTab("mydeals");
@@ -7376,7 +7401,7 @@ export default function FarmToTableApp() {
     try {
       await setDoc(doc(db, "chats", dealId), { messages: updatedMsgs });
     } catch {
-      setChats((c) => ({ ...c, [dealId]: prev }));
+      setChats((c) => ({ ...c, [dealId]: (c[dealId] || []).filter((m) => m.id !== newMsg.id) }));
       setToastMsg("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
     }
   };
@@ -7391,7 +7416,7 @@ export default function FarmToTableApp() {
     setChatTarget({ ...target, chatId });
     const updated = { ...lastChatRead, [chatId]: Date.now() };
     setLastChatRead(updated);
-    localStorage.setItem("last-chat-read", JSON.stringify(updated));
+    if (user?.uid) localStorage.setItem(lastChatReadKey(user.uid), JSON.stringify(updated));
   };
 
   const handleEditDeal = (deal) => { setEditingDeal(deal); setCloningDeal(null); setTab("create"); };
@@ -7426,7 +7451,7 @@ export default function FarmToTableApp() {
     setTab("create");
   };
 
-  const cropPriceRef = (() => {
+  const cropPriceRef = useMemo(() => {
     const acc = {};
     deals.forEach((d) => {
       if ((d.status === "matched" || d.status === "done") && d.selectedProposalId) {
@@ -7441,7 +7466,7 @@ export default function FarmToTableApp() {
     const result = {};
     Object.keys(acc).forEach((k) => { result[k] = Math.round(acc[k].sum / acc[k].count); });
     return result;
-  })();
+  }, [deals]);
   const handleUpdateDeal = (updated) => {
     setDeals((prev) => prev.map((d) => d.id === updated.id ? updated : d));
     persistDeal(updated);
@@ -7586,7 +7611,7 @@ export default function FarmToTableApp() {
     if (key === "mydeals" && isChef) {
       const now = Date.now();
       setLastMyDealsVisit(now);
-      localStorage.setItem("last-mydeals-visit", String(now));
+      if (user?.uid) localStorage.setItem(lastMyDealsVisitKey(user.uid), String(now));
     }
     if (key === "myproposals" && !isChef) {
       const selectedDealIds = deals
@@ -7594,7 +7619,7 @@ export default function FarmToTableApp() {
         .map((d) => d.id);
       const next = [...new Set([...seenSelections, ...selectedDealIds])];
       setSeenSelections(next);
-      localStorage.setItem("seen-selections", JSON.stringify(next));
+      if (user?.uid) localStorage.setItem(seenSelectionsKey(user.uid), JSON.stringify(next));
     }
     setTab(key);
   };
@@ -7608,7 +7633,6 @@ export default function FarmToTableApp() {
 
   return (
     <div style={{ background: TOKENS.bg, minHeight: "100%", padding: isMobile ? "16px 12px" : "32px 24px", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.ink }}>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
       <style>{`
         /* ===== SCROLLBAR ===== */
         ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -7791,7 +7815,7 @@ export default function FarmToTableApp() {
                 )}
               </button>
               {notifOpen && (
-                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, maxHeight: 380, overflowY: "auto", background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, boxShadow: "0 8px 32px rgba(32,40,31,0.16)", zIndex: 9998 }}>
+                <div aria-live="polite" aria-label="알림 목록" style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, maxHeight: 380, overflowY: "auto", background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, boxShadow: "0 8px 32px rgba(32,40,31,0.16)", zIndex: 9998 }}>
                   <div style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: TOKENS.ink }}>알림</span>
                     {notifHistory.length > 0 && (
@@ -7807,10 +7831,12 @@ export default function FarmToTableApp() {
                       const diff = Math.round((today - nDate) / 86400000);
                       const dateLabel = diff === 0 ? "오늘" : diff === 1 ? "어제" : `${diff}일 전`;
                       return (
-                        <div
+                        <button
                           key={n.id}
+                          type="button"
+                          aria-label={`${n.title} — ${n.body}`}
                           onClick={() => { if (n.tab) { setTab(n.tab); setNotifOpen(false); } }}
-                          style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: n.read ? "#FFFFFF" : `${TOKENS.gold}10`, cursor: n.tab ? "pointer" : "default" }}
+                          style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: n.read ? "#FFFFFF" : `${TOKENS.gold}10`, cursor: n.tab ? "pointer" : "default", width: "100%", textAlign: "left", border: "none", borderBottom: `1px solid ${TOKENS.line}`, display: "block" }}
                         >
                           <div style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500, marginBottom: 2 }}>{n.title}</div>
                           <div style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.5 }}>{n.body}</div>
@@ -7820,7 +7846,7 @@ export default function FarmToTableApp() {
                             </span>
                             {n.tab && <span style={{ fontSize: 10, color: TOKENS.moss }}>→ 바로 가기</span>}
                           </div>
-                        </div>
+                        </button>
                       );
                     })
                   )}
