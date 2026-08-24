@@ -235,6 +235,8 @@ allow delete: if request.auth != null
 | v2.36 E2E | `test_v2_36.cjs` — 10/10 통과 (DATA-01/02 uid 분리·STAB-01 null 가드·QUAL-02 deps·QUAL-03 fmtShortDate·브라우저 UI 검증) |
 | v2.37 | DATA-03 `favFarms` Firestore 동기화 (`fav-farms-{uid}`), STAB-02 `cleanBalanceDueKeys` — 딜 완료·삭제·종료 시 `balance-due-notified-{dealId}-*` 키 자동 정리, PERF-01 `SAMPLE_DEALS` `import.meta.env.DEV` 조건 분기 (프로덕션 번들 제외), QUAL-04 `SECTION_LABEL_STYLE`·`sectionCardStyle` 공통 상수 추출 |
 | v2.37 E2E | `test_v2_37.cjs` — 10/10 통과 (DATA-03 Firestore·STAB-02 키 정리·PERF-01 DEV 분기·QUAL-04 공통 상수·브라우저 UI 검증) |
+| v2.38 | SEC-03 방문·선택·채팅읽음 uid 키 분리, SEC-04 `createdBy` 폴백 제거, SEC-05 만료 딜 소유권 필터, DATA-04 `notifiedDealsKey(uid)`, STAB-03 auth cancelled 플래그, STAB-04 채팅 rollback 실패 메시지만 제거, QUAL-05 `rating: null` + null 가드, QUAL-06 `dealsRef` stale closure 수정, PERF-02 `cropPriceRef` useMemo, PERF-03 Google Fonts 중복 → index.html 단일화, A11Y-01 알림 항목 `<button>`, A11Y-02 Toast `role="alert"` |
+| v2.38 E2E | `test_v2_38.cjs` — 14/14 통과 (13개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1210,7 +1212,93 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.37 E2E 테스트 요약
+### v2.38 상세 내역
+
+**4차 감사 — 보안·데이터·안정성·코드품질·성능·접근성**
+
+**SEC-03: 방문기록·선택확인·채팅읽음 uid별 키 분리**
+- `lastMyDealsVisitKey(uid)` / `seenSelectionsKey(uid)` / `lastChatReadKey(uid)` 함수 추가
+- `useState` 초기값: 공용 localStorage 키 읽기 제거 → 빈 값으로 초기화
+- 로그인 후 uid별 키에서 로드, 구버전 공용 키 3개 자동 정리
+- 효과: 공유 기기에서 사용자 간 알림 뱃지·채팅 읽음 상태 혼용 방지
+
+**SEC-04: `createdBy` 폴백 제거**
+- `createdBy: user.uid || user.name` → `createdBy: user.uid` 단독 사용
+- 효과: uid 없을 때 표시명으로 폴백해 소유권 비교 오류가 발생하는 경우 방지
+
+**SEC-05: 만료 딜 자동 종료 소유권 필터**
+- `expired` 필터에 `d.createdBy === userRef.current?.uid` 조건 추가
+- `deals` 대신 `dealsRef.current` 사용
+- 효과: 로그인한 사용자가 타인의 딜을 무단 종료하는 Firestore write 방지
+
+**DATA-04: `notifiedDealsKey(uid)` uid 스코프 적용**
+- `NOTIFIED_DEALS_KEY` 상수 → `notifiedDealsKey(uid)` 함수로 교체
+- `getNotifiedDeals(uid)` / `addNotifiedDeal(uid, id)` — uid 파라미터 추가
+- 효과: 공유 기기에서 사용자 간 알림 dedup 키 혼용으로 신규 딜 알림 누락 방지
+
+**STAB-03: auth 재시도 루프 cancelled 플래그**
+- `useEffect` 최상단에 `let cancelled = false` 선언
+- 재시도 루프 내 `&& !cancelled` 조건 + `if (cancelled) return` 체크
+- cleanup 함수: `() => { cancelled = true; unsub(); }`
+- 효과: 언마운트 후 setState 호출로 인한 React 경고 및 상태 오염 방지
+
+**STAB-04: 채팅 전송 실패 rollback 범위 축소**
+- 기존: `setChats((c) => ({ ...c, [dealId]: prev }))` — 이전 스냅샷 전체 복원
+- 변경: `.filter((m) => m.id !== newMsg.id)` — 실패한 메시지 1개만 제거
+- 효과: 동시에 전송된 다른 메시지가 rollback으로 삭제되는 현상 방지
+
+**QUAL-05: 신규 제안 `rating: null` 처리**
+- `ProposalForm` 제출 시 `rating: 4.0` → `rating: null`
+- 렌더 3곳: `proposal.rating != null` 가드 + null일 때 `"—"` 표시
+- 효과: 리뷰 없는 신규 농가가 매칭 점수에서 부당하게 상위 랭크를 받는 현상 제거
+
+**QUAL-06: `dealsRef` — stale closure 수정**
+- `const dealsRef = useRef([])` + `useEffect(() => { dealsRef.current = deals; }, [deals])` 추가
+- balance-due 알림·만료 딜 종료·딜 마감 알림 3개 effect에서 `deals` 대신 `dealsRef.current` 사용
+- 효과: `loadState`가 `"ready"`로 유지되는 동안 deals가 변경돼도 최신값 참조 보장
+
+**PERF-02: `cropPriceRef` useMemo 적용**
+- IIFE `(() => { ... })()` → `useMemo(() => { ... }, [deals])`
+- `useMemo` named import 추가
+- 효과: 탭 전환·Toast·알림 패널 토글 등 무관한 렌더에서 deals 전체 순회 반복 제거
+
+**PERF-03: Google Fonts 중복 로드 제거**
+- JSX 2곳(`LoginScreen` 반환, `App` 반환)에서 `<link>` 태그 제거
+- `index.html` `<head>`에 preconnect + stylesheet 한 번만 추가
+- 효과: 중복 폰트 요청 제거, 번들 렌더 시 불필요한 DOM 조작 방지
+
+**A11Y-01: 알림 패널 항목 `<button>` 교체**
+- 알림 항목 `<div onClick>` → `<button type="button" aria-label>` 교체
+- `width: 100%, text-align: left` 스타일로 시각적 차이 없음
+- 알림 목록 컨테이너에 `aria-live="polite" aria-label="알림 목록"` 추가
+
+**A11Y-02: Toast ARIA live region**
+- Toast `<div>` → `role="alert" aria-live="assertive" aria-atomic="true"` 추가
+- 닫기 버튼에 `aria-label="알림 닫기"` 추가
+- 효과: 스크린리더가 새 Toast 메시지를 즉시 발화
+
+**E2E 테스트 (`test_v2_38.cjs`) — 14/14 통과**
+
+| # | 테스트 항목 |
+|---|---|
+| 1 | SEC-03: uid 스코프 키 함수 3개 존재 |
+| 2 | SEC-03: useState 초기값 공용 키 읽기 제거 |
+| 3 | SEC-03: uid 스코프 키로 localStorage 저장 |
+| 4 | SEC-04: createdBy 폴백 제거 |
+| 5 | SEC-05: 만료 딜 소유권 필터 코드 존재 |
+| 6 | DATA-04: notifiedDealsKey uid 함수 + call site uid 전달 |
+| 7 | STAB-03: cancelled 플래그 패턴 존재 |
+| 8 | STAB-04: 채팅 rollback 실패 메시지만 filter 제거 |
+| 9 | QUAL-05: rating null 초기화 + null 가드 존재 |
+| 10 | QUAL-06: dealsRef + sync useEffect 패턴 존재 |
+| 11 | PERF-02: cropPriceRef useMemo 존재 |
+| 12 | PERF-03: JSX 중복 fonts link 제거 + index.html 단일 추가 |
+| 13 | A11Y-02: Toast role=alert + aria-live=assertive 존재 |
+| 14 | 농가 딜 찾기 + 내 제안 탭 정상 진입 (앱 무결성) |
+
+---
+
+### v2.28~v2.38 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1223,7 +1311,8 @@ allow delete: if request.auth != null
 | `test_v2_35.cjs` | 10 | 10/10 ✅ |
 | `test_v2_36.cjs` | 10 | 10/10 ✅ |
 | `test_v2_37.cjs` | 10 | 10/10 ✅ |
-| **합계** | **105** | **105/105 ✅** |
+| `test_v2_38.cjs` | 14 | 14/14 ✅ |
+| **합계** | **119** | **119/119 ✅** |
 
 ---
 
