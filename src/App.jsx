@@ -238,10 +238,10 @@ const GRADE_LEVELS = ["보통", "상", "특"];
 const CYCLE_OPTIONS = ["단발성(1회)", "주 1회", "주 2회", "격주"];
 const DEAL_STATUS_LABEL = { open: "모집중", matched: "진행중", done: "완료", closed: "마감" };
 const DEAL_STATUS_COLOR = { open: TOKENS.gold, matched: TOKENS.moss, done: TOKENS.inkSoft, closed: TOKENS.rust };
-const ADMIN_EMAIL = "jhlove0490@nonghyup.com";
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL ?? "";
 const DEPOSIT_RATE = 0.3;
 const FEE_RATE = 0.1;
-const TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq";
+const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY ?? "";
 const BALANCE_DUE_DAYS = 7;
 const farmProfileKey = (uid) => `farm-profile-${uid}`;
 const chefProfileKey = (uid) => `chef-profile-${uid}`;
@@ -1259,6 +1259,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   );
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
+  const isMobile = useIsMobile();
 
   const [aiText, setAiText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -1377,7 +1378,6 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     );
   }
 
-  const isMobile = useIsMobile();
   const stages = RIPENESS_STAGES[data.crop] || [];
 
   return (
@@ -2266,7 +2266,7 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
   );
 }
 
-function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack, lastProposal, onSubmitInquiry }) {
+function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack, lastProposal, onSubmitInquiry, userId }) {
   const [openForm, setOpenForm] = useState(false);
   const [showInqForm, setShowInqForm] = useState(false);
   const [inqText, setInqText] = useState("");
@@ -2584,6 +2584,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
         onSubmitProposal={(id, proposal) => { onSubmitProposal(id, proposal); setDetailDeal(null); }}
         onSubmitInquiry={onSubmitInquiry}
         onBack={() => setDetailDeal(null)}
+        userId={userId}
       />
     );
   }
@@ -3428,7 +3429,7 @@ function ShipModal({ onClose, onConfirm }) {
             rows={2} style={{ width: "100%", padding: "10px 12px", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setLoading(true); onConfirm({ courier, trackingNumber: trackingNumber.trim(), memo: memo.trim(), photoURL }); }}
+          <button onClick={async () => { setLoading(true); try { await onConfirm({ courier, trackingNumber: trackingNumber.trim(), memo: memo.trim(), photoURL }); } catch { /* caller handles */ } finally { setLoading(false); } }}
             disabled={loading}
             style={{ flex: 1, padding: "12px 0", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1 }}>
             {loading ? "처리 중…" : "발송 완료"}
@@ -7558,6 +7559,7 @@ export default function FarmToTableApp() {
     setTab(key);
   };
 
+  // SEC-02: 클라이언트 이메일 비교는 UI 표시 전용. 실 운영 시 Firebase Custom Claims 또는 Firestore 보안 규칙으로 서버 측 검증 필요
   const isAdmin = user.email === ADMIN_EMAIL;
   const adminTab = isAdmin ? [{ key: "admin", label: "관리자" }] : [];
   const TABS = isChef
