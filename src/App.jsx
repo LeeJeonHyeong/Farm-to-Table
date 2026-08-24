@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment, Component } from "react";
 import { storage, db, auth, fbStorage } from "./firebase";
 import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
-import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc, writeBatch, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 function useIsMobile() {
@@ -18,6 +18,9 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
   const [compressing, setCompressing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const fileRef = useRef(null);
+  // STAB-03: 언마운트 후 비동기 콜백에서 setState 호출 방지
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const handleFile = (file) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -41,16 +44,16 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
           const sRef = storageRef(fbStorage, storagePath);
           await uploadString(sRef, dataUrl, "data_url");
           const downloadUrl = await getDownloadURL(sRef);
-          onChange(downloadUrl);
+          if (mountedRef.current) onChange(downloadUrl);
         } catch {
-          onChange(dataUrl);
+          if (mountedRef.current) onChange(dataUrl);
         }
       } else {
-        onChange(dataUrl);
+        if (mountedRef.current) onChange(dataUrl);
       }
-      setCompressing(false);
+      if (mountedRef.current) setCompressing(false);
     };
-    img.onerror = () => setCompressing(false);
+    img.onerror = () => { if (mountedRef.current) setCompressing(false); };
     img.src = url;
   };
 
@@ -60,7 +63,11 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
       <input type="file" accept="image/*" ref={fileRef} style={{ display: "none" }}
         onChange={(e) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
       <div
+        role="button"
+        tabIndex={compressing ? -1 : 0}
+        aria-label={value ? "사진 변경" : label}
         onClick={() => !compressing && fileRef.current.click()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!compressing) fileRef.current.click(); } }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
@@ -106,6 +113,27 @@ function PhotoLightbox({ src, onClose }) {
       <button onClick={onClose} style={{ position: "fixed", top: 16, right: 16, background: "rgba(255,255,255,0.18)", border: "none", color: "#fff", borderRadius: "50%", width: 40, height: 40, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>✕</button>
     </div>
   );
+}
+
+// STAB-01: 예기치 않은 렌더 오류 격리 — 앱 전체 크래시 방지
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err, info) { console.error("[ErrorBoundary]", err, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, textAlign: "center", fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          <p style={{ fontSize: 15, color: "#555", marginBottom: 16 }}>예기치 않은 오류가 발생했습니다. 페이지를 새로고침해 주세요.</p>
+          <button onClick={() => window.location.reload()} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ccc", cursor: "pointer", fontSize: 14 }}>새로고침</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function Toast({ message, onClose }) {
@@ -268,6 +296,8 @@ const addNotifiedDeal = (uid, id) => {
 const lastMyDealsVisitKey = (uid) => `last-mydeals-visit-${uid}`;
 const seenSelectionsKey = (uid) => `seen-selections-${uid}`;
 const lastChatReadKey = (uid) => `last-chat-read-${uid}`;
+// SEC-01: uid별 격리 — 결제 리다이렉트 대기 키 공유 방지
+const pendingTossKey = (uid) => `pending-toss-payment-${uid}`;
 const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
@@ -1272,6 +1302,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   );
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const isMobile = useIsMobile();
 
   const [aiText, setAiText] = useState("");
@@ -1351,7 +1382,10 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   const goBack = () => { setStep((s) => Math.max(1, s - 1)); setErrors({}); };
 
   const handleSubmit = () => {
+    // UX-01: 더블클릭 방지
+    if (submitting) return;
     if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
+    setSubmitting(true);
     if (isEditing) {
       onUpdate({ ...editingDeal, ...data, quantity: Number(data.quantity), targetPrice: Number(data.targetPrice) });
     } else {
@@ -1754,23 +1788,27 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length === 0) {
       setSubmitting(true);
-      onSubmit(deal.id, {
-        id: `p${Date.now()}`,
-        farmerName,
-        farmName: data.farmName,
-        region: data.region,
-        price: Number(data.price),
-        availableQty: Number(data.availableQty),
-        availableDate: data.availableDate,
-        cert: data.cert,
-        rating: null,
-        message: data.message,
-        createdAt: Date.now(),
-        photoURL: farmProfile?.photoURL || null,
-        specialty: farmProfile?.specialty || [],
-        certPhotoURL: farmProfile?.certPhotoURL || null,
-        cropPhotoURL: data.cropPhotoURL || null,
-      });
+      try {
+        onSubmit(deal.id, {
+          id: `p${Date.now()}`,
+          farmerName,
+          farmName: data.farmName,
+          region: data.region,
+          price: Number(data.price),
+          availableQty: Number(data.availableQty),
+          availableDate: data.availableDate,
+          cert: data.cert,
+          rating: null,
+          message: data.message,
+          createdAt: Date.now(),
+          photoURL: farmProfile?.photoURL || null,
+          specialty: farmProfile?.specialty || [],
+          certPhotoURL: farmProfile?.certPhotoURL || null,
+          cropPhotoURL: data.cropPhotoURL || null,
+        });
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -6831,7 +6869,8 @@ export default function FarmToTableApp() {
     const params = new URLSearchParams(window.location.search);
     const paymentKey = params.get("paymentKey");
     if (paymentKey) {
-      localStorage.setItem("pending-toss-payment", JSON.stringify({
+      // SEC-01: 임시 캡처 키 (uid 미확정) → user 로드 후 uid 키로 이관
+      localStorage.setItem("pending-toss-capture", JSON.stringify({
         paymentKey,
         orderId: params.get("orderId") || "",
         amount: Number(params.get("amount") || 0),
@@ -6845,31 +6884,37 @@ export default function FarmToTableApp() {
     }
   }, []);
 
-  // user 로드 직후 — localStorage 결제 대기 정보를 Firestore에 백업 (브라우저 크래시 대비)
+  // user 로드 직후 — SEC-01: 임시 캡처 키를 uid 스코프 키로 이관 + Firestore 백업
   useEffect(() => {
     if (!user) return;
-    const raw = localStorage.getItem("pending-toss-payment");
-    if (!raw) return;
-    storage.set(`pending-toss-${user.uid}`, raw).catch(() => {});
+    const raw = localStorage.getItem("pending-toss-capture");
+    if (raw) {
+      localStorage.setItem(pendingTossKey(user.uid), raw);
+      localStorage.removeItem("pending-toss-capture");
+    }
+    const toBackup = localStorage.getItem(pendingTossKey(user.uid));
+    if (toBackup) storage.set(`pending-toss-${user.uid}`, toBackup).catch(() => {});
   }, [user]);
 
   // 데이터 로드 완료 후 미처리 결제 반영 (localStorage 우선, Firestore 폴백)
   useEffect(() => {
     if (loadState !== "ready") return;
     const firestoreKey = user ? `pending-toss-${user.uid}` : null;
+    const lsKey = user ? pendingTossKey(user.uid) : null;
     const process = async () => {
-      let raw = localStorage.getItem("pending-toss-payment");
+      let raw = lsKey ? localStorage.getItem(lsKey) : null;
       if (!raw && firestoreKey) {
         const fsResult = await storage.get(firestoreKey).catch(() => null);
         if (fsResult?.value) raw = fsResult.value;
       }
       if (!raw) return;
-      localStorage.removeItem("pending-toss-payment");
+      if (lsKey) localStorage.removeItem(lsKey);
       if (firestoreKey) storage.set(firestoreKey, "").catch(() => {});
       try {
         const { orderId, paymentKey, amount } = JSON.parse(raw);
         const isDeposit = orderId.startsWith("dep-");
-        const dealId = orderId.slice(4);
+        // SEC-04: orderId에 타임스탬프 suffix가 추가된 경우 대비 — lastIndexOf로 딜 ID 추출
+        const dealId = orderId.slice(4, orderId.lastIndexOf("-") > 3 ? orderId.lastIndexOf("-") : undefined);
         if (isDeposit) {
           handleDepositPaid(dealId, { paymentKey, amount });
           showPushNotification("💰 선급금 결제 완료", `${Number(amount).toLocaleString()}원이 결제됐습니다.`, "mydeals");
@@ -6892,7 +6937,8 @@ export default function FarmToTableApp() {
     dealsRef.current.forEach((deal) => {
       if (!deal.balanceDueAt || deal.balancePaidAt) return;
       if (deal.createdBy !== cu.uid) return;
-      const notifyKey = `balance-due-notified-${deal.id}-${todayKey}`;
+      // SEC-03: uid 포함으로 공유 기기에서 사용자 간 알림 dedup 키 혼용 방지
+      const notifyKey = `balance-due-notified-${cu.uid}-${deal.id}-${todayKey}`;
       if (localStorage.getItem(notifyKey)) return;
       const dueStart = new Date(deal.balanceDueAt); dueStart.setHours(0, 0, 0, 0);
       const diffDays = Math.round((dueStart - todayStart) / 86400000);
@@ -6949,7 +6995,7 @@ export default function FarmToTableApp() {
     return () => { cancelled = true; unsub(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 공유 데이터 로드 (auth 확인 후)
+  // 공유 데이터 로드 (auth 확인 후) — DATA-03: user?.uid dep으로 재로그인 시 프로필 재로드
   useEffect(() => {
     if (!authChecked) return;
     let cancelled = false;
@@ -6957,16 +7003,26 @@ export default function FarmToTableApp() {
       try {
         const snapshot = await getDocs(collection(db, "deals"));
         if (cancelled) return;
-        setDeals(snapshot.docs.map((d) => d.data()));
+        const dealDocs = snapshot.docs.map((d) => d.data());
+        setDeals(dealDocs);
         const farmResult = user?.uid ? await storage.get(farmProfileKey(user.uid)) : null;
         if (!cancelled && farmResult?.value) setFarm(JSON.parse(farmResult.value));
+        else if (!cancelled && !farmResult?.value) setFarm(null);
         const chefResult = user?.uid ? await storage.get(chefProfileKey(user.uid)) : null;
         if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
+        else if (!cancelled && !chefResult?.value) setChefProfile(null);
         if (user?.uid) {
+          // PERF-01: 셰프는 자신의 딜 채팅만 로드 (전체 chats 컬렉션 불필요 로드 방지)
+          const chefDealIds = user.role === "chef"
+            ? new Set(dealDocs.filter((d) => d.createdBy === user.uid).map((d) => d.id))
+            : null;
           const chatsSnap = await getDocs(collection(db, "chats"));
           if (!cancelled) {
             const loaded = {};
-            chatsSnap.forEach((d) => { loaded[d.id] = d.data().messages || []; });
+            chatsSnap.forEach((d) => {
+              const dealId = d.id.split("__")[0];
+              if (!chefDealIds || chefDealIds.has(dealId)) loaded[d.id] = d.data().messages || [];
+            });
             setChats(loaded);
           }
         }
@@ -6977,7 +7033,7 @@ export default function FarmToTableApp() {
       }
     })();
     return () => { cancelled = true; };
-  }, [authChecked]);
+  }, [authChecked, user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 납품일 지난 모집중 딜 자동 마감
   useEffect(() => {
@@ -7298,8 +7354,9 @@ export default function FarmToTableApp() {
   };
 
   const cleanBalanceDueKeys = (dealId) => {
+    // SEC-03: uid가 포함된 새 키 형식과 구형 키 모두 정리
     Object.keys(localStorage)
-      .filter((k) => k.startsWith(`balance-due-notified-${dealId}-`))
+      .filter((k) => k.startsWith("balance-due-notified-") && k.includes(`-${dealId}-`))
       .forEach((k) => localStorage.removeItem(k));
   };
 
@@ -7368,7 +7425,8 @@ export default function FarmToTableApp() {
     const total = proposal.price * deal.quantity;
     const depositAmt = Math.round(total * DEPOSIT_RATE);
     const amount = type === "deposit" ? depositAmt : total - depositAmt;
-    const orderId = `${type === "deposit" ? "dep" : "bal"}-${deal.id}`;
+    // SEC-04: 타임스탬프 suffix로 동일 딜 재결제 시 orderId 중복 방지
+    const orderId = `${type === "deposit" ? "dep" : "bal"}-${deal.id}-${Date.now()}`;
     const orderName = `[${deal.crop}] ${type === "deposit" ? "선급금 (30%)" : "잔금 (70%)"}`;
     const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
     tossPayments.requestPayment("카드", {
@@ -7395,11 +7453,11 @@ export default function FarmToTableApp() {
     const { text = "", imageURL = null } = typeof payload === "string" ? { text: payload } : payload;
     const newMsg = { id: `m${Date.now()}`, senderName: user.name, senderRole: user.role, text, ts: Date.now() };
     if (imageURL) newMsg.imageURL = imageURL;
-    const prev = chats[dealId] || [];
-    const updatedMsgs = [...prev, newMsg];
-    setChats((c) => ({ ...c, [dealId]: updatedMsgs }));
+    // DATA-02: 함수형 업데이터로 stale closure 방지
+    setChats((c) => ({ ...c, [dealId]: [...(c[dealId] || []), newMsg] }));
     try {
-      await setDoc(doc(db, "chats", dealId), { messages: updatedMsgs });
+      // DATA-01: arrayUnion으로 동시 전송 시 overwrite 경쟁 방지
+      await setDoc(doc(db, "chats", dealId), { messages: arrayUnion(newMsg) }, { merge: true });
     } catch {
       setChats((c) => ({ ...c, [dealId]: (c[dealId] || []).filter((m) => m.id !== newMsg.id) }));
       setToastMsg("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
@@ -7901,7 +7959,8 @@ export default function FarmToTableApp() {
               앱 설치
             </button>
           )}
-          {!isMobile && (
+          {/* SEC-02: 관리자만 샘플 초기화 버튼 표시 — 일반 사용자의 전체 데이터 삭제 방지 */}
+          {!isMobile && isAdmin && (
             <button onClick={handleResetData} style={{ fontSize: 11, color: TOKENS.inkSoft, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", marginBottom: 10, flexShrink: 0 }}>
               샘플 초기화
             </button>
