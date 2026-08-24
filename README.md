@@ -237,6 +237,8 @@ allow delete: if request.auth != null
 | v2.37 E2E | `test_v2_37.cjs` — 10/10 통과 (DATA-03 Firestore·STAB-02 키 정리·PERF-01 DEV 분기·QUAL-04 공통 상수·브라우저 UI 검증) |
 | v2.38 | SEC-03 방문·선택·채팅읽음 uid 키 분리, SEC-04 `createdBy` 폴백 제거, SEC-05 만료 딜 소유권 필터, DATA-04 `notifiedDealsKey(uid)`, STAB-03 auth cancelled 플래그, STAB-04 채팅 rollback 실패 메시지만 제거, QUAL-05 `rating: null` + null 가드, QUAL-06 `dealsRef` stale closure 수정, PERF-02 `cropPriceRef` useMemo, PERF-03 Google Fonts 중복 → index.html 단일화, A11Y-01 알림 항목 `<button>`, A11Y-02 Toast `role="alert"` |
 | v2.38 E2E | `test_v2_38.cjs` — 14/14 통과 (13개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.39 | SEC-02 샘플 초기화 isAdmin 게이팅, SEC-01 `pendingTossKey(uid)` 결제 대기 키 uid 스코프, SEC-03 `balance-due-notified` uid 포함·`cleanBalanceDueKeys` 범용 필터, SEC-04 `orderId` 타임스탬프 suffix + `lastIndexOf` 파싱, DATA-01 `arrayUnion` + merge:true 채팅 전송, DATA-02 `setChats` 함수형 업데이터, STAB-01 `ErrorBoundary` 클래스 컴포넌트, STAB-02 `ProposalForm` `finally { setSubmitting(false) }`, STAB-03 `ImageUpload` `mountedRef` 언마운트 안전, DATA-03+PERF-01 데이터 로드 `[authChecked, user?.uid]` dep + chefDealIds 채팅 필터, UX-01 `DealCreateScreen` submitting 더블클릭 방지, A11Y-01 `ImageUpload` `role="button"` + `onKeyDown` |
+| v2.39 E2E | `test_v2_39.cjs` — 16/16 통과 (15개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1298,7 +1300,66 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.38 E2E 테스트 요약
+### v2.39 상세 내역
+
+**5차 감사 — 보안·데이터·안정성·성능·UX·접근성**
+
+**SEC-02: 샘플 초기화 버튼 isAdmin 게이팅**
+- `{!isMobile && isAdmin && (` 조건으로 관리자만 버튼 표시
+- 효과: 비관리자 사용자가 전체 딜 데이터를 샘플로 초기화하는 것 방지
+
+**SEC-01: `pending-toss-payment` uid 스코프**
+- `pendingTossKey(uid)` 함수 추가, 임시 캡처 키 `pending-toss-capture` 도입
+- user 로드 시 캡처 키 → `pendingTossKey(user.uid)` 이관 후 캡처 키 삭제
+- 효과: 공유 기기에서 사용자 간 결제 대기 정보 혼용 방지
+
+**SEC-03: `balance-due-notified` uid 스코프 + cleanBalanceDueKeys 범용 필터**
+- `notifyKey` = `balance-due-notified-${cu.uid}-${deal.id}-${todayKey}`
+- `cleanBalanceDueKeys`: `startsWith("balance-due-notified-") && includes(-${dealId}-)` 필터
+- 효과: 공유 기기에서 잔금 알림 dedup 키 혼용 방지
+
+**SEC-04: Toss `orderId` 타임스탬프 suffix**
+- `orderId` = `` `${type}-${deal.id}-${Date.now()}` ``
+- 파싱: `orderId.slice(4, orderId.lastIndexOf("-"))` 로 dealId 추출
+- 효과: 동일 딜 재결제 시 orderId 중복으로 Toss 결제 거절 방지
+
+**DATA-01: `handleSendMessage` `arrayUnion` 전환**
+- `setDoc(... { messages: arrayUnion(newMsg) }, { merge: true })`
+- 효과: 동시 메시지 전송 시 overwrite race로 인한 메시지 소실 방지
+
+**DATA-02: 낙관적 업데이트 함수형 업데이터**
+- `setChats((c) => ({ ...c, [dealId]: [...(c[dealId] || []), newMsg] }))`
+- 효과: stale closure로 인한 메시지 누락 방지
+
+**STAB-01: React `ErrorBoundary` 클래스 컴포넌트**
+- `class ErrorBoundary extends Component` — `getDerivedStateFromError` + `componentDidCatch`
+- 효과: 예기치 않은 렌더 오류 격리 — 앱 전체 크래시 방지
+
+**STAB-02: `ProposalForm` `finally { setSubmitting(false) }`**
+- `onSubmit()` 호출을 `try { ... } finally { setSubmitting(false) }` 로 감쌈
+- 효과: 예외 발생 시에도 submitting 상태 항상 복원
+
+**STAB-03: `ImageUpload` `mountedRef` 언마운트 안전**
+- `mountedRef = useRef(true)` + cleanup `() => { mountedRef.current = false; }`
+- `onChange`, `setCompressing` 호출 전 `mountedRef.current` 체크
+- 효과: 이미지 업로드 중 컴포넌트 언마운트 시 setState 경고 방지
+
+**DATA-03 + PERF-01: 데이터 로드 effect 개선**
+- `[authChecked]` → `[authChecked, user?.uid]` — 재로그인 시 farm/chefProfile 재로드
+- 셰프는 자신의 딜 ID 집합(`chefDealIds`)만 필터해 채팅 로드 (불필요한 chats 문서 제외)
+- 효과: 다른 계정 재로그인 시 이전 사용자 프로필이 남는 버그 수정 + 채팅 로드 범위 축소
+
+**UX-01: `DealCreateScreen` 더블클릭 방지**
+- `const [submitting, setSubmitting] = useState(false)` + `if (submitting) return;`
+- 효과: 딜 생성 버튼 더블클릭 시 중복 딜 등록 방지
+
+**A11Y-01: `ImageUpload` 키보드 접근성**
+- `role="button"` + `tabIndex={compressing ? -1 : 0}` + `aria-label` + `onKeyDown` (Enter/Space)
+- 효과: 키보드만으로 이미지 업로드 버튼 포커스·클릭 가능
+
+---
+
+### v2.28~v2.39 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1312,7 +1373,8 @@ allow delete: if request.auth != null
 | `test_v2_36.cjs` | 10 | 10/10 ✅ |
 | `test_v2_37.cjs` | 10 | 10/10 ✅ |
 | `test_v2_38.cjs` | 14 | 14/14 ✅ |
-| **합계** | **119** | **119/119 ✅** |
+| `test_v2_39.cjs` | 16 | 16/16 ✅ |
+| **합계** | **135** | **135/135 ✅** |
 
 ---
 
