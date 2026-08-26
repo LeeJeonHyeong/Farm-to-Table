@@ -831,7 +831,9 @@ function RatingPanel({ farmName, onSubmit }) {
   const handleSubmit = () => {
     if (submitting || rating === 0) return;
     setSubmitting(true);
+    // UX-02: onSubmit은 동기 void — 항상 즉시 복원 (딜 미존재 등 실패 시 버튼 영구 잠금 방지)
     onSubmit(rating, review);
+    setSubmitting(false);
   };
 
   return (
@@ -2340,6 +2342,8 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
   useEffect(() => {
     if (!deal.createdBy) return;
     // STAB-02: 언마운트 후 setChefData 방지 + createdBy 변경 시 재조회
+    // STAB-03: 딜 전환 시 이전 셰프 프로필 잔류 방지 — 조회 전 초기화
+    setChefData(null);
     let cancelled = false;
     storage.get(chefProfileKey(deal.createdBy)).then((result) => {
       if (!cancelled && result?.value) setChefData(JSON.parse(result.value));
@@ -7100,8 +7104,44 @@ export default function FarmToTableApp() {
   // 딜·채팅 실시간 동기화
   useEffect(() => {
     if (loadState !== "ready") return;
+    // RACE-01: deals 미도착 시 chats snapshot 보존용 클로저 변수
+    let pendingChatsSnap = null;
+
+    const processChats = (snapshot) => {
+      const cu = userRef.current;
+      // PERF-01: chef는 본인 딜 채팅만 수신
+      const chefDealIds = cu?.role === "chef"
+        ? new Set(dealsRef.current.filter((d) => d.createdBy === cu.uid).map((d) => d.id))
+        : null;
+      const newChats = {};
+      snapshot.forEach((d) => {
+        const dealId = d.id.split("__")[0];
+        if (!chefDealIds || chefDealIds.has(dealId)) {
+          newChats[d.id] = d.data().messages || [];
+        }
+      });
+      const prev = prevChatsRef.current;
+      if (prev && cu) {
+        Object.entries(newChats).forEach(([chatId, msgs]) => {
+          const prevMsgs = prev[chatId] || [];
+          msgs.slice(prevMsgs.length).forEach((msg) => {
+            if (msg.senderName !== cu.name) {
+              const notifBody = msg.imageURL
+                ? (msg.text ? `📷 ${msg.text.length > 50 ? msg.text.slice(0, 50) + "…" : msg.text}` : "📷 사진을 보냈습니다")
+                : (msg.text.length > 60 ? msg.text.slice(0, 60) + "…" : msg.text);
+              showPushNotification(`새 메시지 — ${msg.senderName}`, notifBody);
+            }
+          });
+        });
+      }
+      prevChatsRef.current = newChats;
+      setChats(newChats);
+    };
+
     const unsubDeals = onSnapshot(collection(db, "deals"), (snapshot) => {
       const newDeals = snapshot.docs.map((d) => d.data());
+      // RACE-01: ref를 동기적으로 갱신해야 processChats에서 최신 딜 참조 가능
+      dealsRef.current = newDeals;
       const prev = prevDealsRef.current;
       const cu = userRef.current;
       if (prev && cu) {
@@ -7257,36 +7297,20 @@ export default function FarmToTableApp() {
       }
       prevDealsRef.current = newDeals;
       setDeals(newDeals);
+      // RACE-01: deals 도착 전 저장된 chats snapshot 재처리
+      if (pendingChatsSnap) {
+        processChats(pendingChatsSnap);
+        pendingChatsSnap = null;
+      }
     });
     const unsubChats = onSnapshot(collection(db, "chats"), (snapshot) => {
       const cu = userRef.current;
-      // PERF-01: chef는 본인 딜 채팅만 수신 (getDocs와 동일한 필터 적용)
-      const chefDealIds = cu?.role === "chef"
-        ? new Set(dealsRef.current.filter((d) => d.createdBy === cu.uid).map((d) => d.id))
-        : null;
-      const newChats = {};
-      snapshot.forEach((d) => {
-        const dealId = d.id.split("__")[0];
-        if (!chefDealIds || chefDealIds.has(dealId)) {
-          newChats[d.id] = d.data().messages || [];
-        }
-      });
-      const prev = prevChatsRef.current;
-      if (prev && cu) {
-        Object.entries(newChats).forEach(([dealId, msgs]) => {
-          const prevMsgs = prev[dealId] || [];
-          msgs.slice(prevMsgs.length).forEach((msg) => {
-            if (msg.senderName !== cu.name) {
-              const notifBody = msg.imageURL
-                ? (msg.text ? `📷 ${msg.text.length > 50 ? msg.text.slice(0, 50) + "…" : msg.text}` : "📷 사진을 보냈습니다")
-                : (msg.text.length > 60 ? msg.text.slice(0, 60) + "…" : msg.text);
-              showPushNotification(`새 메시지 — ${msg.senderName}`, notifBody);
-            }
-          });
-        });
+      // RACE-01: chef이고 deals 미도착 시 snapshot 보존 — deals 도착 후 재처리
+      if (cu?.role === "chef" && dealsRef.current.length === 0) {
+        pendingChatsSnap = snapshot;
+        return;
       }
-      prevChatsRef.current = newChats;
-      setChats(newChats);
+      processChats(snapshot);
     });
     return () => { unsubDeals(); unsubChats(); };
   }, [loadState]);
@@ -7572,7 +7596,8 @@ export default function FarmToTableApp() {
       result[dealId] = (result[dealId] || 0) + count;
     });
     return result;
-  }, [chats, lastChatRead, user]);
+  // PERF-04: user 전체 객체 대신 user?.name만 dep — 프로필 저장 시 불필요한 재계산 방지
+  }, [chats, lastChatRead, user?.name]);
   const handleUpdateDeal = (updated) => {
     setDeals((prev) => prev.map((d) => d.id === updated.id ? updated : d));
     persistDeal(updated);
