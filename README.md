@@ -245,6 +245,8 @@ allow delete: if request.auth != null
 | v2.41 E2E | `test_v2_41.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.42 | RACE-01 chef 채팅 inbox 레이스 수정 (`pendingChatsSnap` + `dealsRef` 동기 업데이트), UX-02 RatingPanel `setSubmitting(false)` 복원, STAB-03 DealDetailView `setChefData(null)` 딜 전환 초기화, PERF-04 `chatUnreads` dep `user` → `user?.name` |
 | v2.42 E2E | `test_v2_42.cjs` — 8/8 통과 (7개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.43 | 긴급: `dDay(n)` 헬퍼 추가 — SAMPLE_DEALS 16개 납품일 만료 → 오늘 기준 미래 날짜로 동적 계산, HIGH-1: SettlementCard 테스트 결제 모드 배너 (DEV 환경, 카드번호 힌트), HIGH-2: 로딩 화면 CSS 스피너 (`ftt-spin` 애니메이션), HIGH-3: 잔금 기한 초과 알림 5초 지연 (`setTimeout` + `clearTimeout` 클린업) |
+| v2.43 E2E | `test_v2_43.cjs` — 7/7 통과 (6개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1420,6 +1422,26 @@ allow delete: if request.auth != null
 
 ---
 
+### v2.43 상세 내역
+
+**긴급: SAMPLE_DEALS 납품일 동적 계산**
+
+- `dDay(n)` 헬퍼 함수 추가 (`Date.now() + n * 86400000`). SAMPLE_DEALS 16개 딜의 `deliveryDate`를 모두 하드코딩 날짜에서 `dDay(4)` ~ `dDay(20)` 동적 표현식으로 교체하여 발표 날짜와 무관하게 항상 미래 날짜로 표시됨.
+
+**HIGH-1: 결제 테스트 모드 배너**
+
+- `SettlementCard` 헤더 아래에 `import.meta.env.DEV` 조건부 배너 추가. 토스페이먼츠 테스트 키 사용 환경임을 명시하고 카드번호 `4242 4242 4242 4242` 힌트 제공. 프로덕션 빌드에서는 Vite가 제거.
+
+**HIGH-2: 로딩 화면 스피너**
+
+- 로딩 화면에 `@keyframes ftt-spin` CSS 애니메이션과 회전하는 원형 스피너 추가. "불러오는 중…" 텍스트와 함께 표시. `<style>` 태그 인라인으로 주입.
+
+**HIGH-3: 잔금 기한 초과 알림 지연**
+
+- 잔금 결제 기한 알림 useEffect 내 `forEach` 직접 실행 → `setTimeout(..., 5000)` 래핑으로 변경. 앱 최초 로드 5초 후에 알림이 발생하도록 지연하여 발표 첫 화면에서 알림이 바로 나타나는 상황 방지. `return () => clearTimeout(timer)` 클린업 추가.
+
+---
+
 ### v2.42 상세 내역
 
 **RACE-01: chef 채팅 inbox 레이스 조건 수정**
@@ -1442,7 +1464,7 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.42 E2E 테스트 요약
+### v2.28~v2.43 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1460,7 +1482,8 @@ allow delete: if request.auth != null
 | `test_v2_40.cjs` | 6 | 6/6 ✅ |
 | `test_v2_41.cjs` | 9 | 9/9 ✅ |
 | `test_v2_42.cjs` | 8 | 8/8 ✅ |
-| **합계** | **158** | **158/158 ✅** |
+| `test_v2_43.cjs` | 7 | 7/7 ✅ |
+| **합계** | **165** | **165/165 ✅** |
 
 ---
 

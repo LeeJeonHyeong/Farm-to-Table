@@ -302,6 +302,7 @@ const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
 // DEV 전용 시연 데이터 — 프로덕션 빌드에서는 Vite가 정적 분석으로 제거
+const dDay = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 const SAMPLE_DEALS = import.meta.env.DEV ? [
   {
     id: "d1",
@@ -312,7 +313,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "라이트레드",
     grade: "특",
     quantity: 100,
-    deliveryDate: "2026-08-10",
+    deliveryDate: dDay(7),
     cycle: "주 1회",
     targetPrice: 23000,
     note: "콩피용으로 사용해 균일한 크기가 중요합니다.",
@@ -330,7 +331,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "어린잎",
     grade: "상",
     quantity: 20,
-    deliveryDate: "2026-08-12",
+    deliveryDate: dDay(10),
     cycle: "주 2회",
     targetPrice: 18000,
     note: "가니쉬용, 향이 진한 품종 선호",
@@ -361,7 +362,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "완숙(레드 100%)",
     grade: "특",
     quantity: 30,
-    deliveryDate: "2026-08-20",
+    deliveryDate: dDay(14),
     cycle: "주 1회",
     targetPrice: 42000,
     note: "디저트 플레이팅용, 당도 12brix 이상 선호합니다.",
@@ -404,7 +405,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "완전결구",
     grade: "상",
     quantity: 50,
-    deliveryDate: "2026-08-18",
+    deliveryDate: dDay(12),
     cycle: "주 2회",
     targetPrice: 8000,
     note: "시저 샐러드 전용, 속잎이 단단한 것으로 부탁드립니다.",
@@ -422,7 +423,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "완숙 블루",
     grade: "특",
     quantity: 15,
-    deliveryDate: "2026-08-25",
+    deliveryDate: dDay(20),
     cycle: "단발성(1회)",
     targetPrice: 35000,
     note: "여름 디저트 메뉴 한정 사용, 냉장 포장 필수.",
@@ -453,7 +454,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "어린잎",
     grade: "보통",
     quantity: 10,
-    deliveryDate: "2026-08-07",
+    deliveryDate: dDay(5),
     cycle: "주 2회",
     targetPrice: 12000,
     note: "타코·세비체용, 향이 강한 것 선호합니다.",
@@ -471,7 +472,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "미니(꽃달림)",
     grade: "특",
     quantity: 40,
-    deliveryDate: "2026-08-15",
+    deliveryDate: dDay(9),
     cycle: "주 1회",
     targetPrice: 15000,
     note: "꽃이 신선하게 달려 있어야 합니다. 당일 수확 후 즉시 배송 요청.",
@@ -489,7 +490,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "성숙순",
     grade: "상",
     quantity: 5,
-    deliveryDate: "2026-08-22",
+    deliveryDate: dDay(16),
     cycle: "격주",
     targetPrice: 28000,
     note: "스테이크 가니쉬 및 인퓨징용, 목질화되지 않은 신선한 순으로.",
@@ -520,7 +521,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "레드(완숙)",
     grade: "상",
     quantity: 25,
-    deliveryDate: "2026-08-11",
+    deliveryDate: dDay(8),
     cycle: "주 1회",
     targetPrice: 19000,
     note: "코스 요리 고명용, 색상이 균일하고 껍질이 얇은 것 선호.",
@@ -538,7 +539,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "어린순",
     grade: "보통",
     quantity: 8,
-    deliveryDate: "2026-08-09",
+    deliveryDate: dDay(6),
     cycle: "주 1회",
     targetPrice: 14000,
     note: "음료·디저트 가니쉬용, 향이 선명하고 잎이 싱싱한 것으로.",
@@ -556,7 +557,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "베이비잎",
     grade: "특",
     quantity: 12,
-    deliveryDate: "2026-08-08",
+    deliveryDate: dDay(4),
     cycle: "주 2회",
     targetPrice: 22000,
     note: "샐러드 베이스용, 부드럽고 쓴맛이 적은 베이비 케일 선호.",
@@ -574,7 +575,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "베이비잎",
     grade: "상",
     quantity: 10,
-    deliveryDate: "2026-08-13",
+    deliveryDate: dDay(11),
     cycle: "주 2회",
     targetPrice: 20000,
     note: "피자·파스타 마무리 가니쉬용, 향이 강한 것 선호합니다.",
@@ -605,7 +606,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "반개",
     grade: "특",
     quantity: 20,
-    deliveryDate: "2026-08-16",
+    deliveryDate: dDay(13),
     cycle: "주 1회",
     targetPrice: 32000,
     note: "코스 요리 메인 식재료, 향이 진하고 육질이 두꺼운 것 선호.",
@@ -623,7 +624,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "레드(완숙)",
     grade: "상",
     quantity: 30,
-    deliveryDate: "2026-08-19",
+    deliveryDate: dDay(15),
     cycle: "주 1회",
     targetPrice: 9000,
     note: "파스타 소스 및 구이용, 과육이 두껍고 씨가 적은 것 선호.",
@@ -641,7 +642,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "완숙",
     grade: "특",
     quantity: 8,
-    deliveryDate: "2026-08-23",
+    deliveryDate: dDay(18),
     cycle: "단발성(1회)",
     targetPrice: 55000,
     note: "여름 디저트 코스용, 껍질이 얇고 당도 높은 것 선호.",
@@ -672,7 +673,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     ripeness: "완숙",
     grade: "상",
     quantity: 25,
-    deliveryDate: "2026-08-17",
+    deliveryDate: dDay(17),
     cycle: "격주",
     targetPrice: 7000,
     note: "수프·샐러드용, 색이 선명하고 흙 없이 세척된 것으로.",
@@ -3675,6 +3676,12 @@ ${type === "balance" ? `<hr><div class="row"><span class="label">플랫폼 수�
       <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 14 }}>
         결제 · 정산
       </div>
+
+      {import.meta.env.DEV && (
+        <div style={{ fontSize: 10, color: "#0064FF", background: "#EEF3FF", border: "1px solid #C7D9FF", borderRadius: 4, padding: "3px 8px", marginBottom: 12, fontFamily: "'IBM Plex Mono', monospace", display: "inline-block" }}>
+          🧪 테스트 결제 모드 · 카드번호: 4242 4242 4242 4242
+        </div>
+      )}
 
       {/* 단계 트래커 */}
       <div style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 14 }}>
@@ -6951,31 +6958,34 @@ export default function FarmToTableApp() {
     process();
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 잔금 결제 기한 알림 (앱 로드 시 1회 체크)
+  // 잔금 결제 기한 알림 (앱 로드 시 1회 체크 — 발표 첫 화면 충돌 방지를 위해 5초 후 실행)
   useEffect(() => {
     const cu = userRef.current;
     if (loadState !== "ready" || !cu) return;
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayKey = todayStart.toISOString().slice(0, 10);
-    dealsRef.current.forEach((deal) => {
-      if (!deal.balanceDueAt || deal.balancePaidAt) return;
-      if (deal.createdBy !== cu.uid) return;
-      // SEC-03: uid 포함으로 공유 기기에서 사용자 간 알림 dedup 키 혼용 방지
-      const notifyKey = `balance-due-notified-${cu.uid}-${deal.id}-${todayKey}`;
-      if (localStorage.getItem(notifyKey)) return;
-      const dueStart = new Date(deal.balanceDueAt); dueStart.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((dueStart - todayStart) / 86400000);
-      if (diffDays === 1) {
-        showPushNotification("📅 잔금 결제 내일까지", `${deal.crop} 딜 잔금 결제 기한이 내일입니다.`, "mydeals");
-        localStorage.setItem(notifyKey, "1");
-      } else if (diffDays === 0) {
-        showPushNotification("⚠️ 잔금 결제 오늘까지", `${deal.crop} 딜 잔금 결제 기한이 오늘까지입니다!`, "mydeals");
-        localStorage.setItem(notifyKey, "1");
-      } else if (diffDays < 0) {
-        showPushNotification("🚨 잔금 결제 기한 초과", `${deal.crop} 딜 잔금 결제 기한이 ${Math.abs(diffDays)}일 지났습니다.`, "mydeals");
-        localStorage.setItem(notifyKey, "1");
-      }
-    });
+    const timer = setTimeout(() => {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayKey = todayStart.toISOString().slice(0, 10);
+      dealsRef.current.forEach((deal) => {
+        if (!deal.balanceDueAt || deal.balancePaidAt) return;
+        if (deal.createdBy !== cu.uid) return;
+        // SEC-03: uid 포함으로 공유 기기에서 사용자 간 알림 dedup 키 혼용 방지
+        const notifyKey = `balance-due-notified-${cu.uid}-${deal.id}-${todayKey}`;
+        if (localStorage.getItem(notifyKey)) return;
+        const dueStart = new Date(deal.balanceDueAt); dueStart.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((dueStart - todayStart) / 86400000);
+        if (diffDays === 1) {
+          showPushNotification("📅 잔금 결제 내일까지", `${deal.crop} 딜 잔금 결제 기한이 내일입니다.`, "mydeals");
+          localStorage.setItem(notifyKey, "1");
+        } else if (diffDays === 0) {
+          showPushNotification("⚠️ 잔금 결제 오늘까지", `${deal.crop} 딜 잔금 결제 기한이 오늘까지입니다!`, "mydeals");
+          localStorage.setItem(notifyKey, "1");
+        } else if (diffDays < 0) {
+          showPushNotification("🚨 잔금 결제 기한 초과", `${deal.crop} 딜 잔금 결제 기한이 ${Math.abs(diffDays)}일 지났습니다.`, "mydeals");
+          localStorage.setItem(notifyKey, "1");
+        }
+      });
+    }, 5000);
+    return () => clearTimeout(timer);
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isMobile = useIsMobile();
@@ -7692,7 +7702,9 @@ export default function FarmToTableApp() {
 
   if (!authChecked || loadState === "loading") {
     return (
-      <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
+      <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
+        <style>{`@keyframes ftt-spin{to{transform:rotate(360deg)}}`}</style>
+        <div style={{ width: 32, height: 32, border: `3px solid ${TOKENS.line}`, borderTopColor: TOKENS.moss, borderRadius: "50%", animation: "ftt-spin 0.8s linear infinite" }} />
         불러오는 중…
       </div>
     );
