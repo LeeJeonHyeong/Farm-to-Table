@@ -243,6 +243,8 @@ allow delete: if request.auth != null
 | v2.40 E2E | `test_v2_40.cjs` — 6/6 통과 (5개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.41 | STAB-01 ChatScreen `mountedRef` 언마운트 안전, STAB-02 DealDetailView chef-profile fetch 취소 플래그, PERF-01 `onSnapshot` 채팅 셰프 필터, PERF-02 `chatUnreads` useMemo, PERF-03 `computeFarmBadges` useMemo (2곳), QUAL-01 `handleDepositPaid/BalancePaid` `dealsRef.current` stale closure 수정, UX-01 RatingPanel 더블클릭 방지 |
 | v2.41 E2E | `test_v2_41.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.42 | RACE-01 chef 채팅 inbox 레이스 수정 (`pendingChatsSnap` + `dealsRef` 동기 업데이트), UX-02 RatingPanel `setSubmitting(false)` 복원, STAB-03 DealDetailView `setChefData(null)` 딜 전환 초기화, PERF-04 `chatUnreads` dep `user` → `user?.name` |
+| v2.42 E2E | `test_v2_42.cjs` — 8/8 통과 (7개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1418,7 +1420,29 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.41 E2E 테스트 요약
+### v2.42 상세 내역
+
+**RACE-01: chef 채팅 inbox 레이스 조건 수정**
+- `pendingChatsSnap` 클로저 변수로 deals 미도착 시 chats snapshot 보존
+- `dealsRef.current = newDeals` — deals 핸들러 내 동기 업데이트 추가
+- deals 도착 후 `processChats(pendingChatsSnap)` 재처리
+- 효과: cold login 시 chats snapshot이 deals보다 먼저 도착해도 셰프 채팅 inbox가 비어있지 않음
+
+**UX-02: RatingPanel `setSubmitting(false)` 복원**
+- `onSubmit(rating, review)` 호출 직후 `setSubmitting(false)` 추가
+- 효과: `onSubmit`이 동기 void 함수이므로 딜 미존재 등 실패 시 버튼이 영구 잠금되던 문제 수정
+
+**STAB-03: DealDetailView 딜 전환 시 이전 셰프 프로필 잔류 수정**
+- effect 재실행 시 `storage.get` 전에 `setChefData(null)` 초기화 추가
+- 효과: 다른 딜로 전환 시 이전 딜 셰프 이름·사진이 짧게 노출되던 문제 수정
+
+**PERF-04: `chatUnreads` useMemo dep 최적화**
+- `[chats, lastChatRead, user]` → `[chats, lastChatRead, user?.name]`
+- 효과: 프로필 저장 등으로 user 객체 참조가 바뀌어도 name이 동일하면 O(채팅×메시지) 재계산 생략
+
+---
+
+### v2.28~v2.42 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1435,7 +1459,8 @@ allow delete: if request.auth != null
 | `test_v2_39.cjs` | 16 | 16/16 ✅ |
 | `test_v2_40.cjs` | 6 | 6/6 ✅ |
 | `test_v2_41.cjs` | 9 | 9/9 ✅ |
-| **합계** | **150** | **150/150 ✅** |
+| `test_v2_42.cjs` | 8 | 8/8 ✅ |
+| **합계** | **158** | **158/158 ✅** |
 
 ---
 
