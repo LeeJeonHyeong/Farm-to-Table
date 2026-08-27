@@ -7633,6 +7633,7 @@ export default function FarmToTableApp() {
     setTab("create");
     setFarm(null);
     setChefProfile(null);
+    setChatTarget(null);
     window.history.replaceState({}, "", window.location.pathname);
   };
 
@@ -8077,6 +8078,7 @@ export default function FarmToTableApp() {
   const totalUnreadChats = Object.values(chatUnreads).reduce((s, n) => s + n, 0);
 
   const handleTabClick = (key) => {
+    setChatTarget(null);
     if (key !== "create") setEditingDeal(null);
     if (key === "mydeals" && isChef) {
       const now = Date.now();
