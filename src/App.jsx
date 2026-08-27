@@ -7057,6 +7057,7 @@ export default function FarmToTableApp() {
   const [chefProfile, setChefProfile] = useState(null);
   const [notifHistory, setNotifHistory] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const unreadNotifCount = notifHistory.filter((n) => !n.read).length;
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
@@ -7117,6 +7118,13 @@ export default function FarmToTableApp() {
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [notifOpen]);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const close = (e) => { if (!e.target.closest("[data-chat-panel]")) setChatOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [chatOpen]);
   const [loadState, setLoadState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
   const [chats, setChats] = useState({});
@@ -7885,6 +7893,28 @@ export default function FarmToTableApp() {
     return result;
   // PERF-04: user 전체 객체 대신 user?.name만 dep — 프로필 저장 시 불필요한 재계산 방지
   }, [chats, lastChatRead, user?.name]);
+
+  // 채팅 인박스: 메시지가 있는 모든 채팅방을 최신 메시지 순으로 정렬
+  const chatInboxItems = useMemo(() => {
+    if (!user) return [];
+    return Object.entries(chats)
+      .filter(([, msgs]) => msgs.length > 0)
+      .map(([chatId, msgs]) => {
+        const [dealId, proposalId] = chatId.split("__");
+        const deal = deals.find((d) => d.id === dealId);
+        if (!deal) return null;
+        const proposal = deal.proposals?.find((p) => p.id === proposalId);
+        if (!proposal) return null;
+        const lastMsg = msgs[msgs.length - 1];
+        const lastRead = lastChatRead[chatId] || 0;
+        const unread = msgs.filter((m) => m.ts > lastRead && m.senderName !== user.name).length;
+        const counterpart = user.role === "chef" ? (proposal.farmName || "농가") : deal.chefName;
+        return { chatId, dealId, proposalId, crop: deal.crop, counterpart, lastMsg, unread };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b.lastMsg?.ts || 0) - (a.lastMsg?.ts || 0));
+  }, [chats, deals, lastChatRead, user?.name, user?.role]);
+
   const handleUpdateDeal = (updated) => {
     setDeals((prev) => prev.map((d) => d.id === updated.id ? updated : d));
     persistDeal(updated);
@@ -8234,6 +8264,80 @@ export default function FarmToTableApp() {
               {isChef ? "셰프" : "농가"}
             </span>
             <span style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500 }}>{user.name}</span>
+            {/* 채팅 인박스 */}
+            <div data-chat-panel style={{ position: "relative" }}>
+              <button
+                onClick={() => { setChatOpen((v) => !v); setNotifOpen(false); }}
+                aria-label={chatOpen ? "채팅 닫기" : `채팅${totalUnreadChats > 0 ? ` (${totalUnreadChats}개 미읽음)` : ""}`}
+                style={{ fontSize: 16, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", position: "relative", lineHeight: 1 }}
+              >
+                💬
+                {totalUnreadChats > 0 && (
+                  <span className="ftt-badge-pulse" style={{ position: "absolute", top: -4, right: -4, background: TOKENS.moss, color: "#fff", borderRadius: 999, fontSize: 9, fontWeight: 700, minWidth: 14, height: 14, padding: "0 3px", fontFamily: "'IBM Plex Mono', monospace" }}>
+                    {totalUnreadChats > 9 ? "9+" : totalUnreadChats}
+                  </span>
+                )}
+              </button>
+              {chatOpen && (
+                <div aria-label="채팅 목록" style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, maxHeight: 420, overflowY: "auto", background: "#FFFFFF", border: `1px solid ${TOKENS.line}`, borderRadius: 12, boxShadow: "0 8px 32px rgba(32,40,31,0.16)", zIndex: 9998 }}>
+                  <div style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#fff" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: TOKENS.ink }}>채팅 ({chatInboxItems.length})</span>
+                    {totalUnreadChats > 0 && (
+                      <span style={{ fontSize: 11, color: TOKENS.moss, fontWeight: 600 }}>{totalUnreadChats}개 미읽음</span>
+                    )}
+                  </div>
+                  {chatInboxItems.length === 0 ? (
+                    <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                      <div style={{ fontSize: 28, marginBottom: 8 }}>💬</div>
+                      <div style={{ fontSize: 13, color: TOKENS.inkSoft }}>아직 채팅이 없습니다</div>
+                    </div>
+                  ) : (
+                    chatInboxItems.map((item) => {
+                      const ts = item.lastMsg?.ts;
+                      const now = new Date(); const today = new Date(now); today.setHours(0,0,0,0);
+                      const msgDate = ts ? new Date(ts) : null;
+                      const msgDay = msgDate ? new Date(msgDate) : null; if (msgDay) msgDay.setHours(0,0,0,0);
+                      const diff = msgDay ? Math.round((today - msgDay) / 86400000) : -1;
+                      const timeLabel = !msgDate ? "" : diff === 0
+                        ? msgDate.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+                        : diff === 1 ? "어제" : `${diff}일 전`;
+                      const preview = item.lastMsg?.imageURL
+                        ? (item.lastMsg.text ? `📷 ${item.lastMsg.text}` : "📷 사진")
+                        : (item.lastMsg?.text || "");
+                      return (
+                        <button
+                          key={item.chatId}
+                          type="button"
+                          onClick={() => {
+                            handleOpenChat({ dealId: item.dealId, proposalId: item.proposalId, crop: item.crop, chefName: item.counterpart, farmName: item.counterpart });
+                            setChatOpen(false);
+                          }}
+                          style={{ width: "100%", textAlign: "left", display: "block", padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: item.unread > 0 ? `${TOKENS.moss}08` : "#fff", cursor: "pointer", border: "none", borderBottom: `1px solid ${TOKENS.line}` }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                              <span style={{ fontSize: 13, fontWeight: item.unread > 0 ? 700 : 500, color: TOKENS.ink, whiteSpace: "nowrap" }}>{item.counterpart}</span>
+                              <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", background: TOKENS.card, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>{item.crop}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                              {item.unread > 0 && (
+                                <span style={{ background: TOKENS.moss, color: "#fff", borderRadius: 999, fontSize: 9, fontWeight: 700, minWidth: 16, height: 16, padding: "0 4px", fontFamily: "'IBM Plex Mono', monospace", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                  {item.unread > 9 ? "9+" : item.unread}
+                                </span>
+                              )}
+                              {timeLabel && <span style={{ fontSize: 10, color: TOKENS.inkSoft }}>{timeLabel}</span>}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12, color: item.unread > 0 ? TOKENS.ink : TOKENS.inkSoft, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                            {preview || <span style={{ fontStyle: "italic" }}>메시지 없음</span>}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
             {/* 벨 아이콘 */}
             <div data-notif-panel style={{ position: "relative" }}>
               <button
