@@ -251,6 +251,8 @@ allow delete: if request.auth != null
 | v2.44 E2E | `test_v2_44.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.45 | H-1: SAMPLE_DEALS에 `d_match`(계약 완료·납품 대기)·`d_done`(납품 완료·잔금 대기) 시연 딜 2건 추가 (`createdBy: ""` 센티널 → `handleResetData` 시 `user.uid` 치환), H-2: `CROP_EMOJI` 맵 추가(37종) + 딜 카드 `photoURL` 없을 때 이모지 fallback 표시, H-3: `LoginScreen` DEV 전용 퀵 로그인 버튼 (`VITE_DEMO_CHEF_EMAIL`/`VITE_DEMO_FARM_EMAIL` env var 기반, `signInWithEmailAndPassword` 직접 호출) |
 | v2.45 E2E | `test_v2_45.cjs` — 7/7 통과 (6개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.46 | M-1: 알림·채팅 뱃지 `ftt-pulse` 펄스 애니메이션 (탭 뱃지·벨 아이콘 뱃지), M-2: 탭 전환 `ftt-fade` 페이드인 애니메이션 (`key={tab}` remount 방식, 0.15s ease), M-3: 딜 만들기 완료 시 내 거래 탭의 신규 딜 카드에 "NEW" 뱃지 5초 강조 (`newDealId` 상태) |
+| v2.46 E2E | `test_v2_46.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
