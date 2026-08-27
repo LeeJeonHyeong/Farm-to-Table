@@ -14,6 +14,17 @@ function useIsMobile() {
   return isMobile;
 }
 
+// 프로젝터/좁은 화면 감지 — 사이드 일러스트 SVG가 뷰포트 밖으로 넘치는 기준
+function useIsNarrow() {
+  const [isNarrow, setIsNarrow] = useState(() => window.innerWidth < 1200);
+  useEffect(() => {
+    const handler = () => setIsNarrow(window.innerWidth < 1200);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isNarrow;
+}
+
 function ImageUpload({ value, onChange, label = "사진 추가", shape = "square", size = 96, storagePath }) {
   const [compressing, setCompressing] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -5274,9 +5285,17 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
       </div>
 
       {filtered.length === 0 && (
-        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 12, padding: 24, textAlign: "center", color: TOKENS.inkSoft, fontSize: 13 }}>
-          <div style={{ marginBottom: 10 }}>{STATUS_FILTERS.find((f) => f.key === statusFilter)?.label} 딜이 없습니다.</div>
-          <button onClick={() => setStatusFilter("전체")} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 12, color: TOKENS.inkSoft, cursor: "pointer" }}>
+        <div style={{ background: TOKENS.card, border: `1px dashed ${TOKENS.line}`, borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 28, marginBottom: 10, opacity: 0.4 }}>
+            {statusFilter === "open" ? "🌱" : statusFilter === "matched" ? "🤝" : statusFilter === "done" ? "✅" : statusFilter === "closed" ? "🔒" : "📋"}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: TOKENS.ink, marginBottom: 6 }}>
+            {STATUS_FILTERS.find((f) => f.key === statusFilter)?.label} 딜이 없습니다
+          </div>
+          <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 18, lineHeight: 1.6 }}>
+            {statusFilter === "open" ? "새 딜을 등록해 농가 제안을 받아보세요" : "필터를 변경해 다른 거래를 확인해 보세요"}
+          </div>
+          <button onClick={() => setStatusFilter("전체")} style={{ padding: "8px 20px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
             전체 보기
           </button>
         </div>
@@ -7110,6 +7129,7 @@ export default function FarmToTableApp() {
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isMobile = useIsMobile();
+  const isNarrow = useIsNarrow();
 
   // Firebase Auth 상태 감지
   useEffect(() => {
@@ -8217,7 +8237,7 @@ export default function FarmToTableApp() {
             {tab === "create" && (
               <div style={{ position: "relative" }}>
                 {/* 왼쪽 사이드 일러스트 — 해바라기·토마토·호박 */}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 280" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 255, opacity: 0.82, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     {/* 배경 워시 */}
                     <rect width="110" height="280" rx="14" fill="#F5F0E4" opacity="0.45"/>
@@ -8293,7 +8313,7 @@ export default function FarmToTableApp() {
                   </svg>
                 )}
                 {/* 오른쪽 사이드 일러스트 — 마늘묶음·허브화분·가지·당근 */}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 280" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 255, opacity: 0.82, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     {/* 배경 워시 */}
                     <rect width="110" height="280" rx="14" fill="#F5F0E4" opacity="0.45"/>
@@ -8385,7 +8405,7 @@ export default function FarmToTableApp() {
             {/* ── 딜 찾기 ── */}
             {tab === "browse" && (
               <div style={{ position: "relative" }}>
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 덩굴 */}
@@ -8425,7 +8445,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="44" cy="283" rx="7" ry="5" fill="#5B7553" opacity="0.75"/>
                   </svg>
                 )}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 걸이 바 */}
@@ -8488,7 +8508,7 @@ export default function FarmToTableApp() {
             {/* ── 내 제안 ── */}
             {tab === "myproposals" && (
               <div style={{ position: "relative" }}>
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 수확 바구니 - 넘쳐흐르는 풍요 */}
@@ -8532,7 +8552,7 @@ export default function FarmToTableApp() {
                     <path d="M70 128 Q88 116 94 98 Q82 108 70 125" fill="#5B7553" opacity="0.75"/>
                   </svg>
                 )}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 새싹 성장 단계 3개 화분 */}
@@ -8579,7 +8599,7 @@ export default function FarmToTableApp() {
             {/* ── 내 거래 ── */}
             {tab === "mydeals" && (
               <div style={{ position: "relative" }}>
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 미즈앙플라스 — 요리 준비 재료들 */}
@@ -8622,7 +8642,7 @@ export default function FarmToTableApp() {
                     <rect x="57" y="290" width="10" height="16" rx="3" fill="#EDE4CC" opacity="0.72"/>
                   </svg>
                 )}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 레스토랑 코너 — 초·와인·다육 */}
@@ -8700,7 +8720,7 @@ export default function FarmToTableApp() {
             {/* ── 내 농가 ── */}
             {tab === "farm" && (
               <div style={{ position: "relative" }}>
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 사과나무 */}
@@ -8747,7 +8767,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="55" cy="318" rx="52" ry="6" fill="#4A7A44" opacity="0.3"/>
                   </svg>
                 )}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 물뿌리개 */}
@@ -8814,7 +8834,7 @@ export default function FarmToTableApp() {
             {/* ── 내 레스토랑 ── */}
             {tab === "chefprofile" && (
               <div style={{ position: "relative" }}>
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 와인병 */}
@@ -8877,7 +8897,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="55" cy="265" rx="48" ry="8" fill="#6A9B58" opacity="0.32"/>
                   </svg>
                 )}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 허브 화분 모음 */}
@@ -8934,7 +8954,7 @@ export default function FarmToTableApp() {
             {/* ── 대시보드 ── */}
             {tab === "dashboard" && (
               <div style={{ position: "relative" }}>
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", left: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 식물 막대그래프 */}
@@ -8980,7 +9000,7 @@ export default function FarmToTableApp() {
                     <path d="M86 72 L87.8 77.6 L93.5 77.6 L89 80.8 L90.8 86.4 L86 83.2 L81.2 86.4 L83 80.8 L78.5 77.6 L84.2 77.6 Z" fill="#C9A84C" opacity="0.8"/>
                   </svg>
                 )}
-                {!isMobile && (
+                {!isNarrow && (
                   <svg viewBox="0 0 110 320" style={{ position: "absolute", right: -118, top: 10, width: 100, height: 290, opacity: 0.78, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg">
                     <rect width="110" height="320" rx="14" fill="#F5F0E4" opacity="0.45"/>
                     {/* 계절 수레바퀴 */}
