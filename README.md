@@ -247,6 +247,8 @@ allow delete: if request.auth != null
 | v2.42 E2E | `test_v2_42.cjs` — 8/8 통과 (7개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.43 | 긴급: `dDay(n)` 헬퍼 추가 — SAMPLE_DEALS 16개 납품일 만료 → 오늘 기준 미래 날짜로 동적 계산, HIGH-1: SettlementCard 테스트 결제 모드 배너 (DEV 환경, 카드번호 힌트), HIGH-2: 로딩 화면 CSS 스피너 (`ftt-spin` 애니메이션), HIGH-3: 잔금 기한 초과 알림 5초 지연 (`setTimeout` + `clearTimeout` 클린업) |
 | v2.43 E2E | `test_v2_43.cjs` — 7/7 통과 (6개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.44 | UX-03: 주요 액션(딜 등록·제안 제출·농가 선택·계약 서명·납품 신고·수령 확인·평점 제출) 완료 시 성공 Toast 피드백 7종 추가, UX-04: 채팅 빈 상태 💬 아이콘+안내 문구로 개선 |
+| v2.44 E2E | `test_v2_44.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
@@ -1422,6 +1424,27 @@ allow delete: if request.auth != null
 
 ---
 
+### v2.44 상세 내역
+
+**UX-03: 주요 액션 성공 Toast 피드백**
+
+- `handleCreateDeal` → `"✅ 딜이 등록됐습니다!"`
+- `handleSubmitProposal` → `"✅ 제안이 전송됐습니다!"`
+- `handleSelectProposal` → `"🤝 농가를 선택했습니다! 계약서에서 서명해 주세요."`
+- `handleSignContract` → role별 분기: 셰프는 "농가 서명을 기다립니다", 농가는 "셰프 서명을 기다립니다"
+- `handleShipDeal` → `"📦 납품 신고 완료!"`
+- `handleConfirmDelivery` → `"✅ 수령 확인 완료! 잔금 결제를 진행해 주세요."`
+- `handleRateChef` / `handleRateProposal` → `"⭐ 평점을 남겼습니다. 감사합니다!"`
+
+이전에 에러 케이스(결제 실패, 메시지 전송 실패)에만 쓰이던 Toast 컴포넌트를 성공 케이스에도 적극 활용.
+
+**UX-04: 채팅 빈 상태 개선**
+
+- 기존: `"채팅 기록이 없습니다"` (단순 텍스트)
+- 개선: 💬 아이콘 + `"아직 대화가 없습니다"` + `"첫 메시지를 보내 대화를 시작해 보세요"` (flex 레이아웃)
+
+---
+
 ### v2.43 상세 내역
 
 **긴급: SAMPLE_DEALS 납품일 동적 계산**
@@ -1464,7 +1487,7 @@ allow delete: if request.auth != null
 
 ---
 
-### v2.28~v2.43 E2E 테스트 요약
+### v2.28~v2.44 E2E 테스트 요약
 
 | 파일 | 항목 수 | 결과 |
 |---|---|---|
@@ -1483,7 +1506,8 @@ allow delete: if request.auth != null
 | `test_v2_41.cjs` | 9 | 9/9 ✅ |
 | `test_v2_42.cjs` | 8 | 8/8 ✅ |
 | `test_v2_43.cjs` | 7 | 7/7 ✅ |
-| **합계** | **165** | **165/165 ✅** |
+| `test_v2_44.cjs` | 9 | 9/9 ✅ |
+| **합계** | **174** | **174/174 ✅** |
 
 ---
 

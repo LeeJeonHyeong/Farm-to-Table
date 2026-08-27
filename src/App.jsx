@@ -4530,7 +4530,11 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
                   <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{deal?.chefName} ↔ {deal?.proposals.find((p) => p.id === deal.selectedProposalId)?.farmName || "농가"}</span>
                 </div>
                 {msgs.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "24px 0", fontSize: 13, color: TOKENS.inkSoft }}>채팅 기록이 없습니다</div>
+                  <div style={{ textAlign: "center", padding: "32px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontSize: 28, opacity: 0.4 }}>💬</div>
+                    <div style={{ fontSize: 13, color: TOKENS.inkSoft, fontWeight: 500 }}>아직 대화가 없습니다</div>
+                    <div style={{ fontSize: 11, color: TOKENS.inkSoft, opacity: 0.7 }}>첫 메시지를 보내 대화를 시작해 보세요</div>
+                  </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 480, overflowY: "auto" }}>
                     {msgs.map((m) => (
@@ -7400,6 +7404,7 @@ export default function FarmToTableApp() {
     setDeals((prev) => [newDeal, ...prev]);
     persistDeal(newDeal);
     setTab("mydeals");
+    setToastMsg("✅ 딜이 등록됐습니다!");
   };
 
   const handleSubmitProposal = (dealId, proposal) => {
@@ -7410,6 +7415,7 @@ export default function FarmToTableApp() {
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     // DATA-02: arrayUnion으로 동시 제안 시 proposals 배열 overwrite 경쟁 방지
     updateDoc(doc(db, "deals", dealId), { proposals: arrayUnion(proposal) }).catch(() => setSaveState("error"));
+    setToastMsg("✅ 제안이 전송됐습니다!");
   };
 
   const handleSelectProposal = (dealId, proposalId) => {
@@ -7418,6 +7424,7 @@ export default function FarmToTableApp() {
     const updated = { ...deal, selectedProposalId: proposalId, status: "matched", selectedAt: Date.now() };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    setToastMsg("🤝 농가를 선택했습니다! 계약서에서 서명해 주세요.");
   };
 
   const cleanBalanceDueKeys = (dealId) => {
@@ -7450,6 +7457,7 @@ export default function FarmToTableApp() {
     };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    setToastMsg("📦 납품 신고 완료!");
   };
 
   const handleConfirmDelivery = (dealId) => {
@@ -7466,6 +7474,7 @@ export default function FarmToTableApp() {
     };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    setToastMsg("✅ 수령 확인 완료! 잔금 결제를 진행해 주세요.");
   };
 
   const handleDepositPaid = (dealId, paymentInfo = {}) => {
@@ -7516,6 +7525,8 @@ export default function FarmToTableApp() {
     const updated = { ...deal, [field]: Date.now() };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    const waitingFor = role === "chef" ? "농가" : "셰프";
+    setToastMsg(`✍️ 서명 완료! ${waitingFor} 서명을 기다립니다.`);
   };
 
   const handleSendMessage = async (dealId, payload) => {
@@ -7643,6 +7654,7 @@ export default function FarmToTableApp() {
     const updated = { ...deal, proposals: deal.proposals.map((p) => p.id === proposalId ? { ...p, rating, review, ratedAt: Date.now() } : p) };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    setToastMsg("⭐ 평점을 남겼습니다. 감사합니다!");
   };
 
   const handleRateChef = (dealId, rating, review) => {
@@ -7651,6 +7663,7 @@ export default function FarmToTableApp() {
     const updated = { ...deal, chefRating: rating, chefReview: review, chefRatedAt: Date.now() };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     persistDeal(updated);
+    setToastMsg("⭐ 평점을 남겼습니다. 감사합니다!");
   };
 
   const handleSendCounterOffer = (dealId, proposalId, counterPrice) => {
