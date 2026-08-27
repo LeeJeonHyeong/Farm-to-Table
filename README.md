@@ -255,6 +255,11 @@ allow delete: if request.auth != null
 | v2.46 E2E | `test_v2_46.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.47 | L-1: `useIsNarrow` 훅(< 1200px) 추가 → 탭별 좌우 사이드 SVG 일러스트 14개 프로젝터·좁은 화면에서 자동 숨김 (`!isMobile` → `!isNarrow`), L-2: 내 거래 필터 빈 상태 UI 개선 — 필터별 이모지(🌱🤝✅🔒📋) + 상황 안내 문구 + 진한 "전체 보기" 버튼 |
 | v2.47 E2E | `test_v2_47.cjs` — 7/7 통과 (6개 정적 코드 검증 + 브라우저 UI 검증) |
+| Groq 모델 교체 | AI 자동 입력·AI 매칭 점수 모델 `llama-3.3-70b-versatile` → `qwen/qwen3.8-27b` 교체 (Groq에서 이전 모델 제거됨, 폴백 없이 정상 응답 1.5초 내 확인) |
+| 발표 준비 H | H-1: `DEMO_SCENARIO.md` 발표 데모 시나리오 작성 (셰프·농가·채팅 3개 시나리오, 멘트 예시, 비상 대응), H-2: 데모 계정 생성(`demo.chef/farm@ftt-demo.kr`) + `.env.local` 퀵 로그인 세팅 5/5 통과, H-3: 농가 입장 딜 찾기 탭 시연 딜 표시 확인 |
+| 발표 준비 M | M-1: Firebase Hosting 배포 (`https://farm-to-table-de5f5.web.app`), M-2: `borderBottom` 중복 키 제거 + Firebase Hosting 설정(`firebase.json`) 추가, M-3: 모바일 UI 점검 7/7 통과 (390×844 iPhone 13, `test_m3_mobile.cjs`) |
+| 발표 준비 L | L-1: `run_tests.cjs` 통합 테스트 러너 + `npm run test:all` / `npm run test:quick` 스크립트, L-2: `.env.example` 환경변수 예시 파일 (Groq·Firebase·TossPayments·퀵로그인 항목) |
+| 버그 수정 | 농가 계약서 서명 버튼 미표시 수정 — 을(매도인) 슬롯 `role:"farm"` → `role:"farmer"` (실제 `user.role`과 불일치로 서명하기 버튼 대신 "서명 대기" 표시되던 문제), 제안 카드 비교 버튼·매칭 점수 겹침 수정 — `position:absolute` 제거 후 채팅/역제안 버튼과 같은 행으로 이동 |
 
 ### v1.6 상세 내역
 
