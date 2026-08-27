@@ -5573,21 +5573,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                         {sortedProposals.map((p) => {
                           const isComparing = compareIds.includes(p.id);
                           return (
-                            <div key={p.id} style={{ position: "relative" }}>
-                              <button
-                                onClick={() => setCompareIds((prev) =>
-                                  isComparing ? prev.filter((id) => id !== p.id) : prev.length < 3 ? [...prev, p.id] : prev
-                                )}
-                                style={{
-                                  position: "absolute", top: 10, right: 10, zIndex: 1,
-                                  background: isComparing ? TOKENS.moss : "#fff",
-                                  color: isComparing ? "#fff" : TOKENS.inkSoft,
-                                  border: `1px solid ${isComparing ? TOKENS.moss : TOKENS.line}`,
-                                  borderRadius: 6, padding: "3px 8px", fontSize: 10, cursor: "pointer",
-                                }}
-                              >
-                                {isComparing ? "✓ 비교중" : "+ 비교"}
-                              </button>
+                            <div key={p.id}>
                               <ProposalCard
                                 proposal={p}
                                 deal={deal}
@@ -5617,6 +5603,19 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                                     💱 역제안
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => setCompareIds((prev) =>
+                                    isComparing ? prev.filter((id) => id !== p.id) : prev.length < 3 ? [...prev, p.id] : prev
+                                  )}
+                                  style={{
+                                    padding: "7px 12px", fontSize: 11, cursor: "pointer", borderRadius: 8, fontWeight: 500,
+                                    background: isComparing ? TOKENS.moss : "#fff",
+                                    color: isComparing ? "#fff" : TOKENS.inkSoft,
+                                    border: `1px solid ${isComparing ? TOKENS.moss : TOKENS.line}`,
+                                  }}
+                                >
+                                  {isComparing ? "✓ 비교중" : "+ 비교"}
+                                </button>
                               </div>
                             </div>
                           );
