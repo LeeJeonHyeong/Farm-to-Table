@@ -8132,7 +8132,7 @@ export default function FarmToTableApp() {
                           type="button"
                           aria-label={`${n.title} — ${n.body}`}
                           onClick={() => { if (n.tab) { setTab(n.tab); setNotifOpen(false); } }}
-                          style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: n.read ? "#FFFFFF" : `${TOKENS.gold}10`, cursor: n.tab ? "pointer" : "default", width: "100%", textAlign: "left", border: "none", borderBottom: `1px solid ${TOKENS.line}`, display: "block" }}
+                          style={{ padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: n.read ? "#FFFFFF" : `${TOKENS.gold}10`, cursor: n.tab ? "pointer" : "default", width: "100%", textAlign: "left", display: "block" }}
                         >
                           <div style={{ fontSize: 13, color: TOKENS.ink, fontWeight: 500, marginBottom: 2 }}>{n.title}</div>
                           <div style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.5 }}>{n.body}</div>
