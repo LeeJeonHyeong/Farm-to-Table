@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:all": "node run_tests.cjs",
+    "test:quick": "node run_tests.cjs --quick"
   },
   "dependencies": {
     "firebase": "^12.16.0",
