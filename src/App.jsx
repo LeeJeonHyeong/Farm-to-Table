@@ -6845,7 +6845,7 @@ function ContractModal({ deal, proposal, onClose, userRole, onSign }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
               {[
                 { label: "갑 (매수인)", name: deal.chefName, role: "chef", signedAt: deal.contractSignedChefAt },
-                { label: "을 (매도인)", name: proposal.farmName, role: "farm", signedAt: deal.contractSignedFarmAt },
+                { label: "을 (매도인)", name: proposal.farmName, role: "farmer", signedAt: deal.contractSignedFarmAt },
               ].map(({ label, name, role, signedAt }) => (
                 <div key={label} style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>{label}</div>
