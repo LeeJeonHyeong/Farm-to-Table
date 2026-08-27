@@ -60,10 +60,10 @@ async function main() {
     ? ok("[8] 정렬 pill 버튼 (AI 추천순 / 최신순 / 오래된 순)")
     : fail("[8] 정렬 pill 버튼 없음");
 
-  // [9] 정렬 행 레이블
-  src.includes("정렬") && src.includes("minWidth: 28")
-    ? ok("[9] 정렬 행 레이블 표시")
-    : fail("[9] 정렬 행 레이블 없음");
+  // [9] 정렬 버튼이 결과 수 바에 위치 (marginLeft: "auto")
+  src.includes('marginLeft: "auto"') && src.includes("✦ AI 추천순")
+    ? ok("[9] 정렬 버튼이 결과 수 바 우측에 위치")
+    : fail("[9] 정렬 버튼 결과 수 바 우측 배치 없음");
 
   // [10] resetFilters — aiScore 기본으로 초기화
   src.includes('setSortBy("aiScore")')

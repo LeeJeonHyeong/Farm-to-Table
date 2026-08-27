@@ -3127,34 +3127,6 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
 
         </div>
 
-        {/* 정렬 행 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>정렬</span>
-          {[
-            { value: "aiScore", label: "✦ AI 추천순" },
-            { value: "latest", label: "최신순" },
-            { value: "oldest", label: "오래된 순" },
-          ].map((o) => (
-            <button key={o.value} type="button" onClick={() => setSortBy(o.value)} style={{
-              padding: "7px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
-              border: `1px solid ${sortBy === o.value ? TOKENS.ink : TOKENS.line}`,
-              background: sortBy === o.value ? TOKENS.ink : "#FFFFFF",
-              color: sortBy === o.value ? "#FFFFFF" : TOKENS.inkSoft,
-              fontWeight: sortBy === o.value ? 600 : 400,
-            }}>
-              {o.label}
-            </button>
-          ))}
-          {!isMobile && <div style={{ flex: 1 }} />}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={{ ...inputStyle, width: "auto", fontSize: 11, padding: "4px 10px", color: TOKENS.inkSoft }}
-          >
-            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-
         {/* 상세 필터 토글 */}
         <button
           onClick={() => setShowAdvanced((v) => !v)}
@@ -3193,9 +3165,9 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
         )}
       </div>
 
-      {/* 결과 수 + 초기화 */}
+      {/* 결과 수 + 초기화 + 정렬 */}
       {!showBookmarks && (
-        <div style={{ display: "flex", alignItems: "center", marginBottom: activeFilterChips.length > 0 ? 8 : 12, gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: activeFilterChips.length > 0 ? 8 : 12, gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
             {filtered.length}건 / 전체 {openDeals.length}건
           </span>
@@ -3207,6 +3179,24 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
               전체 초기화
             </button>
           )}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+            {[
+              { value: "aiScore", label: "✦ AI 추천순" },
+              { value: "latest", label: "최신순" },
+              { value: "oldest", label: "오래된 순" },
+            ].map((o) => (
+              <button key={o.value} type="button" onClick={() => setSortBy(o.value)} style={{
+                padding: "4px 10px", borderRadius: 999, fontSize: 11, cursor: "pointer",
+                border: `1px solid ${sortBy === o.value ? TOKENS.ink : TOKENS.line}`,
+                background: sortBy === o.value ? TOKENS.ink : "#FFFFFF",
+                color: sortBy === o.value ? "#FFFFFF" : TOKENS.inkSoft,
+                fontWeight: sortBy === o.value ? 600 : 400,
+                whiteSpace: "nowrap",
+              }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {showBookmarks && (
