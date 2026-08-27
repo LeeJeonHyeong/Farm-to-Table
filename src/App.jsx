@@ -7212,7 +7212,7 @@ function OnboardingModal({ role, onDone }) {
 export default function FarmToTableApp() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [tab, setTab] = useState("create");
+  const [tab, setTab] = useState("home");
   // M-2: 결제 리다이렉트가 URL을 초기화하기 전에 ?tab= 값을 캡처
   const urlTabRef = useRef(new URLSearchParams(window.location.search).get("tab"));
   const [deals, setDeals] = useState([]);
@@ -7438,7 +7438,7 @@ export default function FarmToTableApp() {
             const { role, displayName } = JSON.parse(profileResult.value);
             const userData = { uid: firebaseUser.uid, email: firebaseUser.email, role, name: displayName };
             setUser(userData);
-            setTab(role === "farmer" ? "browse" : "create");
+            setTab("home");
             if (!localStorage.getItem(`onboarding-done-${firebaseUser.uid}`)) {
               setShowOnboarding(true);
             }
@@ -7793,7 +7793,7 @@ export default function FarmToTableApp() {
   const handleLogout = async () => {
     await signOut(auth);
     setUser(null);
-    setTab("create");
+    setTab("home");
     setFarm(null);
     setChefProfile(null);
     setChatTarget(null);
@@ -8415,7 +8415,7 @@ export default function FarmToTableApp() {
                 <path d="M24 50 Q34 42 38 32 Q30 35 24 46" fill="#5B7553" opacity="0.9"/>
               </svg>
             )}
-            <div>
+            <div style={{ cursor: tab !== "home" ? "pointer" : "default" }} onClick={() => tab !== "home" && handleTabClick("home")}>
               <span style={{ fontSize: 10, letterSpacing: "0.12em", color: TOKENS.rust, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase" }}>
                 역경매 방식 선주문 플랫폼
               </span>
@@ -8578,8 +8578,8 @@ export default function FarmToTableApp() {
           </div>
         </div>
 
-        {/* 탭바 */}
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 0 : 8, marginBottom: 24, borderBottom: `1px solid ${TOKENS.line}`, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        {/* 탭바 — 홈 화면에서는 숨김 */}
+        <div style={{ display: tab === "home" ? "none" : "flex", alignItems: "center", gap: isMobile ? 0 : 8, marginBottom: 24, borderBottom: `1px solid ${TOKENS.line}`, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -8654,6 +8654,69 @@ export default function FarmToTableApp() {
           />
         ) : (
           <div key={tab} className="ftt-tab-content">
+            {tab === "home" && (() => {
+              const chefCards = [
+                { key: "create", icon: "🍽", title: "딜 만들기", desc: "원하는 식재료 조건을 공고하고\n농가의 제안을 받아보세요" },
+                { key: "mydeals", icon: "📋", title: "내 거래", desc: "진행 중인 거래와\n제안 현황을 확인하세요", badge: newProposalCount + totalUnreadChats },
+                { key: "dashboard", icon: "📊", title: "대시보드", desc: "거래 통계와\n매출 현황을 확인하세요" },
+                { key: "chefprofile", icon: "🏪", title: "내 레스토랑", desc: "레스토랑 프로필을\n관리하세요" },
+              ];
+              const farmCards = [
+                { key: "browse", icon: "🔍", title: "딜 찾기", desc: "셰프의 딜을 찾아\n제안을 보내보세요", badge: openCount },
+                { key: "myproposals", icon: "📝", title: "내 제안", desc: "보낸 제안 현황과\n선택 결과를 확인하세요", badge: newSelectionCount + totalUnreadChats },
+                { key: "dashboard", icon: "📊", title: "대시보드", desc: "거래 통계와\n수익 현황을 확인하세요" },
+                { key: "farm", icon: "🌾", title: "내 농가", desc: "농가 프로필과\n전문 품목을 관리하세요" },
+              ];
+              const cards = isChef ? chefCards : farmCards;
+              return (
+                <div style={{ maxWidth: 720, margin: "0 auto" }}>
+                  <div style={{ textAlign: "center", marginBottom: isMobile ? 24 : 36 }}>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: isMobile ? 22 : 28, color: TOKENS.ink, marginBottom: 8 }}>
+                      안녕하세요, {user.name}님 👋
+                    </div>
+                    <div style={{ fontSize: 14, color: TOKENS.inkSoft }}>
+                      {isChef ? "오늘도 신선한 식재료를 만나보세요" : "오늘도 좋은 거래를 시작해보세요"}
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? 12 : 16 }}>
+                    {cards.map((card) => (
+                      <button
+                        key={card.key}
+                        type="button"
+                        onClick={() => handleTabClick(card.key)}
+                        className="ftt-card"
+                        style={{
+                          background: "#FFFFFF",
+                          border: `1px solid ${TOKENS.line}`,
+                          borderRadius: 16,
+                          padding: isMobile ? "20px 14px" : "28px 20px",
+                          cursor: "pointer",
+                          textAlign: "center",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: 10,
+                          boxShadow: "0 1px 4px rgba(32,40,31,0.05)",
+                          position: "relative",
+                        }}
+                      >
+                        {card.badge > 0 && (
+                          <span className="ftt-badge-pulse" style={{ position: "absolute", top: 10, right: 10, background: TOKENS.rust, color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 700, minWidth: 18, height: 18, padding: "0 5px", fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {card.badge > 99 ? "99+" : card.badge}
+                          </span>
+                        )}
+                        <span style={{ fontSize: isMobile ? 30 : 36 }}>{card.icon}</span>
+                        <div>
+                          <div style={{ fontFamily: "'Fraunces', serif", fontSize: isMobile ? 14 : 16, fontWeight: 600, color: TOKENS.ink, marginBottom: 4 }}>{card.title}</div>
+                          <div style={{ fontSize: 11, color: TOKENS.inkSoft, lineHeight: 1.5, whiteSpace: "pre-line" }}>{card.desc}</div>
+                        </div>
+                        <div style={{ fontSize: 18, color: TOKENS.line, marginTop: 2 }}>→</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             {tab === "create" && (
               <div style={{ position: "relative" }}>
                 {/* 왼쪽 사이드 일러스트 — 해바라기·토마토·호박 */}
