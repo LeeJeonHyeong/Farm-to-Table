@@ -49,7 +49,7 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
       canvas.width = width; canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      const dataUrl = canvas.toDataURL("image/webp", 0.82);
       if (storagePath) {
         try {
           const sRef = storageRef(fbStorage, storagePath);
@@ -3147,7 +3147,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
             >
               {deal.photoURL ? (
                 <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
-                  <img src={deal.photoURL} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
+                  <img src={deal.photoURL} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
                 </div>
               ) : CROP_EMOJI[deal.crop] ? (
                 <div style={{ float: "right", marginLeft: 12, marginBottom: 4, width: 64, height: 64, borderRadius: 8, background: TOKENS.line + "40", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>
@@ -3168,6 +3168,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
                   <button
                     onClick={(e) => toggleBookmark(deal.id, e)}
                     title={bookmarks.has(deal.id) ? "북마크 해제" : "나중에 제안하기"}
+                    aria-label={bookmarks.has(deal.id) ? "북마크 해제" : "나중에 제안하기"}
                     style={{
                       background: bookmarks.has(deal.id) ? TOKENS.goldSoft : "transparent",
                       border: `1px solid ${bookmarks.has(deal.id) ? TOKENS.gold : TOKENS.line}`,
@@ -3317,7 +3318,7 @@ function FarmProfileDetailCard({ proposal, allDeals = [] }) {
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: badges.length > 0 ? 10 : 14 }}>
         <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: proposal.photoURL ? "transparent" : `linear-gradient(145deg, ${TOKENS.moss}, #3D5437)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {proposal.photoURL
-            ? <img src={proposal.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ? <img src={proposal.photoURL} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <span style={{ fontSize: 32 }}>🌱</span>
           }
         </div>
@@ -3491,6 +3492,7 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score,
             <button
               onClick={(e) => { e.stopPropagation(); onViewProfile(proposal); }}
               title="농가 프로필 보기"
+              aria-label="농가 프로필 보기"
               style={{ background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "5px 9px", fontSize: 11, color: TOKENS.inkSoft, cursor: "pointer", lineHeight: 1, flexShrink: 0 }}
             >
               👤
@@ -3738,7 +3740,7 @@ function DeliveryTracker({ deal, userRole, onShip, onConfirmDelivery }) {
         </div>
       )}
       {shipped && deal.shippedPhotoURL && (
-        <img src={deal.shippedPhotoURL} alt="발송 사진" onClick={() => window.open(deal.shippedPhotoURL, "_blank", "noopener,noreferrer")}
+        <img src={deal.shippedPhotoURL} alt="발송 사진" loading="lazy" onClick={() => window.open(deal.shippedPhotoURL, "_blank", "noopener,noreferrer")}
           style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, cursor: "pointer", marginBottom: 8 }} />
       )}
       {!isChef && depositPaid && !shipped && (
@@ -4192,7 +4194,7 @@ function FarmProfileModal({ proposal, allDeals, onClose }) {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: `1px solid ${TOKENS.line}`, position: "sticky", top: 0, background: TOKENS.bg, zIndex: 1 }}>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: TOKENS.ink }}>농가 프로필</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: TOKENS.inkSoft, lineHeight: 1, padding: "0 4px" }}>×</button>
+          <button onClick={onClose} aria-label="닫기" style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: TOKENS.inkSoft, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
         <div style={{ padding: "16px 18px" }}>
           <FarmProfileDetailCard proposal={proposal} allDeals={allDeals} />
@@ -4238,6 +4240,16 @@ function MiniBarChart({ items, max, colorFn }) {
       })}
     </div>
   );
+}
+
+function downloadCSV(rows, filename) {
+  const bom = "﻿";
+  const csv = bom + rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
 
 function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }) {
@@ -4440,7 +4452,23 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
             </div>
           </div>
 
-          <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 10 }}>{filteredDeals.length}건</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: TOKENS.inkSoft }}>{filteredDeals.length}건</span>
+            <button
+              onClick={() => {
+                const rows = [["딜ID", "상태", "품목", "셰프", "지역", "수량(kg)", "희망단가(원/kg)", "제안수", "납품일", "등록일"]];
+                filteredDeals.forEach((d) => rows.push([
+                  d.id, DEAL_STATUS_LABEL[d.status] || d.status, d.crop, d.chefName, d.chefRegion || "",
+                  d.quantity, d.targetPrice, d.proposals.length, d.deliveryDate,
+                  d.createdAt ? new Date(d.createdAt).toLocaleDateString("ko-KR") : "",
+                ]));
+                downloadCSV(rows, `deals_${new Date().toISOString().slice(0,10)}.csv`);
+              }}
+              style={{ padding: "5px 12px", fontSize: 11, borderRadius: 7, border: `1px solid ${TOKENS.line}`, background: "#fff", color: TOKENS.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+            >
+              ⬇ CSV 내보내기
+            </button>
+          </div>
 
           {filteredDeals.length === 0 ? (
             <div style={{ textAlign: "center", padding: "30px 0", color: TOKENS.inkSoft, fontSize: 13 }}>
@@ -4529,6 +4557,23 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
 
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* CSV 내보내기 */}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  const rows = [["딜ID", "품목", "셰프", "농가", "거래액(원)", "수수료(원)", "완료일"]];
+                  doneFeeRows.forEach((r) => rows.push([
+                    r.id, r.crop, r.chefName, r.farmName,
+                    r.total, r.fee,
+                    r.completedAt ? new Date(r.completedAt).toLocaleDateString("ko-KR") : "",
+                  ]));
+                  downloadCSV(rows, `settlement_${new Date().toISOString().slice(0,10)}.csv`);
+                }}
+                style={{ padding: "5px 12px", fontSize: 11, borderRadius: 7, border: `1px solid ${TOKENS.line}`, background: "#fff", color: TOKENS.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+              >
+                ⬇ 수수료 내역 CSV
+              </button>
+            </div>
             {/* KPI */}
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10 }}>
               {[
@@ -4718,7 +4763,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
                             {new Date(m.ts).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </div>
-                        {m.imageURL && <img src={m.imageURL} alt="첨부 이미지" style={{ maxWidth: 200, maxHeight: 160, borderRadius: 6, display: "block", marginBottom: m.text ? 4 : 0 }} />}
+                        {m.imageURL && <img src={m.imageURL} alt="첨부 이미지" loading="lazy" style={{ maxWidth: 200, maxHeight: 160, borderRadius: 6, display: "block", marginBottom: m.text ? 4 : 0 }} />}
                         {m.text && <div style={{ fontSize: 13, color: TOKENS.ink, lineHeight: 1.5 }}>{m.text}</div>}
                       </div>
                     ))}
@@ -5382,7 +5427,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
           <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
             {deal.photoURL && (
               <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
-                <img src={deal.photoURL} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
+                <img src={deal.photoURL} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
               </div>
             )}
             <div
@@ -5824,7 +5869,7 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
       if (mountedRef.current) {
-        setPendingImage(canvas.toDataURL("image/jpeg", 0.75));
+        setPendingImage(canvas.toDataURL("image/webp", 0.75));
         setCompressing(false);
       }
     };
@@ -6077,7 +6122,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
           </div>
           {favFarms.map((farm, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: i > 0 ? `1px solid ${TOKENS.line}` : "none" }}>
-              {farm.photoURL && <img src={farm.photoURL} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />}
+              {farm.photoURL && <img src={farm.photoURL} alt="" loading="lazy" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: TOKENS.ink }}>{farm.farmName}</div>
                 <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>{farm.region}{farm.cert && farm.cert !== "인증 없음" ? ` · ${farm.cert}` : ""}</div>
@@ -7005,6 +7050,8 @@ export default function FarmToTableApp() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [tab, setTab] = useState("create");
+  // M-2: 결제 리다이렉트가 URL을 초기화하기 전에 ?tab= 값을 캡처
+  const urlTabRef = useRef(new URLSearchParams(window.location.search).get("tab"));
   const [deals, setDeals] = useState([]);
   const [farm, setFarm] = useState(null);
   const [chefProfile, setChefProfile] = useState(null);
@@ -7558,7 +7605,14 @@ export default function FarmToTableApp() {
 
   const handleLogin = (userData) => {
     setUser(userData);
-    setTab(userData.role === "farmer" ? "browse" : "create");
+    const defaultTab = userData.role === "farmer" ? "browse" : "create";
+    const validTabs = userData.role === "farmer"
+      ? ["browse", "saved", "myproposals", "dashboard", "farm"]
+      : ["create", "mydeals", "dashboard", "chefprofile"];
+    const initTab = urlTabRef.current && validTabs.includes(urlTabRef.current) ? urlTabRef.current : defaultTab;
+    urlTabRef.current = null;
+    setTab(initTab);
+    window.history.replaceState({}, "", `?tab=${initTab}`);
     registerSW();
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -7571,6 +7625,7 @@ export default function FarmToTableApp() {
     setTab("create");
     setFarm(null);
     setChefProfile(null);
+    window.history.replaceState({}, "", window.location.pathname);
   };
 
   const handleSaveFarm = async (farmData) => {
@@ -8007,6 +8062,7 @@ export default function FarmToTableApp() {
       if (user?.uid) localStorage.setItem(seenSelectionsKey(user.uid), JSON.stringify(next));
     }
     setTab(key);
+    window.history.replaceState({}, "", `?tab=${key}`);
   };
 
   // SEC-02: 클라이언트 이메일 비교 — UI 표시 전용. 파괴적 admin 핸들러는 함수 레벨에서도 user?.email !== ADMIN_EMAIL 재확인.
@@ -8195,6 +8251,7 @@ export default function FarmToTableApp() {
                     });
                   }
                 }}
+                aria-label={notifOpen ? "알림 닫기" : `알림${unreadNotifCount > 0 ? ` (${unreadNotifCount}개 미읽음)` : ""}`}
                 style={{ fontSize: 16, background: "none", border: `1px solid ${TOKENS.line}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", position: "relative", lineHeight: 1 }}
               >
                 🔔
