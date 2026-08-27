@@ -1402,6 +1402,17 @@ async function getAIMatchComment(deal, proposal, score) {
 
 /* ---------- 1. 딜 만들기 (셰프) ---------- */
 
+// 카카오 우편번호 서비스 (다음 postcode) 동적 로드
+const loadKakaoPostcode = () =>
+  new Promise((resolve, reject) => {
+    if (window.daum?.Postcode) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
 const DEAL_FIELD_REQUIRED = {
   chefName: "레스토랑명",
   crop: "품목",
@@ -1409,7 +1420,7 @@ const DEAL_FIELD_REQUIRED = {
   quantity: "필요 수량",
   deliveryDate: "희망 납품일",
   targetPrice: "희망 단가",
-  deliveryAddress: "납품 장소",
+  deliveryBaseAddr: "납품 장소",
 };
 
 const DEAL_STEPS = [
@@ -1478,13 +1489,20 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   const isCloning = !!cloningFrom;
   const blank = {
     chefName: defaultChefName, chefRegion: defaultChefRegion, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
-    grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "", photoURL: "", deliveryAddress: "",
+    grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "", photoURL: "",
+    deliveryBaseAddr: "", deliveryDetail: "", deliveryAddress: "",
   };
   const [dealId] = useState(() => isEditing ? editingDeal.id : `d${Date.now()}`);
   const [step, setStep] = useState(1);
   const [data, setData] = useState(
     isEditing
-      ? { ...editingDeal, quantity: String(editingDeal.quantity), targetPrice: String(editingDeal.targetPrice) }
+      ? {
+          ...editingDeal,
+          quantity: String(editingDeal.quantity),
+          targetPrice: String(editingDeal.targetPrice),
+          deliveryBaseAddr: editingDeal.deliveryBaseAddr || editingDeal.deliveryAddress || "",
+          deliveryDetail: editingDeal.deliveryDetail || "",
+        }
       : isCloning
       ? {
           ...cloningFrom,
@@ -1508,6 +1526,28 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   const [aiNote, setAiNote] = useState(null);
 
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
+
+  const handleAddrSearch = async () => {
+    try {
+      await loadKakaoPostcode();
+      new window.daum.Postcode({
+        oncomplete: (d) => {
+          const base = d.roadAddress || d.jibunAddress;
+          const region = [d.sido, d.sigungu, d.bname].filter(Boolean).join(" ");
+          setData((prev) => ({
+            ...prev,
+            deliveryBaseAddr: base,
+            chefRegion: region,
+            deliveryDetail: "",
+            deliveryAddress: base,
+          }));
+        },
+      }).open();
+    } catch {
+      alert("주소 검색 서비스를 불러올 수 없습니다. 직접 입력해 주세요.");
+    }
+  };
+
   const handleCropChange = (crop) => {
     const stages = RIPENESS_STAGES[crop] || [];
     setData((d) => ({ ...d, crop, ripeness: stages[Math.floor(stages.length / 2)] || "" }));
@@ -1556,10 +1596,10 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   };
 
   const STEP_FIELDS = {
-    1: ["chefName", "crop"],
+    1: ["chefName", "crop", "deliveryBaseAddr"],
     2: ["sizeCondition"],
     3: ["quantity"],
-    4: ["deliveryDate", "targetPrice", "deliveryAddress"],
+    4: ["deliveryDate", "targetPrice"],
   };
 
   const validateStep = (s) => {
@@ -1714,8 +1754,43 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
           <input type="text" placeholder="예: 테이블나인" value={data.chefName} onChange={(e) => update("chefName", e.target.value)} style={inputStyle} />
           {errors.chefName && <ErrorText text={errors.chefName} />}
 
-          <FieldLabel>납품 지역</FieldLabel>
-          <input type="text" placeholder="예: 서울 강남" value={data.chefRegion || ""} onChange={(e) => update("chefRegion", e.target.value)} style={inputStyle} />
+          <FieldLabel required>납품 장소</FieldLabel>
+          <div style={{ display: "flex", gap: 8, marginBottom: data.deliveryBaseAddr ? 6 : 0 }}>
+            <input
+              type="text"
+              readOnly
+              placeholder="주소 찾기 버튼을 눌러 검색하세요"
+              value={data.deliveryBaseAddr || ""}
+              style={{ ...inputStyle, flex: 1, background: "#F8F7F0", cursor: "default", color: data.deliveryBaseAddr ? TOKENS.ink : TOKENS.inkSoft }}
+            />
+            <button
+              type="button"
+              onClick={handleAddrSearch}
+              style={{ padding: "0 14px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+            >
+              주소 찾기
+            </button>
+          </div>
+          {data.deliveryBaseAddr && (
+            <input
+              type="text"
+              placeholder="상세주소 입력 (동/호수/건물명 등, 선택)"
+              value={data.deliveryDetail || ""}
+              onChange={(e) => {
+                const detail = e.target.value;
+                setData((prev) => ({
+                  ...prev,
+                  deliveryDetail: detail,
+                  deliveryAddress: [prev.deliveryBaseAddr, detail].filter(Boolean).join(" "),
+                }));
+              }}
+              style={{ ...inputStyle, marginBottom: 4 }}
+            />
+          )}
+          <div style={{ fontSize: 11, color: TOKENS.moss, marginTop: 3, marginBottom: 2 }}>
+            🔒 체결 전에는 농가에게 동(洞) 단위까지만 공개됩니다
+          </div>
+          {errors.deliveryBaseAddr && <ErrorText text={errors.deliveryBaseAddr} />}
 
           <FieldLabel required>품목</FieldLabel>
           <select value={data.crop} onChange={(e) => handleCropChange(e.target.value)} style={inputStyle}>
@@ -1800,19 +1875,6 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
               )}
             </div>
           </div>
-          <FieldLabel required>납품 장소</FieldLabel>
-          <input
-            type="text"
-            placeholder="예: 서울 용산구 이태원동 123-45 ○○빌딩 3층"
-            value={data.deliveryAddress || ""}
-            onChange={(e) => update("deliveryAddress", e.target.value)}
-            style={inputStyle}
-          />
-          <div style={{ fontSize: 11, color: TOKENS.moss, marginTop: 4, marginBottom: 2 }}>
-            🔒 체결 전에는 농가에게 동(洞) 단위까지만 공개됩니다
-          </div>
-          {errors.deliveryAddress && <ErrorText text={errors.deliveryAddress} />}
-
           <FieldLabel>추가 요청사항 (선택)</FieldLabel>
           <textarea
             rows={3} placeholder="예: 콩피용으로 사용해 균일한 크기가 중요합니다"
@@ -7899,8 +7961,8 @@ export default function FarmToTableApp() {
     const base = deal.deliveryDate && deal.deliveryDate > new Date().toISOString().slice(0, 10)
       ? new Date(deal.deliveryDate) : new Date();
     const next = new Date(base.getTime() + days * 86400000).toISOString().slice(0, 10);
-    const { crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryAddress } = deal;
-    setCloningDeal({ crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryAddress, deliveryDate: next, _isNextCycle: true, _prevDealId: deal.id });
+    const { crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryAddress, deliveryBaseAddr, deliveryDetail } = deal;
+    setCloningDeal({ crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryAddress, deliveryBaseAddr, deliveryDetail, deliveryDate: next, _isNextCycle: true, _prevDealId: deal.id });
     setEditingDeal(null);
     setTab("create");
   };
