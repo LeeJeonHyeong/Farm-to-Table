@@ -19,5 +19,20 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vendor-react": ["react", "react-dom"],
+            "vendor-firebase": [
+              "firebase/app",
+              "firebase/auth",
+              "firebase/firestore",
+            ],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 800,
+    },
   };
 });

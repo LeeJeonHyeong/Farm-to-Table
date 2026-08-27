@@ -130,16 +130,27 @@ function PhotoLightbox({ src, onClose }) {
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError() { return { hasError: true }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(err, info) { console.error("[ErrorBoundary]", err, info); }
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: 40, textAlign: "center", fontFamily: "'IBM Plex Sans', sans-serif" }}>
-          <p style={{ fontSize: 15, color: "#555", marginBottom: 16 }}>예기치 않은 오류가 발생했습니다. 페이지를 새로고침해 주세요.</p>
-          <button onClick={() => window.location.reload()} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ccc", cursor: "pointer", fontSize: 14 }}>새로고침</button>
+        <div style={{ background: "#F3F1E7", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          <div style={{ maxWidth: 360, width: "100%", textAlign: "center" }}>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>⚠️</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: "#20281F", margin: "0 0 10px" }}>예기치 않은 오류</h2>
+            <p style={{ fontSize: 14, color: "#6B7C69", lineHeight: 1.7, margin: "0 0 28px" }}>
+              화면을 표시하는 중 문제가 발생했습니다.<br />새로고침하면 해결되는 경우가 많습니다.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: "12px 36px", background: "#5B7553", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "0.01em" }}
+            >
+              새로고침
+            </button>
+          </div>
         </div>
       );
     }
@@ -340,7 +351,36 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     note: "콩피용으로 사용해 균일한 크기가 중요합니다.",
     status: "open",
     createdAt: Date.now() - 86400000 * 2,
-    proposals: [],
+    proposals: [
+      {
+        id: "pd1_1",
+        farmName: "충주토마토팜",
+        farmerName: "충주토마토팜",
+        region: "충북 충주",
+        price: 22500,
+        availableQty: 120,
+        availableDate: dDay(6),
+        leadTimeDays: 1,
+        cert: "GAP",
+        rating: 4.6,
+        message: "완숙 직전 라이트레드 단계 수확으로 균일도 최상입니다. 주 1회 정기 납품 경험 다수 보유.",
+        createdAt: Date.now() - 3600000 * 5,
+      },
+      {
+        id: "pd1_2",
+        farmName: "경기도농협토마토",
+        farmerName: "경기도농협토마토",
+        region: "경기 화성",
+        price: 21000,
+        availableQty: 150,
+        availableDate: dDay(7),
+        leadTimeDays: 1,
+        cert: "무농약",
+        rating: 4.4,
+        message: "대량 안정 공급 가능합니다. 크기 선별 후 박스 포장 납품합니다.",
+        createdAt: Date.now() - 3600000 * 2,
+      },
+    ],
     selectedProposalId: null,
   },
   {
@@ -432,7 +472,22 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     note: "시저 샐러드 전용, 속잎이 단단한 것으로 부탁드립니다.",
     status: "open",
     createdAt: Date.now() - 86400000 * 3,
-    proposals: [],
+    proposals: [
+      {
+        id: "pd4_1",
+        farmName: "강원청정채소",
+        farmerName: "강원청정채소",
+        region: "강원 홍천",
+        price: 7800,
+        availableQty: 60,
+        availableDate: dDay(11),
+        leadTimeDays: 1,
+        cert: "유기농",
+        rating: 4.8,
+        message: "고랭지 재배 로메인으로 잎이 두껍고 아삭합니다. 주 2회 새벽 배송 가능합니다.",
+        createdAt: Date.now() - 3600000 * 8,
+      },
+    ],
     selectedProposalId: null,
   },
   {
@@ -724,6 +779,11 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     contractSignedChefAt: Date.now() - 86400000 * 4,
     contractSignedFarmAt: Date.now() - 86400000 * 4 + 3600000,
     depositPaidAt: Date.now() - 86400000 * 3,
+    deliveryStatus: "shipped",
+    shippedAt: Date.now() - 86400000,
+    courierName: "CJ대한통운",
+    trackingNumber: "619072345678",
+    shippedMemo: "신선도 유지를 위해 아이스팩 2개 동봉했습니다. 수령 즉시 냉장 보관 부탁드립니다.",
     proposals: [
       {
         id: "p_demo1",
@@ -762,9 +822,17 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     contractSignedFarmAt: Date.now() - 86400000 * 11 + 3600000,
     depositPaidAt: Date.now() - 86400000 * 10,
     deliveryStatus: "delivered",
+    shippedAt: Date.now() - 86400000 * 4,
+    courierName: "한진택배",
+    trackingNumber: "401234567890",
+    shippedMemo: "당일 수확 후 당일 발송. 보냉 박스 포장 완료.",
     deliveredAt: Date.now() - 86400000 * 2,
     completedAt: Date.now() - 86400000 * 2,
     balanceDueAt: dDay(5),
+    balancePaidAt: Date.now() - 86400000,
+    chefRating: 4.9,
+    chefReview: "신속한 소통과 정확한 납품 일정을 지켜주셔서 감사합니다. 다음에도 꼭 함께하고 싶습니다.",
+    chefRatedAt: Date.now() - 86400000,
     proposals: [
       {
         id: "p_demo2",
@@ -775,7 +843,9 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
         availableQty: 12,
         leadTimeDays: 2,
         cert: "GAP",
-        rating: 4.8,
+        rating: 4.9,
+        review: "당도가 매우 높고 상태가 훌륭했습니다. 봉황 품종 특유의 풍미가 살아있어 코스 디저트에 최적이었습니다. 재계약 의사 있습니다.",
+        ratedAt: Date.now() - 86400000 * 2,
         message: "봉황 품종으로 당도와 향이 뛰어납니다. 수확 당일 발송 가능.",
         createdAt: Date.now() - 86400000 * 13,
       },
@@ -7856,20 +7926,45 @@ export default function FarmToTableApp() {
 
   if (!authChecked || loadState === "loading") {
     return (
-      <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.inkSoft, fontSize: 14 }}>
-        <style>{`@keyframes ftt-spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ width: 32, height: 32, border: `3px solid ${TOKENS.line}`, borderTopColor: TOKENS.moss, borderRadius: "50%", animation: "ftt-spin 0.8s linear infinite" }} />
-        불러오는 중…
+      <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 24, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+        <style>{`
+          @keyframes ftt-spin { to { transform: rotate(360deg); } }
+          @keyframes ftt-load-pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+        `}</style>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+          <div style={{ position: "relative", width: 64, height: 64 }}>
+            <div style={{ position: "absolute", inset: 0, border: `3px solid ${TOKENS.line}`, borderTopColor: TOKENS.moss, borderRadius: "50%", animation: "ftt-spin 0.9s linear infinite" }} />
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🌾</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: TOKENS.ink, letterSpacing: "-0.01em", marginBottom: 6 }}>Farm to Table</div>
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, animation: "ftt-load-pulse 1.6s ease-in-out infinite" }}>불러오는 중…</div>
+          </div>
+        </div>
       </div>
     );
   }
   if (loadState === "error") {
+    const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
     return (
-      <div style={{ background: TOKENS.bg, minHeight: "100%", padding: "60px 24px", textAlign: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: TOKENS.rust, fontSize: 14 }}>
-        <div style={{ marginBottom: 16 }}>데이터를 불러오지 못했습니다.</div>
-        <button onClick={() => window.location.reload()} style={{ padding: "10px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-          다시 시도
-        </button>
+      <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", fontFamily: "'IBM Plex Sans', sans-serif" }}>
+        <div style={{ maxWidth: 360, width: "100%", textAlign: "center" }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>{isOffline ? "📡" : "🌾"}</div>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: TOKENS.ink, margin: "0 0 10px" }}>
+            {isOffline ? "인터넷 연결 없음" : "데이터 로드 실패"}
+          </h2>
+          <p style={{ fontSize: 14, color: TOKENS.inkSoft, lineHeight: 1.7, margin: "0 0 28px" }}>
+            {isOffline
+              ? "Wi-Fi 또는 모바일 데이터를 확인한 후\n다시 시도해 주세요."
+              : "Firebase 연결에 문제가 발생했습니다.\n잠시 후 다시 시도해 주세요."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: "12px 36px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "0.01em" }}
+          >
+            다시 시도
+          </button>
+        </div>
       </div>
     );
   }
