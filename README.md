@@ -101,6 +101,7 @@ allow delete: if request.auth != null
 | 단골 농가 즐겨찾기 | 매칭 후 농가 카드에 ☆/★ 즐겨찾기 버튼, 내 레스토랑 탭에 즐겨찾기 농가 목록 |
 | 정기 딜 자동 연장 | 완료 딜에서 "↻ 다음 회차 딜 만들기" 버튼으로 딜 빠른 복제 생성 |
 | 작물 가격 참고 | 딜 만들기 Step 4에서 해당 품목 최근 평균 거래가 참고 배너 표시 |
+| 납품 장소 | 딜 생성 시 상세 주소 입력, 체결 전 농가에게 동 단위까지만 공개, 체결 후 전체 주소 공개 |
 | 농가 문의 답변 | 내 거래에서 농가 문의 N건 미답변 표시 + 텍스트 입력 후 "답변 등록" |
 | 정산 이력 | 대시보드에서 매칭·완료 딜의 거래처·금액·단계·확정일 일람 |
 | 알림 뱃지 | 새 제안 도착 및 미확인 채팅 시 "내 거래" 탭에 숫자 뱃지 |
@@ -127,6 +128,7 @@ allow delete: if request.auth != null
 | 기능 | 설명 |
 |---|---|
 | 실시간 채팅 | 매칭 후 셰프↔농가 채팅 + 미확인 메시지 뱃지 + 전송 실패 롤백 |
+| 채팅 인박스 | 헤더 💬 버튼 드롭다운 — 전체 채팅 목록 (상대방명·품목·마지막 메시지 미리보기·타임스탬프·미읽음 뱃지), 클릭 시 바로 채팅 열기 |
 | 앱 내 알림 히스토리 | 🔔 벨 아이콘 + 미읽음 뱃지 + 드롭다운 패널 + 탭 바로가기 클릭 |
 | 웹 푸시 알림 | 제안·채팅·서명 완료·선급금 지급·발송 완료·수령 확인·정산 완료·딜 마감 D-3·잔금 기한 D-1/D-day/초과 (총 14종, Service Worker) |
 | 계약서 서명 | 표준 농산물 거래 계약서 자동 생성 + 갑(셰프)·을(농가) 양측 서명 UI + 인쇄/PDF 저장 |
@@ -260,6 +262,14 @@ allow delete: if request.auth != null
 | 발표 준비 M | M-1: Firebase Hosting 배포 (`https://farm-to-table-de5f5.web.app`), M-2: `borderBottom` 중복 키 제거 + Firebase Hosting 설정(`firebase.json`) 추가, M-3: 모바일 UI 점검 7/7 통과 (390×844 iPhone 13, `test_m3_mobile.cjs`) |
 | 발표 준비 L | L-1: `run_tests.cjs` 통합 테스트 러너 + `npm run test:all` / `npm run test:quick` 스크립트, L-2: `.env.example` 환경변수 예시 파일 (Groq·Firebase·TossPayments·퀵로그인 항목) |
 | 버그 수정 | 농가 계약서 서명 버튼 미표시 수정 — 을(매도인) 슬롯 `role:"farm"` → `role:"farmer"` (실제 `user.role`과 불일치로 서명하기 버튼 대신 "서명 대기" 표시되던 문제), 제안 카드 비교 버튼·매칭 점수 겹침 수정 — `position:absolute` 제거 후 채팅/역제안 버튼과 같은 행으로 이동 |
+| v2.48 | H-1: Vite `manualChunks` 벤더 번들 분리 (`vendor-react`·`vendor-firebase`), 로딩 화면 브랜딩 (🌾 아이콘·"Farm to Table"·`ftt-load-pulse` 펄스 애니메이션), H-2: 시연 딜 데이터 강화 — `d_match`(배송중·택배사·운송장), `d_done`(완납·리뷰·balancePaidAt), d1(토마토) 제안 2건·d4(로메인) 제안 1건 추가, H-3: 에러 화면 개선 — `navigator.onLine` 오프라인 감지·분기 메시지, `ErrorBoundary` 브랜드 UI (Fraunces·`#5B7553` 버튼) |
+| v2.48 E2E | `test_v2_48.cjs` — 12/12 통과 (정적 코드 11종 + 브라우저 UI 1종) |
+| v2.49 | M-1: A11Y `aria-label` 4곳 (알림·북마크·농가프로필·닫기 버튼 동적 레이블), M-2: URL 딥링크 — `?tab=` 마운트 시 캡처(`urlTabRef`), 로그인·탭 전환·로그아웃 시 URL 동기화(`window.history.replaceState`), M-3: 이미지 WebP 변환(`canvas.toDataURL("image/webp")`) + `loading="lazy"` 5곳 이상 적용, M-4: 관리자 CSV 내보내기 — 딜 목록(`deals_YYYY-MM-DD.csv`)·수수료 내역(`settlement_YYYY-MM-DD.csv`) UTF-8 BOM |
+| v2.49 E2E | `test_v2_49.cjs` — 14/14 통과 (정적 코드 13종 + 브라우저 UI 1종) |
+| v2.50 | 채팅 인박스 드롭다운 — 헤더 🔔 벨 옆에 💬 채팅 버튼 추가, 미읽음 수 뱃지(9+), `chatInboxItems` useMemo(chats·deals·lastChatRead 기반 최신순 정렬), 드롭다운 패널(상대방명·품목·마지막 메시지 미리보기·타임스탬프·미읽음 뱃지), 이미지 메시지 📷 미리보기, 빈 상태 안내, 항목 클릭 → `handleOpenChat` 직접 연동 |
+| v2.50 E2E | `test_v2_50.cjs` — 14/14 통과 (정적 코드 12종 + 브라우저 UI 2종) |
+| 버그 수정 | 채팅창 유지 버그 수정 — 탭 전환 시(`handleTabClick`) 및 로그아웃 시(`handleLogout`) `setChatTarget(null)` 추가, 다른 화면으로 이동해도 채팅창이 남는 문제·다른 계정 로그인 시 이전 채팅창 잔존 문제 해결 |
+| 납품 장소 기능 | 딜 생성 Step 4에 "납품 장소" 필수 입력 추가 (상세 주소), 체결 전 농가에게 동(洞) 단위까지만 마스킹 공개(`maskAddress`), 딜 체결(농가 선택) 후 선택된 농가에게 전체 주소 공개, 딜 찾기 목록·상세·내 제안 화면에 📍 아이콘으로 표시, 계약서·명세서에 전체 주소 반영, 다음 회차 딜 복제 시 납품 장소 승계 |
 
 ### v1.6 상세 내역
 
