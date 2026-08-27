@@ -301,6 +301,16 @@ const pendingTossKey = (uid) => `pending-toss-payment-${uid}`;
 const USER_KEY = "current-user";
 const CERT_OPTIONS = ["인증 없음", "무농약", "유기농", "GAP", "친환경"];
 
+const CROP_EMOJI = {
+  "토마토": "🍅", "방울토마토": "🍅", "딸기": "🍓", "바질": "🌿", "로메인": "🥬",
+  "블루베리": "🫐", "고수": "🌿", "애호박": "🥒", "로즈마리": "🌿", "민트": "🌿",
+  "케일": "🥬", "루꼴라": "🥬", "표고버섯": "🍄", "파프리카": "🫑", "무화과": "🍑",
+  "비트": "🥬", "상추": "🥬", "깻잎": "🌿", "오이": "🥒", "가지": "🍆",
+  "고구마": "🍠", "감자": "🥔", "당근": "🥕", "양파": "🧅", "마늘": "🧄",
+  "배추": "🥬", "무": "🥕", "옥수수": "🌽", "수박": "🍉", "복숭아": "🍑",
+  "포도": "🍇", "사과": "🍎", "배": "🍐", "레몬": "🍋", "참외": "🍈",
+};
+
 // DEV 전용 시연 데이터 — 프로덕션 빌드에서는 Vite가 정적 분석으로 제거
 const dDay = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 const SAMPLE_DEALS = import.meta.env.DEV ? [
@@ -681,6 +691,84 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     createdAt: Date.now() - 86400000 * 4,
     proposals: [],
     selectedProposalId: null,
+  },
+  {
+    id: "d_match",
+    chefName: "테이블나인",
+    chefRegion: "서울 용산",
+    crop: "딸기",
+    sizeCondition: "25g 이상 균일",
+    ripeness: "완숙(레드 100%)",
+    grade: "특",
+    quantity: 30,
+    deliveryDate: dDay(5),
+    cycle: "주 1회",
+    targetPrice: 42000,
+    note: "디저트 플레이팅용, 당도 12brix 이상 선호합니다.",
+    status: "matched",
+    createdBy: "",
+    createdAt: Date.now() - 86400000 * 7,
+    selectedProposalId: "p_demo1",
+    selectedAt: Date.now() - 86400000 * 5,
+    contractSignedChefAt: Date.now() - 86400000 * 4,
+    contractSignedFarmAt: Date.now() - 86400000 * 4 + 3600000,
+    depositPaidAt: Date.now() - 86400000 * 3,
+    proposals: [
+      {
+        id: "p_demo1",
+        farmName: "햇살딸기농원",
+        farmerName: "햇살딸기농원",
+        region: "경남 진주",
+        price: 41000,
+        availableQty: 50,
+        leadTimeDays: 2,
+        cert: "GAP",
+        rating: 4.7,
+        message: "설향 품종으로 당도 13brix 이상 보장합니다.",
+        createdAt: Date.now() - 86400000 * 6,
+      },
+    ],
+  },
+  {
+    id: "d_done",
+    chefName: "테이블나인",
+    chefRegion: "서울 용산",
+    crop: "무화과",
+    sizeCondition: "개당 60g 이상",
+    ripeness: "완숙",
+    grade: "특",
+    quantity: 8,
+    deliveryDate: dDay(-2),
+    cycle: "단발성(1회)",
+    targetPrice: 55000,
+    note: "여름 디저트 코스용, 껍질이 얇고 당도 높은 것 선호.",
+    status: "done",
+    createdBy: "",
+    createdAt: Date.now() - 86400000 * 14,
+    selectedProposalId: "p_demo2",
+    selectedAt: Date.now() - 86400000 * 12,
+    contractSignedChefAt: Date.now() - 86400000 * 11,
+    contractSignedFarmAt: Date.now() - 86400000 * 11 + 3600000,
+    depositPaidAt: Date.now() - 86400000 * 10,
+    deliveryStatus: "delivered",
+    deliveredAt: Date.now() - 86400000 * 2,
+    completedAt: Date.now() - 86400000 * 2,
+    balanceDueAt: dDay(5),
+    proposals: [
+      {
+        id: "p_demo2",
+        farmName: "남도무화과농원",
+        farmerName: "남도무화과농원",
+        region: "전남 영암",
+        price: 53000,
+        availableQty: 12,
+        leadTimeDays: 2,
+        cert: "GAP",
+        rating: 4.8,
+        message: "봉황 품종으로 당도와 향이 뛰어납니다. 수확 당일 발송 가능.",
+        createdAt: Date.now() - 86400000 * 13,
+      },
+    ],
   },
 ] : [];
 
@@ -2976,11 +3064,15 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
               onClick={() => setDetailDeal(deal)}
               style={{ background: TOKENS.card, border: `1px solid ${isMySpecialty ? TOKENS.moss + "66" : TOKENS.line}`, borderLeft: `4px solid ${isMySpecialty ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)", cursor: "pointer" }}
             >
-              {deal.photoURL && (
+              {deal.photoURL ? (
                 <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
                   <img src={deal.photoURL} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
                 </div>
-              )}
+              ) : CROP_EMOJI[deal.crop] ? (
+                <div style={{ float: "right", marginLeft: 12, marginBottom: 4, width: 64, height: 64, borderRadius: 8, background: TOKENS.line + "40", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>
+                  {CROP_EMOJI[deal.crop]}
+                </div>
+              ) : null}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
@@ -6499,6 +6591,25 @@ function LoginScreen({ onLogin }) {
             </div>
           )}
 
+          {import.meta.env.DEV && import.meta.env.VITE_DEMO_CHEF_EMAIL && mode === "login" && (
+            <div style={{ marginBottom: 16, padding: "10px 12px", background: "#EEF3FF", borderRadius: 8, border: "1px solid #C7D9FF" }}>
+              <div style={{ fontSize: 10, color: "#0064FF", fontFamily: "'IBM Plex Mono', monospace", marginBottom: 8 }}>🧪 DEV 데모 계정 빠른 로그인</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button"
+                  onClick={async () => { setError(""); try { await signInWithEmailAndPassword(auth, import.meta.env.VITE_DEMO_CHEF_EMAIL, import.meta.env.VITE_DEMO_CHEF_PW ?? ""); } catch (e) { setError(e.message); } }}
+                  style={{ flex: 1, padding: "7px 0", fontSize: 12, fontWeight: 500, background: "#fff", border: `1px solid ${TOKENS.line}`, borderRadius: 6, cursor: "pointer", color: TOKENS.ink }}>
+                  🍳 셰프
+                </button>
+                {import.meta.env.VITE_DEMO_FARM_EMAIL && (
+                  <button type="button"
+                    onClick={async () => { setError(""); try { await signInWithEmailAndPassword(auth, import.meta.env.VITE_DEMO_FARM_EMAIL, import.meta.env.VITE_DEMO_FARM_PW ?? ""); } catch (e) { setError(e.message); } }}
+                    style={{ flex: 1, padding: "7px 0", fontSize: 12, fontWeight: 500, background: "#fff", border: `1px solid ${TOKENS.line}`, borderRadius: 6, cursor: "pointer", color: TOKENS.ink }}>
+                    🌱 농가
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           <FieldLabel required>이메일</FieldLabel>
           <input type="email" placeholder="example@email.com" value={email}
             onChange={(e) => { setEmail(e.target.value); setError(""); }}
@@ -7394,9 +7505,12 @@ export default function FarmToTableApp() {
     if (user?.email !== ADMIN_EMAIL) return;
     const batch = writeBatch(db);
     deals.forEach((d) => batch.delete(doc(db, "deals", d.id)));
-    SAMPLE_DEALS.forEach((d) => batch.set(doc(db, "deals", d.id), d));
+    SAMPLE_DEALS.forEach((d) => {
+      const dealData = d.createdBy === "" ? { ...d, createdBy: user.uid } : d;
+      batch.set(doc(db, "deals", d.id), dealData);
+    });
     await batch.commit();
-    setDeals(SAMPLE_DEALS);
+    setDeals(SAMPLE_DEALS.map((d) => (d.createdBy === "" ? { ...d, createdBy: user.uid } : d)));
   };
 
   const handleCreateDeal = (deal) => {

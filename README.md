@@ -249,6 +249,8 @@ allow delete: if request.auth != null
 | v2.43 E2E | `test_v2_43.cjs` — 7/7 통과 (6개 정적 코드 검증 + 브라우저 UI 검증) |
 | v2.44 | UX-03: 주요 액션(딜 등록·제안 제출·농가 선택·계약 서명·납품 신고·수령 확인·평점 제출) 완료 시 성공 Toast 피드백 7종 추가, UX-04: 채팅 빈 상태 💬 아이콘+안내 문구로 개선 |
 | v2.44 E2E | `test_v2_44.cjs` — 9/9 통과 (8개 정적 코드 검증 + 브라우저 UI 검증) |
+| v2.45 | H-1: SAMPLE_DEALS에 `d_match`(계약 완료·납품 대기)·`d_done`(납품 완료·잔금 대기) 시연 딜 2건 추가 (`createdBy: ""` 센티널 → `handleResetData` 시 `user.uid` 치환), H-2: `CROP_EMOJI` 맵 추가(37종) + 딜 카드 `photoURL` 없을 때 이모지 fallback 표시, H-3: `LoginScreen` DEV 전용 퀵 로그인 버튼 (`VITE_DEMO_CHEF_EMAIL`/`VITE_DEMO_FARM_EMAIL` env var 기반, `signInWithEmailAndPassword` 직접 호출) |
+| v2.45 E2E | `test_v2_45.cjs` — 7/7 통과 (6개 정적 코드 검증 + 브라우저 UI 검증) |
 
 ### v1.6 상세 내역
 
