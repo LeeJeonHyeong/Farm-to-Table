@@ -1484,13 +1484,13 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null, userId = "", cropPriceRef = {} }) {
+function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null, userId = "", cropPriceRef = {}, profileAddress = "" }) {
   const isEditing = !!editingDeal;
   const isCloning = !!cloningFrom;
   const blank = {
     chefName: defaultChefName, chefRegion: defaultChefRegion, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
     grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "", photoURL: "",
-    deliveryBaseAddr: "", deliveryDetail: "", deliveryAddress: "",
+    deliveryBaseAddr: profileAddress || "", deliveryDetail: "", deliveryAddress: profileAddress || "",
   };
   const [dealId] = useState(() => isEditing ? editingDeal.id : `d${Date.now()}`);
   const [step, setStep] = useState(1);
@@ -1526,6 +1526,20 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   const [aiNote, setAiNote] = useState(null);
 
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
+
+  // 납품 장소 소스: "profile" = 프로필 주소, "custom" = 직접 입력
+  const [addrSource, setAddrSource] = useState(
+    profileAddress && !editingDeal && !cloningFrom ? "profile" : "custom"
+  );
+
+  const applyProfileAddress = (src) => {
+    setAddrSource(src);
+    if (src === "profile" && profileAddress) {
+      setData((prev) => ({ ...prev, deliveryBaseAddr: profileAddress, deliveryDetail: "", deliveryAddress: profileAddress }));
+    } else if (src === "custom") {
+      setData((prev) => ({ ...prev, deliveryBaseAddr: "", deliveryDetail: "", deliveryAddress: "" }));
+    }
+  };
 
   const handleAddrSearch = async () => {
     try {
@@ -1755,37 +1769,69 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
           {errors.chefName && <ErrorText text={errors.chefName} />}
 
           <FieldLabel required>납품 장소</FieldLabel>
-          <div style={{ display: "flex", gap: 8, marginBottom: data.deliveryBaseAddr ? 6 : 0 }}>
-            <input
-              type="text"
-              readOnly
-              placeholder="주소 찾기 버튼을 눌러 검색하세요"
-              value={data.deliveryBaseAddr || ""}
-              style={{ ...inputStyle, flex: 1, background: "#F8F7F0", cursor: "default", color: data.deliveryBaseAddr ? TOKENS.ink : TOKENS.inkSoft }}
-            />
-            <button
-              type="button"
-              onClick={handleAddrSearch}
-              style={{ padding: "0 14px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
-            >
-              주소 찾기
-            </button>
-          </div>
-          {data.deliveryBaseAddr && (
-            <input
-              type="text"
-              placeholder="상세주소 입력 (동/호수/건물명 등, 선택)"
-              value={data.deliveryDetail || ""}
-              onChange={(e) => {
-                const detail = e.target.value;
-                setData((prev) => ({
-                  ...prev,
-                  deliveryDetail: detail,
-                  deliveryAddress: [prev.deliveryBaseAddr, detail].filter(Boolean).join(" "),
-                }));
-              }}
-              style={{ ...inputStyle, marginBottom: 4 }}
-            />
+          {profileAddress && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+              {[
+                { key: "profile", label: "🏪 프로필 주소 사용" },
+                { key: "custom", label: "✏️ 직접 입력" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => applyProfileAddress(opt.key)}
+                  style={{
+                    padding: "6px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                    border: `1px solid ${addrSource === opt.key ? TOKENS.moss : TOKENS.line}`,
+                    background: addrSource === opt.key ? TOKENS.mossSoft : "#FFFFFF",
+                    color: addrSource === opt.key ? TOKENS.moss : TOKENS.inkSoft,
+                    fontWeight: addrSource === opt.key ? 600 : 400,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {profileAddress && addrSource === "profile" ? (
+            <div style={{ background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}33`, borderRadius: 8, padding: "10px 14px", marginBottom: 4, fontSize: 13, color: TOKENS.ink }}>
+              📍 {profileAddress}
+              <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginTop: 3 }}>레스토랑 프로필에 저장된 주소입니다. 변경하려면 "직접 입력"을 선택하세요.</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 8, marginBottom: data.deliveryBaseAddr ? 6 : 0 }}>
+                <input
+                  type="text"
+                  readOnly
+                  placeholder="주소 찾기 버튼을 눌러 검색하세요"
+                  value={data.deliveryBaseAddr || ""}
+                  style={{ ...inputStyle, flex: 1, background: "#F8F7F0", cursor: "default", color: data.deliveryBaseAddr ? TOKENS.ink : TOKENS.inkSoft }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddrSearch}
+                  style={{ padding: "0 14px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                >
+                  주소 찾기
+                </button>
+              </div>
+              {data.deliveryBaseAddr && (
+                <input
+                  type="text"
+                  placeholder="상세주소 입력 (동/호수/건물명 등, 선택)"
+                  value={data.deliveryDetail || ""}
+                  onChange={(e) => {
+                    const detail = e.target.value;
+                    setData((prev) => ({
+                      ...prev,
+                      deliveryDetail: detail,
+                      deliveryAddress: [prev.deliveryBaseAddr, detail].filter(Boolean).join(" "),
+                    }));
+                  }}
+                  style={{ ...inputStyle, marginBottom: 4 }}
+                />
+              )}
+            </>
           )}
           <div style={{ fontSize: 11, color: TOKENS.moss, marginTop: 3, marginBottom: 2 }}>
             🔒 체결 전에는 농가에게 동(洞) 단위까지만 공개됩니다
@@ -6148,7 +6194,7 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
 /* ---------- 4-0. 내 레스토랑 (셰프) ---------- */
 
 function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "", onShowOnboarding }) {
-  const blank = { restaurantName: defaultRestaurantName, region: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체", photoURL: "" };
+  const blank = { restaurantName: defaultRestaurantName, region: "", address: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체", photoURL: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
@@ -6171,6 +6217,22 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
         : [...d.preferCrops, crop],
     }));
     setSaved(false);
+  };
+
+  const handleChefAddrSearch = async () => {
+    try {
+      await loadKakaoPostcode();
+      new window.daum.Postcode({
+        oncomplete: (d) => {
+          const base = d.roadAddress || d.jibunAddress;
+          const region = [d.sido, d.sigungu, d.bname].filter(Boolean).join(" ");
+          setData((prev) => ({ ...prev, address: base, region: prev.region || region }));
+          setSaved(false);
+        },
+      }).open();
+    } catch {
+      alert("주소 검색 서비스를 불러올 수 없습니다.");
+    }
   };
 
   const handleSave = () => {
@@ -6245,6 +6307,29 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
           <FieldLabel>지역</FieldLabel>
           <input type="text" placeholder="예: 서울 강남" value={data.region} onChange={(e) => update("region", e.target.value)} style={inputStyle} />
         </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel>레스토랑 주소 (도로명)</FieldLabel>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="text"
+            readOnly
+            placeholder="주소 찾기 버튼을 눌러 검색하세요"
+            value={data.address || ""}
+            style={{ ...inputStyle, flex: 1, background: "#F8F7F0", cursor: "default", color: data.address ? TOKENS.ink : TOKENS.inkSoft }}
+          />
+          <button
+            type="button"
+            onClick={handleChefAddrSearch}
+            style={{ padding: "0 14px", background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+          >
+            주소 찾기
+          </button>
+        </div>
+        {data.address && (
+          <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginTop: 4 }}>딜 만들기 시 이 주소를 납품 장소로 바로 사용할 수 있습니다.</div>
+        )}
       </div>
 
       <FieldLabel>선호 품목 (복수 선택 가능)</FieldLabel>
@@ -8882,7 +8967,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="87" cy="213" rx="4" ry="2.5" fill="#3D6B38" opacity="0.7" transform="rotate(20 87 213)"/>
                   </svg>
                 )}
-                <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} />
+                <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} profileAddress={chefProfile?.address || ""} />
               </div>
             )}
             {/* ── 딜 찾기 ── */}
