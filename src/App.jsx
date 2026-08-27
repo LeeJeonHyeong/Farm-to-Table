@@ -2302,12 +2302,23 @@ function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onVi
         const isSelected = deal.selectedProposalId === proposal.id;
         const isRejected = deal.selectedProposalId && !isSelected;
         const isClosed = deal.status === "closed";
+        const hasPendingCounter = proposal.counterOffer?.status === "pending";
         const statusLabel = isSelected ? "선택됨" : isRejected ? "미선택" : isClosed ? "마감됨" : "검토 중";
         const statusColor = isSelected ? TOKENS.moss : isRejected ? TOKENS.inkSoft : isClosed ? TOKENS.rust : "#B45309";
         const statusBg = isSelected ? TOKENS.mossSoft : isRejected ? TOKENS.line : isClosed ? TOKENS.rustSoft : "#FEF3C7";
 
         return (
-          <div key={proposal.id} onClick={() => setDetailItem({ deal, proposal })} style={{ background: TOKENS.card, border: `1px solid ${isSelected ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, cursor: "pointer" }}>
+          <div key={proposal.id} onClick={() => setDetailItem({ deal, proposal })} style={{ background: TOKENS.card, border: `1px solid ${hasPendingCounter ? TOKENS.rust : isSelected ? TOKENS.moss : TOKENS.line}`, borderLeft: `4px solid ${hasPendingCounter ? TOKENS.rust : isSelected ? TOKENS.moss : TOKENS.line}`, borderRadius: 12, padding: 18, cursor: "pointer" }}>
+            {hasPendingCounter && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}33`, borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>
+                <span style={{ fontSize: 16 }}>💱</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: TOKENS.rust }}>셰프가 역제안을 보냈습니다</div>
+                  <div style={{ fontSize: 11, color: TOKENS.rust, opacity: 0.8 }}>{proposal.counterOffer.price.toLocaleString()}원/kg — 클릭해서 수락 또는 거절하세요</div>
+                </div>
+                <span className="ftt-badge-pulse" style={{ marginLeft: "auto", background: TOKENS.rust, color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 700, padding: "2px 8px" }}>NEW</span>
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <div>
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
@@ -3572,22 +3583,33 @@ function ProposalCard({ proposal, deal, onSelect, isSelected, selectable, score,
     }
   };
 
+  const isPendingCounter = proposal.counterOffer?.status === "pending";
+
   return (
     <div
       className="ftt-card"
       onClick={onClick}
       style={{
         background: "#FFFFFF",
-        border: `1px solid ${isSelected ? TOKENS.moss + "88" : TOKENS.line}`,
-        borderLeft: `4px solid ${isSelected ? TOKENS.moss : TOKENS.line}`,
+        border: `1px solid ${isPendingCounter ? TOKENS.rust + "88" : isSelected ? TOKENS.moss + "88" : TOKENS.line}`,
+        borderLeft: `4px solid ${isPendingCounter ? TOKENS.rust : isSelected ? TOKENS.moss : TOKENS.line}`,
         borderRadius: 10,
         padding: 14,
         cursor: onClick ? "pointer" : "default",
-        boxShadow: isSelected
+        boxShadow: isPendingCounter
+          ? "0 2px 12px rgba(180,74,40,0.10), 0 1px 4px rgba(180,74,40,0.07)"
+          : isSelected
           ? "0 2px 12px rgba(91,117,83,0.12), 0 1px 4px rgba(91,117,83,0.08)"
           : "0 1px 3px rgba(32,40,31,0.05), 0 2px 8px rgba(32,40,31,0.03)",
       }}
     >
+      {isPendingCounter && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}33`, borderRadius: 6, padding: "6px 10px", marginBottom: 10, fontSize: 11 }}>
+          <span>💱</span>
+          <span style={{ fontWeight: 700, color: TOKENS.rust }}>역제안 대기중</span>
+          <span style={{ color: TOKENS.rust, opacity: 0.8 }}>— {proposal.counterOffer.price.toLocaleString()}원/kg 제안됨</span>
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, color: TOKENS.ink }}>{proposal.farmName}</span>
@@ -5526,6 +5548,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
         );
         const selectedProposal = deal.proposals.find((p) => p.id === deal.selectedProposalId);
         const statusAccent = deal.status === "open" ? TOKENS.gold : deal.status === "matched" ? TOKENS.moss : deal.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
+        const pendingCounterProposals = deal.proposals.filter((p) => p.counterOffer?.status === "pending");
         return (
           <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
             {deal.photoURL && (
@@ -5543,6 +5566,11 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 13, color: TOKENS.inkSoft }}>{expanded ? "▲" : "▼"}</span>
+                {pendingCounterProposals.length > 0 && (
+                  <span className="ftt-badge-pulse" style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px", fontWeight: 700 }}>
+                    💱 역제안 대기 {pendingCounterProposals.length}건
+                  </span>
+                )}
                 {deal.closeReason === "expired" && (
                   <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px" }}>
                     납품일 만료
@@ -8417,7 +8445,7 @@ export default function FarmToTableApp() {
                             handleOpenChat({ dealId: item.dealId, proposalId: item.proposalId, crop: item.crop, chefName: item.counterpart, farmName: item.counterpart });
                             setChatOpen(false);
                           }}
-                          style={{ width: "100%", textAlign: "left", display: "block", padding: "12px 16px", borderBottom: `1px solid ${TOKENS.line}`, background: item.unread > 0 ? `${TOKENS.moss}08` : "#fff", cursor: "pointer", border: "none", borderBottom: `1px solid ${TOKENS.line}` }}
+                          style={{ width: "100%", textAlign: "left", display: "block", padding: "12px 16px", background: item.unread > 0 ? `${TOKENS.moss}08` : "#fff", cursor: "pointer", border: "none", borderBottom: `1px solid ${TOKENS.line}` }}
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>

@@ -44,6 +44,7 @@ const TESTS = [
   { file: "test_v2_48.cjs",                   label: "v2.48 HIGH (빌드/로딩/샘플/에러)" },
   { file: "test_v2_49.cjs",                   label: "v2.49 MEDIUM (A11Y/URL/WebP/CSV)" },
   { file: "test_v2_50.cjs",                   label: "v2.50 채팅 인박스 드롭다운" },
+  { file: "test_v2_51.cjs",                   label: "v2.51 역제안 알림+구별" },
   // ── 발표 준비 ──
   { file: "test_h2_quicklogin.cjs",           label: "H-2 퀵로그인" },
   { file: "test_h3_farm_deals.cjs",           label: "H-3 농가 딜찾기" },
