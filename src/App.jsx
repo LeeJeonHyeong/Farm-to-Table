@@ -2150,12 +2150,32 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
 }
 
 const SORT_OPTIONS = [
-  { value: "smart", label: "내 전문 품목 우선" },
+  { value: "aiScore", label: "✦ AI 추천순" },
   { value: "latest", label: "최신순" },
+  { value: "oldest", label: "가장 오래된 순" },
   { value: "priceAsc", label: "단가 낮은순" },
   { value: "priceDesc", label: "단가 높은순" },
   { value: "proposals", label: "제안 많은순" },
 ];
+
+function calcDealAttractionScore(deal, farmProfile) {
+  let score = 0;
+  const specialty = new Set(farmProfile?.specialty ?? []);
+  // 전문 품목 매칭 — 가장 중요
+  if (specialty.size > 0 && specialty.has(deal.crop)) score += 40;
+  // 희망 단가 — 높을수록 유리
+  if (deal.targetPrice >= 50000) score += 20;
+  else if (deal.targetPrice >= 30000) score += 15;
+  else if (deal.targetPrice >= 15000) score += 10;
+  else score += 5;
+  // 경쟁 강도 — 제안 수 적을수록 유리
+  const pCount = (deal.proposals || []).length;
+  score += pCount === 0 ? 20 : pCount <= 2 ? 15 : pCount <= 5 ? 8 : pCount <= 10 ? 3 : 0;
+  // 신선도 — 최신 딜 우선
+  const ageDays = (Date.now() - (deal.createdAt || 0)) / 86400000;
+  score += ageDays < 1 ? 20 : ageDays < 3 ? 14 : ageDays < 7 ? 8 : 2;
+  return score;
+}
 
 function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, onRateChef, onRespondCounterOffer, chatUnreads = {} }) {
   const isMobile = useIsMobile();
@@ -2800,7 +2820,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
   const [gradeFilter, setGradeFilter] = useState("전체");
   const hasSpecialty = (farmProfile?.specialty?.length ?? 0) > 0;
   const [specialtyOnly, setSpecialtyOnly] = useState(false);
-  const [sortBy, setSortBy] = useState(hasSpecialty ? "smart" : "latest");
+  const [sortBy, setSortBy] = useState("aiScore");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [regionFilter, setRegionFilter] = useState("전체");
   const [dateFrom, setDateFrom] = useState("");
@@ -2876,6 +2896,8 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
       return true;
     })
     .sort((a, b) => {
+      if (sortBy === "aiScore") return calcDealAttractionScore(b, farmProfile) - calcDealAttractionScore(a, farmProfile);
+      if (sortBy === "oldest") return a.createdAt - b.createdAt;
       if (sortBy === "smart") {
         const aMatch = specialty.has(a.crop) ? 0 : 1;
         const bMatch = specialty.has(b.crop) ? 0 : 1;
@@ -2889,9 +2911,9 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
     });
 
   const hasAdvanced = dateFrom || dateTo || qtyMin || qtyMax || priceMin || priceMax;
-  const hasFilters = search || specialtyOnly || cropFilter !== "전체" || gradeFilter !== "전체" || cycleFilter !== "전체" || regionFilter !== "전체" || sortBy !== (hasSpecialty ? "smart" : "latest") || hasAdvanced;
+  const hasFilters = search || specialtyOnly || cropFilter !== "전체" || gradeFilter !== "전체" || cycleFilter !== "전체" || regionFilter !== "전체" || sortBy !== "aiScore" || hasAdvanced;
   const resetFilters = () => {
-    setSearch(""); setSpecialtyOnly(false); setCropFilter("전체"); setGradeFilter("전체"); setCycleFilter("전체"); setRegionFilter("전체"); setSortBy(hasSpecialty ? "smart" : "latest");
+    setSearch(""); setSpecialtyOnly(false); setCropFilter("전체"); setGradeFilter("전체"); setCycleFilter("전체"); setRegionFilter("전체"); setSortBy("aiScore");
     setDateFrom(""); setDateTo(""); setQtyMin(""); setQtyMax(""); setPriceMin(""); setPriceMax("");
   };
 
@@ -3103,11 +3125,31 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
             </button>
           ))}
 
+        </div>
+
+        {/* 정렬 행 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>정렬</span>
+          {[
+            { value: "aiScore", label: "✦ AI 추천순" },
+            { value: "latest", label: "최신순" },
+            { value: "oldest", label: "오래된 순" },
+          ].map((o) => (
+            <button key={o.value} type="button" onClick={() => setSortBy(o.value)} style={{
+              padding: "7px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+              border: `1px solid ${sortBy === o.value ? TOKENS.ink : TOKENS.line}`,
+              background: sortBy === o.value ? TOKENS.ink : "#FFFFFF",
+              color: sortBy === o.value ? "#FFFFFF" : TOKENS.inkSoft,
+              fontWeight: sortBy === o.value ? 600 : 400,
+            }}>
+              {o.label}
+            </button>
+          ))}
           {!isMobile && <div style={{ flex: 1 }} />}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            style={{ ...inputStyle, width: "auto", fontSize: 12, padding: "4px 10px", color: TOKENS.inkSoft }}
+            style={{ ...inputStyle, width: "auto", fontSize: 11, padding: "4px 10px", color: TOKENS.inkSoft }}
           >
             {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
