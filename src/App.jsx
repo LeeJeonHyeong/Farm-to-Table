@@ -340,6 +340,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     id: "d1",
     chefName: "테이블나인",
     chefRegion: "서울 용산",
+    deliveryAddress: "서울 용산구 이태원동 123-45 테이블나인 레스토랑",
     crop: "토마토",
     sizeCondition: "지름 5cm 이상",
     ripeness: "라이트레드",
@@ -418,6 +419,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     id: "d3",
     chefName: "오마카세 료",
     chefRegion: "서울 강남",
+    deliveryAddress: "서울 강남구 청담동 88-12 오마카세 료 지하 1층",
     crop: "딸기",
     sizeCondition: "25g 이상 균일",
     ripeness: "완숙(레드 100%)",
@@ -762,6 +764,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     id: "d_match",
     chefName: "테이블나인",
     chefRegion: "서울 용산",
+    deliveryAddress: "서울 용산구 이태원동 123-45 테이블나인 레스토랑",
     crop: "딸기",
     sizeCondition: "25g 이상 균일",
     ripeness: "완숙(레드 100%)",
@@ -804,6 +807,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     id: "d_done",
     chefName: "테이블나인",
     chefRegion: "서울 용산",
+    deliveryAddress: "서울 용산구 이태원동 123-45 테이블나인 레스토랑",
     crop: "무화과",
     sizeCondition: "개당 60g 이상",
     ripeness: "완숙",
@@ -856,6 +860,15 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
 // AdminScreen·DashboardScreen 공통 섹션 스타일
 const SECTION_LABEL_STYLE = { fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 };
 const sectionCardStyle = (isMobile) => ({ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? "16px 14px" : "20px 20px", marginBottom: 14 });
+
+// 납품 주소를 동 수준까지만 마스킹
+function maskAddress(addr) {
+  if (!addr) return "";
+  const m = addr.match(/^([\s\S]*?(?:동|읍|면|리))(?:\s|$)/);
+  if (m) return m[1].trim();
+  // 동/읍/면/리 없으면 앞 3토큰만 (시/구 수준)
+  return addr.split(" ").slice(0, 3).join(" ");
+}
 
 function chipBadge(bg, color) {
   return {
@@ -1396,6 +1409,7 @@ const DEAL_FIELD_REQUIRED = {
   quantity: "필요 수량",
   deliveryDate: "희망 납품일",
   targetPrice: "희망 단가",
+  deliveryAddress: "납품 장소",
 };
 
 const DEAL_STEPS = [
@@ -1464,7 +1478,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   const isCloning = !!cloningFrom;
   const blank = {
     chefName: defaultChefName, chefRegion: defaultChefRegion, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
-    grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "", photoURL: "",
+    grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "", photoURL: "", deliveryAddress: "",
   };
   const [dealId] = useState(() => isEditing ? editingDeal.id : `d${Date.now()}`);
   const [step, setStep] = useState(1);
@@ -1545,7 +1559,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     1: ["chefName", "crop"],
     2: ["sizeCondition"],
     3: ["quantity"],
-    4: ["deliveryDate", "targetPrice"],
+    4: ["deliveryDate", "targetPrice", "deliveryAddress"],
   };
 
   const validateStep = (s) => {
@@ -1786,6 +1800,19 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
               )}
             </div>
           </div>
+          <FieldLabel required>납품 장소</FieldLabel>
+          <input
+            type="text"
+            placeholder="예: 서울 용산구 이태원동 123-45 ○○빌딩 3층"
+            value={data.deliveryAddress || ""}
+            onChange={(e) => update("deliveryAddress", e.target.value)}
+            style={inputStyle}
+          />
+          <div style={{ fontSize: 11, color: TOKENS.moss, marginTop: 4, marginBottom: 2 }}>
+            🔒 체결 전에는 농가에게 동(洞) 단위까지만 공개됩니다
+          </div>
+          {errors.deliveryAddress && <ErrorText text={errors.deliveryAddress} />}
+
           <FieldLabel>추가 요청사항 (선택)</FieldLabel>
           <textarea
             rows={3} placeholder="예: 콩피용으로 사용해 균일한 크기가 중요합니다"
@@ -1835,7 +1862,8 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
             </div>
             <div style={{ fontSize: 13, color: TOKENS.inkSoft, lineHeight: 1.8 }}>
               필요 수량 {data.quantity}kg · 희망단가 {Number(data.targetPrice || 0).toLocaleString()}원/kg<br />
-              희망 납품일 {data.deliveryDate}
+              희망 납품일 {data.deliveryDate}<br />
+              {data.deliveryAddress && <>납품 장소 {data.deliveryAddress}</>}
             </div>
             {data.note && <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10 }}>"{data.note}"</p>}
           </div>
@@ -2350,7 +2378,17 @@ function MyProposalDetailView({ deal, proposal, onBack, onCancel, onOpenChat, on
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
           <div>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: TOKENS.ink }}>{deal.crop}</div>
-            <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginTop: 3 }}>{deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""}</div>
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginTop: 3 }}>
+              {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""}
+              {deal.deliveryAddress && (
+                <span style={{ marginLeft: 6 }}>
+                  {isSelected
+                    ? <span style={{ color: TOKENS.moss, fontWeight: 500 }}>📍 {deal.deliveryAddress}</span>
+                    : <span title="체결 후 전체 주소 공개">📍 {maskAddress(deal.deliveryAddress)}</span>
+                  }
+                </span>
+              )}
+            </div>
           </div>
           <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 999, background: isSelected ? TOKENS.mossSoft : isRejected ? TOKENS.line : isClosed ? TOKENS.rustSoft : "#FEF3C7", color: statusColor }}>
             {statusLabel}
@@ -2547,6 +2585,9 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
             </div>
             <div style={{ fontSize: 13, color: TOKENS.inkSoft, marginTop: 4 }}>
               {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""}
+              {deal.deliveryAddress && (
+                <span style={{ marginLeft: 6 }} title="체결 후 상세 주소 공개">📍 {maskAddress(deal.deliveryAddress)}</span>
+              )}
             </div>
           </div>
           <StatusBadge status={deal.status} />
@@ -3182,7 +3223,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
                 </div>
               </div>
               <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 2 }}>
-                {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
+                {deal.chefName}{deal.chefRegion ? ` · ${deal.chefRegion}` : ""}{deal.deliveryAddress ? ` · 📍 ${maskAddress(deal.deliveryAddress)}` : ""} · 희망단가 {deal.targetPrice.toLocaleString()}원/kg · {deal.quantity}kg
               </div>
               <DealSummaryRow deal={deal} />
               <div style={{ fontSize: 11, color: TOKENS.inkSoft, marginBottom: myProposal ? 10 : 0 }}>
@@ -6877,7 +6918,7 @@ function ContractModal({ deal, proposal, onClose, userRole, onSign }) {
           {/* 계약 당사자 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 28 }}>
             {[
-              { role: "갑 (매수인 / BUYER)", name: deal.chefName, sub1: `지역: ${deal.chefRegion || "미입력"}`, sub2: "역할: 레스토랑" },
+              { role: "갑 (매수인 / BUYER)", name: deal.chefName, sub1: `납품지: ${deal.deliveryAddress || deal.chefRegion || "미입력"}`, sub2: "역할: 레스토랑" },
               { role: "을 (매도인 / SELLER)", name: proposal.farmName, sub1: `담당: ${proposal.farmerName || proposal.farmName}`, sub2: `인증: ${proposal.cert || "인증 없음"}` },
             ].map(({ role, name, sub1, sub2 }) => (
               <div key={role} style={{ border: "1px solid #E0E0E0", borderRadius: 8, padding: 16 }}>
@@ -6922,7 +6963,7 @@ function ContractModal({ deal, proposal, onClose, userRole, onSign }) {
               <tbody>
                 {row("납품 예정일", proposal.availableDate || deal.deliveryDate)}
                 {row("납품 주기", deal.cycle || "단발성(1회)")}
-                {row("납품 장소", deal.chefRegion || "별도 협의")}
+                {row("납품 장소", deal.deliveryAddress || deal.chefRegion || "별도 협의")}
               </tbody>
             </table>
           </div>
@@ -7858,8 +7899,8 @@ export default function FarmToTableApp() {
     const base = deal.deliveryDate && deal.deliveryDate > new Date().toISOString().slice(0, 10)
       ? new Date(deal.deliveryDate) : new Date();
     const next = new Date(base.getTime() + days * 86400000).toISOString().slice(0, 10);
-    const { crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion } = deal;
-    setCloningDeal({ crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryDate: next, _isNextCycle: true, _prevDealId: deal.id });
+    const { crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryAddress } = deal;
+    setCloningDeal({ crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion, deliveryAddress, deliveryDate: next, _isNextCycle: true, _prevDealId: deal.id });
     setEditingDeal(null);
     setTab("create");
   };
