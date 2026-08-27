@@ -5104,7 +5104,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {}, userId = "", onNextCycle, onAnswerInquiry, onSendCounterOffer }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {}, userId = "", onNextCycle, onAnswerInquiry, onSendCounterOffer, newDealId = null }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -5309,6 +5309,11 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                 {deal.closeReason === "expired" && (
                   <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px" }}>
                     납품일 만료
+                  </span>
+                )}
+                {deal.id === newDealId && (
+                  <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: "#fff", background: TOKENS.moss, borderRadius: 4, padding: "1px 6px", fontWeight: 700, letterSpacing: "0.03em" }}>
+                    NEW
                   </span>
                 )}
                 <StatusBadge status={deal.status} />
@@ -6920,6 +6925,7 @@ export default function FarmToTableApp() {
   const unreadNotifCount = notifHistory.filter((n) => !n.read).length;
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+  const [newDealId, setNewDealId] = useState(null);
 
   useEffect(() => {
     _recordNotif = (notif) => {
@@ -7519,6 +7525,8 @@ export default function FarmToTableApp() {
     persistDeal(newDeal);
     setTab("mydeals");
     setToastMsg("✅ 딜이 등록됐습니다!");
+    setNewDealId(newDeal.id);
+    setTimeout(() => setNewDealId(null), 5000);
   };
 
   const handleSubmitProposal = (dealId, proposal) => {
@@ -7940,6 +7948,10 @@ export default function FarmToTableApp() {
         @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeSlideUp { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
         .ftt-screen-enter { animation: fadeSlideIn 0.25s ease; }
+        @keyframes ftt-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .ftt-tab-content { animation: ftt-fade 0.15s ease; }
+        @keyframes ftt-pulse { 0%, 100% { transform: scale(1); } 60% { transform: scale(1.3); } }
+        .ftt-badge-pulse { animation: ftt-pulse 2s ease-in-out infinite; display: inline-flex; align-items: center; justify-content: center; }
 
         /* ===== 선택된 제안 하이라이트 ===== */
         .ftt-proposal-selected {
@@ -8073,7 +8085,7 @@ export default function FarmToTableApp() {
               >
                 🔔
                 {unreadNotifCount > 0 && (
-                  <span style={{ position: "absolute", top: -4, right: -4, background: TOKENS.rust, color: "#fff", borderRadius: 999, fontSize: 9, fontWeight: 700, minWidth: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "'IBM Plex Mono', monospace" }}>
+                  <span className="ftt-badge-pulse" style={{ position: "absolute", top: -4, right: -4, background: TOKENS.rust, color: "#fff", borderRadius: 999, fontSize: 9, fontWeight: 700, minWidth: 14, height: 14, padding: "0 3px", fontFamily: "'IBM Plex Mono', monospace" }}>
                     {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
                   </span>
                 )}
@@ -8146,9 +8158,8 @@ export default function FarmToTableApp() {
               {t.key === "browse" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{openCount}</span>}
               {t.key === "mydeals" && <span style={{ marginLeft: 6, fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{myDeals.length}</span>}
               {t.badge > 0 && (
-                <span style={{
+                <span className="ftt-badge-pulse" style={{
                   marginLeft: 6,
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
                   minWidth: 16, height: 16, borderRadius: 999,
                   background: TOKENS.rust, color: "#fff",
                   fontSize: 10, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace",
@@ -8202,7 +8213,7 @@ export default function FarmToTableApp() {
             onBack={() => setChatTarget(null)}
           />
         ) : (
-          <>
+          <div key={tab} className="ftt-tab-content">
             {tab === "create" && (
               <div style={{ position: "relative" }}>
                 {/* 왼쪽 사이드 일러스트 — 해바라기·토마토·호박 */}
@@ -8683,7 +8694,7 @@ export default function FarmToTableApp() {
                     <rect x="54" y="211" width="52" height="9" rx="3" fill="#B44A28"/>
                   </svg>
                 )}
-                <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} onAnswerInquiry={handleAnswerInquiry} onSendCounterOffer={handleSendCounterOffer} />
+                <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} onAnswerInquiry={handleAnswerInquiry} onSendCounterOffer={handleSendCounterOffer} newDealId={newDealId} />
               </div>
             )}
             {/* ── 내 농가 ── */}
@@ -9037,7 +9048,7 @@ export default function FarmToTableApp() {
               </div>
             )}
             {tab === "admin" && isAdmin && <AdminScreen deals={deals} chats={chats} onDeleteDeal={handleDeleteDeal} onCloseDeal={handleCloseDeal} onCompleteDeal={handleCompleteDeal} />}
-          </>
+          </div>
         )}
       </div>
       <Toast message={toastMsg} onClose={() => setToastMsg(null)} />
