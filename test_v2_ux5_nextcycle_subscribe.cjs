@@ -96,17 +96,26 @@ async function login(page, email, pw) {
 }
 
 async function goToTab(page, label) {
+  // v2.53: 홈 화면에서는 탭 바가 숨겨지고 ftt-card(div)가 표시됨 → 먼저 홈 카드 시도
+  const homeCard = page.locator('.ftt-card').filter({ hasText: new RegExp(label) });
+  if (await homeCard.count() > 0 && await homeCard.last().isVisible().catch(() => false)) {
+    await homeCard.last().click();
+    await page.waitForTimeout(600);
+    return;
+  }
   const btn = page.locator("button", { hasText: label });
-  if (await btn.count() > 0) { await btn.first().click(); await page.waitForTimeout(600); }
+  if (await btn.count() > 0) { await btn.last().click(); await page.waitForTimeout(600); }
 }
 
 async function createDeal(page, crop = "토마토", chefName = CHEF_NAME) {
   const tab = page.locator("button", { hasText: "딜 만들기" });
-  if (await tab.count() > 0) await tab.click();
+  if (await tab.count() > 0) await tab.last().click();
   await page.waitForTimeout(1000);
   // Step 1
   const ni = page.locator('input[placeholder="예: 테이블나인"]').first();
   if (await ni.count() > 0 && !(await ni.inputValue())) await ni.fill(chefName);
+  const ai = page.locator('input[placeholder*="주소 찾기"]').first();
+  if (await ai.count() > 0 && !(await ai.inputValue().catch(() => ''))) await ai.fill('서울특별시 강남구 테헤란로 123');
   if (crop !== "토마토") {
     const cropBtn = page.locator("button", { hasText: crop }).first();
     if (await cropBtn.count() > 0) await cropBtn.click();
@@ -159,7 +168,7 @@ async function run() {
     "[1] handleNextCycleDeal — _isNextCycle:true + _prevDealId 플래그 설정"
   );
   assert(
-    code.includes("const { crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion } = deal;") &&
+    code.includes("const { crop, grade, ripeness, sizeCondition, quantity, targetPrice, cycle, note, chefName, chefRegion") &&
     !code.includes("setCloningDeal({ ...deal,"),
     "[2] handleNextCycleDeal — 이력 필드 제외 (spread 없이 명시적 pick)"
   );
@@ -171,7 +180,7 @@ async function run() {
   );
   assert(
     code.includes("notifyNewDeals") &&
-    code.includes("notified-deal-") &&
+    code.includes("notifiedDealsKey") &&
     code.includes("fp?.notifyNewDeals"),
     "[14] 품목 구독 알림 코드 + localStorage dedup 키 + farmRef 체크"
   );

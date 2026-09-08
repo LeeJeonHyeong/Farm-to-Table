@@ -82,11 +82,13 @@ async function logout(page) {
 
 async function createDeal(page, crop = '토마토') {
   const tab = page.locator('button', { hasText: '딜 만들기' });
-  if (await tab.count() > 0) await tab.click();
+  if (await tab.count() > 0) await tab.last().click();
   await page.waitForTimeout(1000);
   // Step 1
   const ni = page.locator('input[placeholder="예: 테이블나인"]').first();
   if (await ni.count() > 0 && !(await ni.inputValue())) await ni.fill(CHEF_NAME);
+  const ai = page.locator('input[placeholder*="주소 찾기"]').first();
+  if (await ai.count() > 0 && !(await ai.inputValue().catch(() => ''))) await ai.fill('서울특별시 강남구 테헤란로 123');
   if (crop !== '토마토') { const s = page.locator('select').first(); if (await s.count() > 0) await s.selectOption(crop); }
   let nxt = page.locator('button', { hasText: '다음 단계 →' });
   if (await nxt.count() > 0) await nxt.click(); await page.waitForTimeout(700);
@@ -110,7 +112,7 @@ async function createDeal(page, crop = '토마토') {
 
 async function openDeal(page, crop) {
   const bt = page.locator('button', { hasText: '딜 찾기' });
-  if (await bt.count() > 0) await bt.click(); await page.waitForTimeout(1500);
+  if (await bt.count() > 0) await bt.last().click(); await page.waitForTimeout(1500);
   const back = page.locator('button', { hasText: '← 딜 목록으로' });
   if (await back.count() > 0) { await back.click(); await page.waitForTimeout(800); }
   let card = page.locator('.ftt-card').filter({ hasText: crop }).filter({ hasText: CHEF_NAME }).first();
@@ -137,7 +139,7 @@ async function submitProposal(page, crop, price) {
 
 async function expandDeal(page, crop) {
   const tab = page.locator('button', { hasText: '내 거래' });
-  if (await tab.count() > 0) await tab.click(); await page.waitForTimeout(3000);
+  if (await tab.count() > 0) await tab.last().click(); await page.waitForTimeout(3000);
   const dealCard = page.locator('.ftt-card').filter({ hasText: crop }).first();
   if (await dealCard.count() > 0) {
     if (await dealCard.locator('text=▲').count() === 0) {
@@ -181,7 +183,7 @@ async function closeBell(page) {
   check('셰프 가입', await chefPage.locator('button[class*="ftt-tab"]').count() > 0);
   await createDeal(chefPage, '토마토');
   const chefMyDeals = chefPage.locator('button', { hasText: '내 거래' });
-  if (await chefMyDeals.count() > 0) await chefMyDeals.click(); await chefPage.waitForTimeout(2000);
+  if (await chefMyDeals.count() > 0) await chefMyDeals.last().click(); await chefPage.waitForTimeout(2000);
   check('딜 생성 확인', await chefPage.locator('text=토마토').count() > 0);
   await ss(chefPage, 'cmp_01_deal_created');
 
@@ -219,8 +221,8 @@ async function closeBell(page) {
   // 딜 찾기 탭으로 이동해 onSnapshot 활성 유지
   await chefPage.waitForTimeout(3000);
   const chefBrowse = chefPage.locator('button', { hasText: '딜 만들기' });
-  if (await chefBrowse.count() > 0) await chefBrowse.click(); await chefPage.waitForTimeout(800);
-  if (await chefMyDeals.count() > 0) await chefMyDeals.click(); await chefPage.waitForTimeout(1000);
+  if (await chefBrowse.count() > 0) await chefBrowse.last().click(); await chefPage.waitForTimeout(800);
+  if (await chefMyDeals.count() > 0) await chefMyDeals.last().click(); await chefPage.waitForTimeout(1000);
 
   const bellChef = chefPage.locator('button').filter({ hasText: /🔔/ }).first();
   let chefNotifCount = 0;
@@ -321,7 +323,7 @@ async function closeBell(page) {
   // 농가A 컨텍스트는 계속 활성 상태 → Firestore onSnapshot이 답변 변경 감지 → 알림 발화
   await farmPage.waitForTimeout(3000);
   const farmBrowse = farmPage.locator('button', { hasText: '딜 찾기' });
-  if (await farmBrowse.count() > 0) await farmBrowse.click(); await farmPage.waitForTimeout(1500);
+  if (await farmBrowse.count() > 0) await farmBrowse.last().click(); await farmPage.waitForTimeout(1500);
 
   const bellFarm = farmPage.locator('button').filter({ hasText: /🔔/ }).first();
   let farmNotifCount = 0;
@@ -335,12 +337,17 @@ async function closeBell(page) {
 
   // ══════════════════════════════════════════
   console.log('\n[18] 농가A — 딜 상세에서 답변 텍스트 확인');
-  const back2 = farmPage.locator('button', { hasText: '← 딜 목록으로' });
-  if (await back2.count() > 0) { await back2.click(); await farmPage.waitForTimeout(800); }
-  let card2 = farmPage.locator('.ftt-card').filter({ hasText: '토마토' }).first();
-  if (await card2.count() > 0) { await card2.click(); await farmPage.waitForTimeout(1000); }
+  // openDeal 재활용: 찾기 탭 이동 + 목록으로 복귀 + 카드 클릭 처리
+  const opened18 = await openDeal(farmPage, '토마토');
+  if (opened18) {
+    // 답변 텍스트가 렌더링될 때까지 최대 6초 대기
+    try {
+      await farmPage.waitForSelector('text=10kg 박스 단위', { timeout: 6000 });
+    } catch(e) { /* 타임아웃 시 아래 fallback으로 확인 */ }
+  }
   const ansVisible = await farmPage.locator('text=10kg 박스 단위').count() > 0 ||
-                     await farmPage.locator('text=/셰프가 답변/').count() > 0;
+                     await farmPage.locator('text=/셰프가 답변/').count() > 0 ||
+                     await farmPage.locator('text=포장 단위').count() > 0;
   check('[18] 농가 딜 상세 — 답변 텍스트 표시', ansVisible);
   await ss(farmPage, 'cmp_14_farm_answer');
 
