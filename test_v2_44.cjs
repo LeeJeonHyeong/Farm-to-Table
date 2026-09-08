@@ -16,7 +16,7 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 
-const BASE = "http://localhost:5186";
+const BASE = "http://localhost:5173";
 const APP_JSX = "c:/Users/USER/Desktop/D.N.A/farm-to-table-project/farm-to-table-project/src/App.jsx";
 const TS = Date.now();
 

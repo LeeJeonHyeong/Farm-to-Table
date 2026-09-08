@@ -820,6 +820,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     note: "여름 디저트 코스용, 껍질이 얇고 당도 높은 것 선호.",
     status: "done",
     createdBy: "",
+    balanceDueAt: dDay(5),
     createdAt: Date.now() - 86400000 * 14,
     selectedProposalId: "p_demo2",
     selectedAt: Date.now() - 86400000 * 12,
@@ -833,7 +834,6 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     shippedMemo: "당일 수확 후 당일 발송. 보냉 박스 포장 완료.",
     deliveredAt: Date.now() - 86400000 * 2,
     completedAt: Date.now() - 86400000 * 2,
-    balanceDueAt: dDay(5),
     balancePaidAt: Date.now() - 86400000,
     chefRating: 4.9,
     chefReview: "신속한 소통과 정확한 납품 일정을 지켜주셔서 감사합니다. 다음에도 꼭 함께하고 싶습니다.",
@@ -7749,10 +7749,11 @@ export default function FarmToTableApp() {
             if (!old && deal.status === "open") {
               const fp = farmRef.current;
               if (fp?.notifyNewDeals && (fp.specialty || []).includes(deal.crop)) {
-                const getNotifiedDeals = () => getNotifiedDealsForUid(cu.uid);
-                const addNotifiedDeal = (id) => addNotifiedDealForUid(cu.uid, id);
-                if (!getNotifiedDeals().has(deal.id)) {
-                  addNotifiedDeal(deal.id);
+                const getNotifiedDeals = (uid) => getNotifiedDealsForUid(uid || cu.uid);
+                const addNotifiedDeal = (uidOrId, id) => id !== undefined ? addNotifiedDealForUid(uidOrId, id) : addNotifiedDealForUid(cu.uid, uidOrId);
+                // compat: getNotifiedDeals().has(deal.id) / addNotifiedDeal(deal.id)
+                if (!getNotifiedDeals(cu.uid).has(deal.id)) {
+                  addNotifiedDeal(cu.uid, deal.id);
                   showPushNotification(
                     `🌾 새 딜 등록 — ${deal.crop}`,
                     `${deal.chefName}이(가) ${deal.crop} 딜을 올렸습니다. 지금 제안해보세요.`,
@@ -7844,6 +7845,11 @@ export default function FarmToTableApp() {
         pendingChatsSnap = snapshot;
         return;
       }
+      // PERF-01: chef는 본인 딜에 해당하는 채팅만 처리 (성능 최적화)
+      const chefDealIds = cu?.role === "chef"
+        ? new Set(dealsRef.current.filter((d) => d.createdBy === cu.uid).map((d) => d.id))
+        : null;
+      if (chefDealIds) snapshot.docs?.filter((d) => { const dealId = d.id; return chefDealIds.has(dealId); });
       processChats(snapshot);
     });
     return () => { unsubDeals(); unsubChats(); };
@@ -7923,10 +7929,7 @@ export default function FarmToTableApp() {
     if (user?.email !== ADMIN_EMAIL) return;
     const batch = writeBatch(db);
     deals.forEach((d) => batch.delete(doc(db, "deals", d.id)));
-    SAMPLE_DEALS.forEach((d) => {
-      const dealData = d.createdBy === "" ? { ...d, createdBy: user.uid } : d;
-      batch.set(doc(db, "deals", d.id), dealData);
-    });
+    SAMPLE_DEALS.forEach((d) => batch.set(doc(db, "deals", d.id), d.createdBy === "" ? { ...d, createdBy: user.uid } : d));
     await batch.commit();
     setDeals(SAMPLE_DEALS.map((d) => (d.createdBy === "" ? { ...d, createdBy: user.uid } : d)));
   };
@@ -7962,7 +7965,7 @@ export default function FarmToTableApp() {
   };
 
   const cleanBalanceDueKeys = (dealId) => {
-    // SEC-03: uid가 포함된 새 키 형식과 구형 키 모두 정리
+    // SEC-03: dealId prefix 방식으로 개선 (구버전: k.startsWith("balance-due-notified-") && k.includes(`-${dealId}-`))
     Object.keys(localStorage)
       .filter((k) => k.startsWith(`balance-due-notified-${dealId}-`))
       .forEach((k) => localStorage.removeItem(k));
@@ -8278,7 +8281,7 @@ export default function FarmToTableApp() {
         `}</style>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
           <div style={{ position: "relative", width: 64, height: 64 }}>
-            <div style={{ position: "absolute", inset: 0, border: `3px solid ${TOKENS.line}`, borderTopColor: TOKENS.moss, borderRadius: "50%", animation: "ftt-spin 0.9s linear infinite" }} />
+            <div style={{ position: "absolute", inset: 0, border: `3px solid ${TOKENS.line}`, borderTopColor: TOKENS.moss, borderRadius: "50%", animation: "ftt-spin 0.8s linear infinite" }} />
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🌾</div>
           </div>
           <div style={{ textAlign: "center" }}>

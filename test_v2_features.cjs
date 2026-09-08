@@ -82,17 +82,21 @@ async function logout(page) {
 // 딜 생성 (셰프) — 5단계 위저드
 async function createDeal(page) {
   const createTab = page.locator('button', { hasText: '딜 만들기' });
-  if (await createTab.count() > 0) await createTab.click();
+  if (await createTab.count() > 0) await createTab.last().click();
   await page.waitForTimeout(1000);
 
-  // Step 1: 레스토랑명 + 품목(select, 기본값 토마토)
-  // 레스토랑명이 비어 있으면 채우기
+  // Step 1: 레스토랑명 + 납품 장소 + 품목
   const nameInput = page.locator('input[placeholder="예: 테이블나인"]').first();
   if (await nameInput.count() > 0) {
     const val = await nameInput.inputValue().catch(() => '');
     if (!val) await nameInput.fill(CHEF_NAME);
   }
-  // 품목 select은 기본값 "토마토" — 변경 불필요
+  // 납품 장소 직접 입력
+  const addrInput = page.locator('input[placeholder*="주소 찾기"]').first();
+  if (await addrInput.count() > 0) {
+    const addrVal = await addrInput.inputValue().catch(() => '');
+    if (!addrVal) await addrInput.fill('서울특별시 강남구 테헤란로 123');
+  }
   const next1 = page.locator('button', { hasText: '다음 단계 →' });
   if (await next1.count() > 0) await next1.click();
   await page.waitForTimeout(700);
@@ -137,7 +141,7 @@ async function createDeal(page) {
 // 제안 보내기 (농가) — CHEF_NAME으로 우리 딜을 특정하여 제안
 async function submitProposal(page) {
   const browseTab = page.locator('button', { hasText: '딜 찾기' });
-  if (await browseTab.count() > 0) await browseTab.click();
+  if (await browseTab.count() > 0) await browseTab.last().click();
   await page.waitForTimeout(2500);
 
   // 우리 셰프의 딜을 이름으로 찾기 (CHEF_NAME으로 찾다가 없으면 첫 토마토)
@@ -182,7 +186,7 @@ async function submitProposal(page) {
 // 제안 선택 (셰프) — 딜 카드 클릭 금지 (toggle로 접힘 방지)
 async function selectProposal(page) {
   const myDealsTab = page.locator('button', { hasText: '내 거래' });
-  if (await myDealsTab.count() > 0) await myDealsTab.click();
+  if (await myDealsTab.count() > 0) await myDealsTab.last().click();
   await page.waitForTimeout(4000); // Firebase 동기화 대기
 
   // deals[0]는 자동 확장됨 — 클릭 없이 "이 농가 선택하기" 버튼 탐색
@@ -246,7 +250,7 @@ async function selectProposal(page) {
   console.log('\n[3] 딜 생성');
   await createDeal(page);
   const myDealsTab = page.locator('button', { hasText: '내 거래' });
-  if (await myDealsTab.count() > 0) await myDealsTab.click();
+  if (await myDealsTab.count() > 0) await myDealsTab.last().click();
   await page.waitForTimeout(2000);
   const dealCardCount = await page.locator('text=토마토').count();
   check('딜 생성 후 내 거래에 토마토 카드 표시', dealCardCount > 0);
@@ -274,7 +278,7 @@ async function selectProposal(page) {
   // selectProposal()에서 이미 "내 거래" 탭에 있고 딜이 자동 확장 상태
   // 딜 헤더 클릭 시 toggle로 접히므로 절대 클릭 금지!
   const myDealsTab2 = page.locator('button', { hasText: '내 거래' });
-  if (await myDealsTab2.count() > 0) await myDealsTab2.click();
+  if (await myDealsTab2.count() > 0) await myDealsTab2.last().click();
   await page.waitForTimeout(1500);
 
   // 딜은 deals[0] 자동 확장 → 바로 "납품 추적" 확인
@@ -308,7 +312,7 @@ async function selectProposal(page) {
   await login(page, FARM_EMAIL, PW);
 
   const myProposalTab = page.locator('button', { hasText: '내 제안' });
-  if (await myProposalTab.count() > 0) await myProposalTab.click();
+  if (await myProposalTab.count() > 0) await myProposalTab.last().click();
   await page.waitForTimeout(1500);
 
   // MyProposalsScreen 리스트에서는 "선택됨" (이모지 없음), 상세 뷰에서만 "🎉 선택됨"
@@ -354,7 +358,7 @@ async function selectProposal(page) {
   // ══════════════════════════════════════════
   console.log('\n[11] SettlementCard D-day 표시 요소 확인');
   const myDealsTab3 = page.locator('button', { hasText: '내 거래' });
-  if (await myDealsTab3.count() > 0) await myDealsTab3.click();
+  if (await myDealsTab3.count() > 0) await myDealsTab3.last().click();
   await page.waitForTimeout(1000);
   const tomatoCard2 = page.locator('text=토마토').first();
   if (await tomatoCard2.count() > 0) await tomatoCard2.click();

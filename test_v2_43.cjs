@@ -14,7 +14,7 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 
-const BASE = "http://localhost:5184";
+const BASE = "http://localhost:5173";
 const APP_JSX = "c:/Users/USER/Desktop/D.N.A/farm-to-table-project/farm-to-table-project/src/App.jsx";
 const TS = Date.now();
 
@@ -73,7 +73,9 @@ async function signup(page, email, pw, role, name) {
 }
 
 async function goToTab(page, label) {
-  const btn = page.locator("button", { hasText: label });
+  const card = page.locator("button.ftt-card", { hasText: label });
+  if (await card.count() > 0) { await card.first().click(); await page.waitForTimeout(1500); return; }
+  const btn = page.locator("button.ftt-tab", { hasText: label });
   if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1500); }
 }
 

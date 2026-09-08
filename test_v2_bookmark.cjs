@@ -90,7 +90,7 @@ async function logout(page) {
 
 async function createDeal(page, crop) {
   const createTab = page.locator('button', { hasText: '딜 만들기' });
-  if (await createTab.count() > 0) await createTab.click();
+  if (await createTab.count() > 0) await createTab.last().click();
   await page.waitForTimeout(1000);
 
   // Step 1
@@ -98,6 +98,11 @@ async function createDeal(page, crop) {
   if (await nameInput.count() > 0) {
     const val = await nameInput.inputValue().catch(() => '');
     if (!val) await nameInput.fill(CHEF_NAME);
+  }
+  const addrInput = page.locator('input[placeholder*="주소 찾기"]').first();
+  if (await addrInput.count() > 0) {
+    const addrVal = await addrInput.inputValue().catch(() => '');
+    if (!addrVal) await addrInput.fill('서울특별시 강남구 테헤란로 123');
   }
   const cropSelect = page.locator('select').first();
   if (await cropSelect.count() > 0) await cropSelect.selectOption(crop);
@@ -143,7 +148,7 @@ async function createDeal(page, crop) {
 // 딜 찾기로 이동 + 상세 페이지 닫기
 async function goToBrowse(page) {
   const browseTab = page.locator('button', { hasText: '딜 찾기' });
-  if (await browseTab.count() > 0) await browseTab.click();
+  if (await browseTab.count() > 0) await browseTab.last().click();
   await page.waitForTimeout(1500);
   const backBtn = page.locator('button', { hasText: '← 딜 목록으로' });
   if (await backBtn.count() > 0) { await backBtn.click(); await page.waitForTimeout(800); }
@@ -178,7 +183,7 @@ function bookmarkBtn(page, idx = 0) {
 
   // 딜 2건 목록 확인 (내 거래)
   const myDealsTab = page.locator('button', { hasText: '내 거래' });
-  if (await myDealsTab.count() > 0) await myDealsTab.click();
+  if (await myDealsTab.count() > 0) await myDealsTab.last().click();
   await page.waitForTimeout(2000);
   const chefDealCards = await page.locator('.ftt-card').count();
   check('셰프 딜 2건 등록', chefDealCards >= 2);
