@@ -81,8 +81,6 @@ async function goToTab(page, label) {
   if (await card.count() > 0) { await card.first().click(); await page.waitForTimeout(1500); return; }
   const btn = page.locator("button.ftt-tab", { hasText: label });
   if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1500); }
-});
-  if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1200); }
 }
 
 async function run() {
