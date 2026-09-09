@@ -80,12 +80,13 @@ async function signup(page, email, pw, role, name) {
   const nameInput = page.locator(`input[placeholder="${ph}"]`).first();
   if (await nameInput.count() > 0) await nameInput.fill(name);
   await page.locator("button", { hasText: /가입하기$/ }).last().click();
-  await page.waitForTimeout(5000);
+  // Wait for actual signup completion
+  await page.waitForSelector('button.ftt-card, button.ftt-tab', { timeout: 20000 }).catch(() => {});
   if (await page.locator('button[class*="ftt-tab"], button.ftt-card').count() === 0) {
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', pw);
     await page.locator("button", { hasText: /로그인$/ }).last().click();
-    await page.waitForTimeout(5000);
+    await page.waitForSelector('button.ftt-card, button.ftt-tab', { timeout: 20000 }).catch(() => {});
   }
   await dismissOverlays(page);
 }
@@ -101,7 +102,8 @@ async function login(page, email, pw) {
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', pw);
   await page.locator("button", { hasText: /로그인$/ }).last().click();
-  await page.waitForTimeout(5000);
+  // Wait for logged-in UI (ftt-card home landing or ftt-tab)
+  await page.waitForSelector('button.ftt-card, button.ftt-tab', { timeout: 20000 }).catch(() => {});
   await dismissOverlays(page);
 }
 
