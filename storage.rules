@@ -1,24 +1,18 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // 셰프 프로필 사진: 본인만 쓰기, 전체 읽기
-    match /images/chef-profile/{userId}.jpg {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 2 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-    }
-    // 농가 프로필 사진: 본인만 쓰기, 전체 읽기
-    match /images/farm-profile/{userId}.jpg {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 2 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-    }
-    // 딜 사진: 인증된 유저만 쓰기, 전체 읽기
-    match /images/deal/{fileName} {
-      allow read: if true;
+    // 실제 업로드 경로는 images/<uid>/<이름> 이다 (App.jsx ImageUpload의 storagePath):
+    //   images/<uid>/chef_profile, images/<uid>/farm_profile,
+    //   images/<uid>/cert, images/<uid>/crop_<dealId>
+    // 이전 버전은 images/chef-profile/<uid>.jpg 를 매칭해 앱 경로와 전혀 맞지 않았다.
+    match /images/{userId}/{fileName} {
+      // 상대방(셰프↔농가)이 사진을 봐야 하므로 로그인 사용자에게는 열어둔다.
+      // getDownloadURL이 발급하는 토큰 URL은 이 규칙과 무관하게 동작한다.
+      allow read: if request.auth != null;
+
+      // 업로드는 본인 경로에만. 업로드 산출물은 canvas webp 이다.
       allow write: if request.auth != null
+                   && request.auth.uid == userId
                    && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }

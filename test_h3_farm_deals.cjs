@@ -2,10 +2,10 @@
  * H-3 검증: 농가 계정으로 딜 찾기 탭에 시연 딜이 표시되는지 확인
  */
 const { chromium } = require("playwright");
+const { demoCreds } = require("./load_env.cjs");
 
 const BASE = "http://localhost:5173";
-const FARM_EMAIL = "demo.farm@ftt-demo.kr";
-const PW = "fttDemo2026!";
+const { farmEmail: FARM_EMAIL, farmPw: PW } = demoCreds();
 
 async function dismissOverlays(page) {
   for (let i = 0; i < 8; i++) {

@@ -3,11 +3,15 @@
  * 셰프 + 농가 데모 계정을 Firebase에 생성하고 자격증명을 출력합니다.
  */
 const { chromium } = require("playwright");
+const { demoCreds } = require("./load_env.cjs");
 
 const BASE = "http://localhost:5173";
-const CHEF_EMAIL = "demo.chef@ftt-demo.kr";
-const FARM_EMAIL = "demo.farm@ftt-demo.kr";
-const PW = "fttDemo2026!";
+
+// 자격증명은 저장소에 두지 않는다. .env.local이 유일한 출처다.
+const {
+  chefEmail: CHEF_EMAIL, chefPw: CHEF_PW,
+  farmEmail: FARM_EMAIL, farmPw: FARM_PW,
+} = demoCreds();
 
 async function dismissOverlays(page) {
   for (let i = 0; i < 8; i++) {
@@ -78,24 +82,19 @@ async function run() {
 
   // 셰프 계정
   console.log(`▶ 셰프 계정 생성: ${CHEF_EMAIL}`);
-  const chefOk = await createAccount(page, CHEF_EMAIL, PW, "chef", "데모 레스토랑");
+  const chefOk = await createAccount(page, CHEF_EMAIL, CHEF_PW, "chef", "데모 레스토랑");
   console.log(chefOk ? "  ✅ 셰프 계정 준비 완료" : "  ❌ 셰프 계정 생성 실패");
 
   // 농가 계정
   console.log(`\n▶ 농가 계정 생성: ${FARM_EMAIL}`);
-  const farmOk = await createAccount(page, FARM_EMAIL, PW, "farm", "데모 농장");
+  const farmOk = await createAccount(page, FARM_EMAIL, FARM_PW, "farm", "데모 농장");
   console.log(farmOk ? "  ✅ 농가 계정 준비 완료" : "  ❌ 농가 계정 생성 실패");
 
   await browser.close();
 
   if (chefOk && farmOk) {
     console.log("\n============================================");
-    console.log(".env.local에 추가할 내용:");
-    console.log("============================================");
-    console.log(`VITE_DEMO_CHEF_EMAIL=${CHEF_EMAIL}`);
-    console.log(`VITE_DEMO_CHEF_PW=${PW}`);
-    console.log(`VITE_DEMO_FARM_EMAIL=${FARM_EMAIL}`);
-    console.log(`VITE_DEMO_FARM_PW=${PW}`);
+    console.log("두 계정 모두 .env.local의 자격증명으로 로그인 확인됨.");
     console.log("============================================\n");
     process.exit(0);
   } else {
