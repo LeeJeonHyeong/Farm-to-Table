@@ -52,7 +52,12 @@ async function dismissOverlays(page) {
 
 async function signup(page, email, pw, role, name) {
   await page.goto(BASE);
-  await page.waitForSelector('input[type="email"]', { timeout: 20000 });
+  try {
+    await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+  } catch {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector('input[type="email"]', { timeout: 25000 });
+  }
   const toSignup = page.locator("button", { hasText: /가입/ }).first();
   if (await toSignup.count() > 0) await toSignup.click();
   await page.waitForTimeout(400);
@@ -64,12 +69,12 @@ async function signup(page, email, pw, role, name) {
   const nameInput = page.locator(`input[placeholder="${ph}"]`).first();
   if (await nameInput.count() > 0) await nameInput.fill(name);
   await page.locator("button", { hasText: /가입하기$/ }).last().click();
-  await page.waitForTimeout(3000);
-  if (await page.locator('button[class*="ftt-tab"]').count() === 0) {
+  await page.waitForTimeout(5000);
+  if (await page.locator('button[class*="ftt-tab"], button.ftt-card').count() === 0) {
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', pw);
     await page.locator("button", { hasText: /로그인$/ }).last().click();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
   }
   await dismissOverlays(page);
 }
