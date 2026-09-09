@@ -21,7 +21,13 @@ npm run dev
 ├── package.json
 ├── vite.config.js
 ├── firebase.json
-├── firestore.rules
+├── firestore.rules        # Firestore 보안 규칙 (배포됨)
+├── storage.rules          # Storage 보안 규칙 (Storage 미활성화로 미배포)
+├── run_tests.cjs          # E2E 통합 러너 (test_*.cjs 35개 순차 실행)
+├── load_env.cjs           # .env.local 로더 (Node 스크립트용)
+├── rotate_demo_password.cjs # 데모 계정 비밀번호 교체
+├── api
+│   └── groq/[...path].js  # Groq 프록시 (Vercel 서버리스, 경로·모델·레이트리밋 제한)
 ├── public
 │   ├── sw.js               # Service Worker (웹 푸시 알림, 오프라인 캐싱)
 │   ├── manifest.json       # PWA 매니페스트
@@ -50,35 +56,60 @@ npm run dev
 - 인증은 **Firebase Authentication** (이메일/비밀번호) 을 사용합니다.
 - 세션 데이터(`current-user`)만 localStorage에 저장되며, 로그인 상태는 Firebase Auth가 자동 유지합니다.
 - `onSnapshot` 실시간 동기화로 딜 목록과 채팅이 즉시 반영됩니다.
-- AI 자동 입력은 **Groq API (Llama 3.3 70B)** 를 사용하며, 실패 시 규칙 기반 한국어 파서로 폴백합니다.
+- AI 자동 입력·매칭 코멘트는 **Groq API (`qwen/qwen3.8-27b`)** 를 사용하며, 실패 시 규칙 기반 한국어 파서로 폴백합니다. 키를 클라이언트에 노출하지 않기 위해 Vercel 서버리스 함수 [`api/groq/[...path].js`](api/groq/[...path].js)를 프록시로 경유하며, 경로·메서드·모델·본문 크기를 고정하고 출처 검사와 레이트리밋을 적용합니다.
+- **이미지는 Firestore에 base64 data URL로 저장됩니다.** 코드에는 Firebase Storage 업로드 경로(`images/<uid>/<이름>`)가 있으나 이 프로젝트는 Storage를 활성화한 적이 없어 업로드가 항상 실패하고 base64 폴백으로 동작합니다 (향후 과제 참고).
 - **웹 푸시 알림**은 Web Notification API + Service Worker로 구현됩니다 (Firebase Functions 불필요).
 
 ### Firestore 보안 규칙
 
+실제 규칙은 [`firestore.rules`](firestore.rules)에 있습니다. 아래는 설계 요약입니다.
+
 ```
-# storage 컬렉션 (프로필 등): value 필드 문자열 구조만 허용, user-profile은 본인만 쓰기
-allow read: if true;
-allow write: if request.auth != null
-             && request.resource.data.keys().hasAll(['value'])
-             && request.resource.data.value is string
-             && request.resource.data.value.size() < 1048576
-             && (!key.matches('user-profile-.*') ||
-                 key == 'user-profile-' + request.auth.uid);
+# storage 컬렉션 — 키는 예외 없이 '<접두어>-<uid>' 형태
+#   읽기: 본인 키 + chef-profile-*(농가가 딜 작성자 조회) + 관리자
+#   목록 조회: 관리자만 (관리자 사용자 목록 화면 전용)
+#   쓰기: 본인 키만 + { value } 문자열 1MB 이하
+allow get: if isOwnKey(key)
+           || (isSignedIn() && key.matches('chef-profile-.*'))
+           || isAdmin();
+allow list: if isAdmin();
+allow create, update: if isOwnKey(key)
+                      && request.resource.data.keys().hasOnly(['value'])
+                      && request.resource.data.value is string
+                      && request.resource.data.value.size() < 1048576;
+
+# deals 컬렉션
+#   읽기: 인증 필요 (로그인 없이는 앱이 렌더되지 않으므로 열어둘 이유가 없음)
+allow get, list: if isSignedIn();
+allow create: if isSignedIn()
+              && request.resource.data.createdBy == request.auth.uid;
+
+#   수정: 소유자·관리자는 전체. 비소유자(농가)는 아래 필드만 변경 가능하고
+#   price·quantity·deliveryAddress·createdBy·contractSignedChefAt·
+#   depositPaidAt·balancePaidAt 는 잠긴다 (결제·서명 위조 차단)
+allow update: if isOwner() || isAdmin()
+              || (isSignedIn() && farmWritableOnly()
+                  && farmStatusOk() && farmDeliveryOk());
+#     farmWritableOnly: proposals, inquiries, deliveryStatus, shippedAt,
+#       courierName, trackingNumber, shippedPhotoURL, shippedMemo,
+#       contractSignedFarmAt, chefRating, chefReview, chefRatedAt,
+#       selectedProposalId, status, selectedAt
+#     farmStatusOk:   농가는 status 를 'matched' 로만 (done·closed 불가)
+#     farmDeliveryOk: 농가는 deliveryStatus 를 'shipped' 로만 (delivered 는 셰프)
+
+allow delete: if isOwner() || isAdmin();
 
 # chats 컬렉션: 인증된 유저만 읽기/쓰기
-allow read, write: if request.auth != null;
-
-# deals 컬렉션: 읽기 전체 허용
-allow read: if true;
-# 생성: createdBy 필드가 반드시 본인 uid
-allow create: if request.auth != null
-              && request.resource.data.createdBy == request.auth.uid;
-# 수정: 인증된 유저 (셰프 딜 수정 + 농가 제안 추가 모두 허용)
-allow update: if request.auth != null;
-# 삭제: 딜 생성자(셰프)만 가능
-allow delete: if request.auth != null
-              && resource.data.createdBy == request.auth.uid;
+#   참여자 단위로 좁히지 못한 상태다. 채팅 문서에는 messages 만 있고 메시지에는
+#   senderName/senderRole 만 담기며 proposals 에도 농가 uid 가 없어 규칙이 대조할
+#   uid 가 데이터에 존재하지 않는다. 또 앱이 chats 컬렉션 전체를 구독하므로 문서
+#   단위 제한을 걸면 목록 조회 자체가 거부된다. participants 필드 추가와 구독
+#   쿼리 필터링이 선행돼야 한다 (향후 과제).
+allow read, write: if isSignedIn();
 ```
+
+관리자는 규칙에서 이메일로 강제합니다. 앱의 `ADMIN_EMAIL`(`VITE_ADMIN_EMAIL`) 비교는
+UI 표시 전용이며, 규칙 파일은 클라이언트로 전송되지 않습니다.
 
 ## 주요 기능
 
@@ -270,6 +301,9 @@ allow delete: if request.auth != null
 | v2.50 E2E | `test_v2_50.cjs` — 14/14 통과 (정적 코드 12종 + 브라우저 UI 2종) |
 | 버그 수정 | 채팅창 유지 버그 수정 — 탭 전환 시(`handleTabClick`) 및 로그아웃 시(`handleLogout`) `setChatTarget(null)` 추가, 다른 화면으로 이동해도 채팅창이 남는 문제·다른 계정 로그인 시 이전 채팅창 잔존 문제 해결 |
 | 납품 장소 기능 | 딜 생성 Step 4에 "납품 장소" 필수 입력 추가 (상세 주소), 체결 전 농가에게 동(洞) 단위까지만 마스킹 공개(`maskAddress`), 딜 체결(농가 선택) 후 선택된 농가에게 전체 주소 공개, 딜 찾기 목록·상세·내 제안 화면에 📍 아이콘으로 표시, 계약서·명세서에 전체 주소 반영, 다음 회차 딜 복제 시 납품 장소 승계 |
+| E2E 안정화 | v2.53 홈 랜딩 도입 후 깨진 테스트 13개 수정 — 탭 바가 `display:none`이 되면서 DOM 순서상 숨겨진 `button.ftt-tab`이 보이는 `button.ftt-card`보다 먼저 잡히던 문제(`goToTab` 헬퍼 `ftt-card` 우선 조회로 교체), 로그인·가입 후 고정 대기(5초) → `waitForSelector('button.ftt-card, button.ftt-tab')` 교체로 Firebase 지연 내성 확보 (스위트 후반부에서만 실패하던 원인) → **35/35 통과** |
+| 보안 강화 | 감사에서 확인된 배포 환경 악용 경로 차단 — Firestore 규칙 전면 재작성(storage 교차 쓰기 차단·미인증 읽기 제거·deals 필드 단위 분리로 결제/서명 위조 차단·관리자 서버 강제), Groq 프록시 오픈 릴레이 잠금, 데모 계정 자격증명 저장소 분리 및 비밀번호 교체. 규칙 실서비스 배포 후 E2E 35/35 재검증 |
+| 버그 수정 | 규칙 배포로 드러난 로그인 화면 회귀 — 공유 데이터 로드가 `authChecked`만 확인하고 `user`는 보지 않아 로그인 전에도 `getDocs(deals)`를 호출, 새 규칙이 거부하며 `loadState="error"` → 에러 렌더 분기가 로그인 분기보다 앞에 있어 로그인 폼이 가려졌다. 렌더 분기에 `user` 조건 추가 + 로그인 전 조회 차단 + 로그아웃 후 미인증 구독 정리 |
 
 ### v1.6 상세 내역
 
@@ -1532,7 +1566,81 @@ allow delete: if request.auth != null
 
 ---
 
+### 보안 강화 상세 내역
+
+감사에서 나온 항목 중 **배포된 앱에서 실제로 악용 가능한 것**들을 우선 처리했습니다.
+
+**1. Firestore 규칙 (`firestore.rules`)**
+
+기존 규칙의 소유권 검사가 `user-profile-*` 만 커버했으나 실제 키는 `farm-profile-<uid>`,
+`chef-profile-<uid>`, `farm-bookmarks-<uid>` 등이었습니다. 결과적으로 로그인한 셰프가
+임의 농가의 프로필을 덮어쓸 수 있었습니다. 앱의 모든 `storage.set` 호출부가 자기 uid만
+사용하는 것을 확인한 뒤, 키가 `-<본인 uid>`로 끝나야 쓰기를 허용하도록 바꿨습니다.
+
+`deals` 수정은 `allow update: if request.auth != null` 이어서 로그인만 하면 아무 딜이나
+고칠 수 있었습니다. 특히 `depositPaidAt`·`balancePaidAt` 결제 플래그가 서버 검증 없이
+클라이언트에서만 기록돼 "결제 완료" 위조가 가능했습니다.
+`diff().affectedKeys().hasOnly()` 로 농가가 정당하게 쓰는 15개 필드만 허용하고, 나머지는
+소유자 전용으로 잠갔습니다. 농가는 `status`를 `matched`까지만, `deliveryStatus`를
+`shipped`까지만 바꿀 수 있어 완료·마감·수령확인도 위조되지 않습니다.
+
+`storage`·`deals`의 미인증 읽기(`allow read: if true`)도 제거했습니다. `deals`에는
+납품 주소가 평문으로 담겨 있어 REST 호출 한 번으로 전체 주소를 덤프할 수 있었고,
+`maskAddress`는 UI 전용이라 방어가 되지 않았습니다. 로그인 없이는 앱이 아무것도
+렌더하지 않으므로 열어둘 이유도 없었습니다.
+
+관리자 권한을 규칙에서 이메일로 강제했습니다. 부수적으로, 삭제 규칙이 딜 생성자만
+허용해 관리자 삭제가 조용히 실패하던 문제도 함께 해소됐습니다.
+
+**2. Groq 프록시 (`api/groq/[...path].js`)**
+
+인증·오리진 검사·경로 제한·레이트리밋이 전부 없이 `req.query.path`를 그대로
+`api.groq.com`에 이어붙여 서버의 `GROQ_API_KEY`로 호출하고 있었습니다. URL만 알면
+누구나 키를 무제한으로 쓸 수 있는 오픈 릴레이였습니다. 경로를
+`openai/v1/chat/completions` 하나로 고정하고, POST 한정·모델 화이트리스트·본문 16KB 및
+`max_tokens` 상한·출처 검사·레이트리밋·업스트림 오류 본문 차단을 적용했습니다.
+호출부 두 곳이 실패 시 규칙 기반 폴백으로 degrade하므로 거부돼도 앱은 동작합니다.
+
+> 한계: 여전히 인증되지 않는 엔드포인트입니다. 출처 검사는 타 사이트 경유 호출과 단순
+> 스크래핑을 막을 뿐 헤더를 위조하는 직접 호출은 막지 못합니다. 완전한 차단에는
+> Firebase ID 토큰 검증이 필요합니다.
+
+**3. 데모 계정 자격증명**
+
+`setup_demo_accounts.cjs`와 테스트 3개에 비밀번호가 하드코딩돼 있었고, 해당 계정이 공유
+Firebase 프로젝트에 실존해 배포된 로그인 폼에 그대로 통과했습니다. 위 1~2번 취약점과
+합쳐지면 전체 쓰기 권한이 되는 조합이었습니다. 하드코딩을 제거하고 `.env.local`을 유일한
+출처로 만들었으며(`load_env.cjs`), 비밀번호는 Firebase에서 교체했습니다
+(`rotate_demo_password.cjs` — 기존 비밀번호로 로그인 후 `updatePassword` 호출, 서비스
+계정 키 불필요). 이미 커밋 이력에 남은 값이라 파일 수정만으로는 무효화되지 않기 때문에
+실제 교체가 필요했습니다.
+
+**4. Storage 규칙**
+
+`storage.rules`는 `images/chef-profile/<uid>.jpg` 를 매칭했으나 앱은
+`images/<uid>/cert` 형태를 씁니다. 그대로 배포하면 전 업로드가 거부돼 base64 폴백으로
+떨어지는 상태였습니다. 실제 경로에 맞게 재작성했지만, 배포 시도 중 **이 프로젝트에
+Firebase Storage가 설정된 적이 없다는 사실**이 확인됐습니다(콘솔 'Get Started' 미실행).
+즉 사진 업로드는 처음부터 실패해 왔습니다. `firebase.json`에 storage 블록을 두면
+`firebase deploy` 전체가 실패하므로 넣지 않았고, 활성화 절차를 `storage.rules` 주석에
+남겼습니다.
+
+**검증 방식**
+
+Java가 없어 Firestore 에뮬레이터를 띄울 수 없었고, 규칙을 배포하지 않은 상태의 E2E는
+기존 규칙을 상대로 돌기 때문에 새 규칙을 검증하지 못합니다. 그래서 배포가 첫 검증이
+됐고, 전체 스위트(약 15분) 전에 핵심 흐름 스모크 테스트를 먼저 돌려 회귀를 잡았습니다.
+최종적으로 배포된 규칙 상태에서 E2E 35/35를 확인했습니다.
+
+---
+
 ## 향후 과제
 
+- **채팅 참여자 제한** — 현재 모든 가입자가 임의 딜의 협상 대화를 읽고 메시지를 주입할 수 있습니다. 채팅 문서에 `participants: [uid, uid]` 필드를 추가하고 구독을 `where('participants','array-contains',uid)` 로 필터링해야 합니다. 앱이 `chats` 컬렉션 전체를 구독하는 성능 문제와 동일한 작업이며, 기존 문서 마이그레이션이 필요합니다.
+- **Firebase Storage 활성화** — 사진이 base64로 Firestore에 저장돼 문서가 비대해집니다. 콘솔에서 Storage를 켜고 `firebase.json`에 `"storage": { "rules": "storage.rules" }` 를 추가하면 정상화됩니다 (규칙은 이미 실제 경로에 맞게 준비돼 있음).
+- **Groq 프록시 인증** — Firebase ID 토큰 검증을 붙여야 키 도용을 실제로 막을 수 있습니다.
+- **초기 로드 중복 읽기 제거** — 로그인 시 `getDocs(deals)`·`getDocs(chats)` 프리페치 후 `onSnapshot` 첫 스냅샷이 같은 데이터를 다시 배달합니다. 프리페치를 제거하면 초기 읽기가 반감됩니다. 아울러 쿼리에 `where`/`limit`이 없어 모든 클라이언트가 앱 전체의 모든 메시지를 내려받습니다.
+- **테스트 러너 교체** — `run_tests.cjs`가 `execSync` 순차 실행이고 `stdio:"pipe"`로 실패 출력을 버려 실패 시 "오류" 한 줄만 남습니다. `@playwright/test`로 옮기면 병렬 워커(15분→2~3분)·자동 재시도(Firebase 타이밍 flakiness 흡수)·실패 trace를 얻습니다.
+- **App.jsx 분리** — 단일 파일 9,600여 줄입니다. 모든 컴포넌트가 이미 모듈 스코프에 있고 데이터가 props로만 흘러 분리는 기계적인 파일 이동입니다. 다만 테스트 약 20개가 App.jsx **소스 텍스트**를 검사하므로(`code.includes(...)`) 파일을 쪼개면 함께 깨집니다. 테스트 전략 정리가 선행돼야 합니다.
 - 앱스토어 등록 (PWA → Capacitor/Cordova 래핑 또는 TWA)
 - 최종 발표 준비 및 비즈니스 모델 고도화 (10월)
