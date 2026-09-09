@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_v2_28_29.cjs
  * v2.28 alert→Toast + 푸시 알림 아이콘 / v2.29 북마크 Firestore 동기화 + Firebase Storage
  *
@@ -99,7 +99,11 @@ async function login(page, email, pw) {
 }
 
 async function goToTab(page, label) {
-  const btn = page.locator("button", { hasText: label });
+  const card = page.locator("button.ftt-card", { hasText: label });
+  if (await card.count() > 0) { await card.first().click(); await page.waitForTimeout(1500); return; }
+  const btn = page.locator("button.ftt-tab", { hasText: label });
+  if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1500); }
+});
   if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1000); }
 }
 

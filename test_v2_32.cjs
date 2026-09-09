@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_v2_32.cjs
  * v2.32 — 알림 dedup 키 누적 방지 + 결제 pending Firestore 병행 저장
  *
@@ -77,7 +77,11 @@ async function signup(page, email, pw, role, name) {
 }
 
 async function goToTab(page, label) {
-  const btn = page.locator("button", { hasText: label });
+  const card = page.locator("button.ftt-card", { hasText: label });
+  if (await card.count() > 0) { await card.first().click(); await page.waitForTimeout(1500); return; }
+  const btn = page.locator("button.ftt-tab", { hasText: label });
+  if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1500); }
+});
   if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1200); }
 }
 
