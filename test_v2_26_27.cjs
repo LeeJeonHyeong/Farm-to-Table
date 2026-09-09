@@ -63,7 +63,12 @@ async function dismissOverlays(page) {
 
 async function signup(page, email, pw, role, name) {
   await page.goto(BASE);
-  await page.waitForSelector('input[type="email"]', { timeout: 12000 });
+  try {
+    await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+  } catch {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector('input[type="email"]', { timeout: 20000 });
+  }
   const toSignup = page.locator("button", { hasText: /가입/ }).first();
   if (await toSignup.count() > 0) await toSignup.click();
   await page.waitForTimeout(400);
@@ -75,23 +80,28 @@ async function signup(page, email, pw, role, name) {
   const nameInput = page.locator(`input[placeholder="${ph}"]`).first();
   if (await nameInput.count() > 0) await nameInput.fill(name);
   await page.locator("button", { hasText: /가입하기$/ }).last().click();
-  await page.waitForTimeout(3000);
-  if (await page.locator('button[class*="ftt-tab"]').count() === 0) {
+  await page.waitForTimeout(5000);
+  if (await page.locator('button[class*="ftt-tab"], button.ftt-card').count() === 0) {
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', pw);
     await page.locator("button", { hasText: /로그인$/ }).last().click();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
   }
   await dismissOverlays(page);
 }
 
 async function login(page, email, pw) {
   await page.goto(BASE);
-  await page.waitForSelector('input[type="email"]', { timeout: 12000 });
+  try {
+    await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+  } catch {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector('input[type="email"]', { timeout: 20000 });
+  }
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', pw);
   await page.locator("button", { hasText: /로그인$/ }).last().click();
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(5000);
   await dismissOverlays(page);
 }
 
@@ -241,20 +251,23 @@ async function run() {
     await login(farmPage, FARM_EMAIL, PW);
 
     // [6] 내 농가 탭 진입
-    const farmTabBtn = farmPage.locator("button", { hasText: "내 농가" }).first();
-    if (await farmTabBtn.count() > 0) {
-      await farmTabBtn.click({ force: true });
-      await farmPage.waitForTimeout(1500);
+    const farmCard = farmPage.locator("button.ftt-card", { hasText: "내 농가" });
+    if (await farmCard.count() > 0) { await farmCard.first().click(); await farmPage.waitForTimeout(1500); }
+    else {
+      const farmTabBtn = farmPage.locator("button.ftt-tab", { hasText: "내 농가" }).first();
+      if (await farmTabBtn.count() > 0) { await farmTabBtn.click({ force: true }); await farmPage.waitForTimeout(1500); }
     }
     let farmScreenLoaded = false;
     try {
-      await farmPage.waitForSelector('input[placeholder="예: 신선팜"]', { timeout: 5000 });
+      await farmPage.waitForSelector('input[placeholder="예: 신선팜"]', { timeout: 6000 });
       farmScreenLoaded = true;
     } catch (e) {
-      await farmPage.locator("button", { hasText: "내 농가" }).first().click({ force: true }).catch(() => {});
+      const farmCard2 = farmPage.locator("button.ftt-card", { hasText: "내 농가" });
+      if (await farmCard2.count() > 0) { await farmCard2.first().click(); }
+      else { await farmPage.locator("button", { hasText: "내 농가" }).first().click({ force: true }).catch(() => {}); }
       await farmPage.waitForTimeout(2000);
       try {
-        await farmPage.waitForSelector('input[placeholder="예: 신선팜"]', { timeout: 4000 });
+        await farmPage.waitForSelector('input[placeholder="예: 신선팜"]', { timeout: 5000 });
         farmScreenLoaded = true;
       } catch (_) {}
     }
