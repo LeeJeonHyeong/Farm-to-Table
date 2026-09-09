@@ -250,21 +250,22 @@ async function run() {
     const farmPage = await farmCtx.newPage();
     await login(farmPage, FARM_EMAIL, PW);
 
-    // [6] 내 농가 탭 진입
-    const farmCard = farmPage.locator("button.ftt-card", { hasText: "내 농가" });
-    if (await farmCard.count() > 0) { await farmCard.first().click(); await farmPage.waitForTimeout(1500); }
-    else {
-      const farmTabBtn = farmPage.locator("button.ftt-tab", { hasText: "내 농가" }).first();
-      if (await farmTabBtn.count() > 0) { await farmTabBtn.click({ force: true }); await farmPage.waitForTimeout(1500); }
+    // [6] 내 농가 탭 진입 — ftt-card 우선(홈랜딩), 없으면 ftt-tab
+    const farmNavCard = farmPage.locator("button.ftt-card", { hasText: "내 농가" });
+    if (await farmNavCard.count() > 0) {
+      await farmNavCard.first().click({ force: true });
+    } else {
+      await farmPage.locator("button.ftt-tab", { hasText: "내 농가" }).first().click({ force: true }).catch(() => {});
     }
+    await farmPage.waitForTimeout(1500);
     let farmScreenLoaded = false;
     try {
       await farmPage.waitForSelector('input[placeholder="예: 신선팜"]', { timeout: 6000 });
       farmScreenLoaded = true;
     } catch (e) {
-      const farmCard2 = farmPage.locator("button.ftt-card", { hasText: "내 농가" });
-      if (await farmCard2.count() > 0) { await farmCard2.first().click(); }
-      else { await farmPage.locator("button", { hasText: "내 농가" }).first().click({ force: true }).catch(() => {}); }
+      const farmNavCard2 = farmPage.locator("button.ftt-card", { hasText: "내 농가" });
+      if (await farmNavCard2.count() > 0) { await farmNavCard2.first().click({ force: true }); }
+      else { await farmPage.locator("button.ftt-tab", { hasText: "내 농가" }).first().click({ force: true }).catch(() => {}); }
       await farmPage.waitForTimeout(2000);
       try {
         await farmPage.waitForSelector('input[placeholder="예: 신선팜"]', { timeout: 5000 });
