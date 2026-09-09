@@ -1,3 +1,9 @@
+// 주의: 이 프로젝트는 Firebase Storage를 아직 설정하지 않았다(콘솔에서 'Get Started'
+// 미실행). 그래서 사진 업로드는 전부 실패하고 App.jsx의 base64 data URL 폴백으로
+// Firestore에 저장된다. 이 파일도 배포된 적이 없다.
+// Storage를 켠 뒤에 firebase.json에 아래를 추가하면 이 규칙이 적용된다:
+//   "storage": { "rules": "storage.rules" }
+// 켜지 않은 상태로 추가하면 firebase deploy 전체가 실패한다.
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
