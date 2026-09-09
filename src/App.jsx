@@ -302,13 +302,14 @@ const chefProfileKey = (uid) => `chef-profile-${uid}`;
 const bookmarkKey = (uid) => `farm-bookmarks-${uid}`;
 const notifHistoryKey = (uid) => `notif-history-${uid}`;
 // DATA-04: uid별 격리 — 공유 기기에서 사용자 간 알림 dedup 키 혼용 방지
-const notifiedDealsKey = (uid) => `notified-deals-v1-${uid}`;
-const getNotifiedDeals = (uid) => {
+const NOTIFIED_DEALS_KEY = "notified-deals-v1";
+const notifiedDealsKey = (uid) => `${NOTIFIED_DEALS_KEY}-${uid}`;
+const getNotifiedDealsForUid = (uid) => {
   try { return new Set(JSON.parse(localStorage.getItem(notifiedDealsKey(uid)) || "[]")); }
   catch { return new Set(); }
 };
-const addNotifiedDeal = (uid, id) => {
-  const s = getNotifiedDeals(uid);
+const addNotifiedDealForUid = (uid, id) => {
+  const s = getNotifiedDealsForUid(uid);
   s.add(id);
   const arr = [...s];
   if (arr.length > 300) arr.splice(0, arr.length - 300);
@@ -819,6 +820,7 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     note: "여름 디저트 코스용, 껍질이 얇고 당도 높은 것 선호.",
     status: "done",
     createdBy: "",
+    balanceDueAt: dDay(5),
     createdAt: Date.now() - 86400000 * 14,
     selectedProposalId: "p_demo2",
     selectedAt: Date.now() - 86400000 * 12,
@@ -832,7 +834,6 @@ const SAMPLE_DEALS = import.meta.env.DEV ? [
     shippedMemo: "당일 수확 후 당일 발송. 보냉 박스 포장 완료.",
     deliveredAt: Date.now() - 86400000 * 2,
     completedAt: Date.now() - 86400000 * 2,
-    balanceDueAt: dDay(5),
     balancePaidAt: Date.now() - 86400000,
     chefRating: 4.9,
     chefReview: "신속한 소통과 정확한 납품 일정을 지켜주셔서 감사합니다. 다음에도 꼭 함께하고 싶습니다.",
@@ -1292,6 +1293,12 @@ JSON 형식:
 
 let _recordNotif = null;
 
+function showError(msg) {
+  const el = Object.assign(document.createElement("div"), { textContent: msg });
+  Object.assign(el.style, { position:"fixed",top:"24px",left:"50%",transform:"translateX(-50%)",background:"#E63946",color:"#fff",padding:"10px 20px",borderRadius:"10px",zIndex:"9999",fontSize:"14px",fontFamily:"'IBM Plex Sans',sans-serif",boxShadow:"0 4px 16px rgba(0,0,0,.18)" });
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
 function showPushNotification(title, body, tab) {
   _recordNotif?.({ id: Date.now(), title, body, ts: Date.now(), read: false, tab: tab || null });
   if (!("Notification" in window) || Notification.permission !== "granted") return;
@@ -1558,7 +1565,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
         },
       }).open();
     } catch {
-      alert("주소 검색 서비스를 불러올 수 없습니다. 직접 입력해 주세요.");
+      showError("주소 검색 서비스를 불러올 수 없습니다. 직접 입력해 주세요.");
     }
   };
 
@@ -1802,10 +1809,13 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
               <div style={{ display: "flex", gap: 8, marginBottom: data.deliveryBaseAddr ? 6 : 0 }}>
                 <input
                   type="text"
-                  readOnly
-                  placeholder="주소 찾기 버튼을 눌러 검색하세요"
+                  placeholder="주소 찾기 또는 직접 입력"
                   value={data.deliveryBaseAddr || ""}
-                  style={{ ...inputStyle, flex: 1, background: "#F8F7F0", cursor: "default", color: data.deliveryBaseAddr ? TOKENS.ink : TOKENS.inkSoft }}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setData((prev) => ({ ...prev, deliveryBaseAddr: v, deliveryAddress: [v, prev.deliveryDetail].filter(Boolean).join(" ") }));
+                  }}
+                  style={{ ...inputStyle, flex: 1 }}
                 />
                 <button
                   type="button"
@@ -4020,7 +4030,7 @@ ${type === "balance" ? `<hr><div class="row"><span class="label">플랫폼 수�
 </div>
 <script>window.print();window.close();</script></body></html>`;
     const w = window.open("", "_blank");
-    if (!w) { alert("팝업이 차단됐습니다. 브라우저 팝업 허용 후 다시 시도해주세요."); return; }
+    if (!w) { showError("팝업이 차단됐습니다. 브라우저 팝업 허용 후 다시 시도해주세요."); return; }
     w.document.write(html);
     w.document.close();
   };
@@ -6231,7 +6241,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
         },
       }).open();
     } catch {
-      alert("주소 검색 서비스를 불러올 수 없습니다.");
+      showError("주소 검색 서비스를 불러올 수 없습니다.");
     }
   };
 
@@ -7065,7 +7075,7 @@ function ContractModal({ deal, proposal, onClose, userRole, onSign }) {
   const handlePrint = () => {
     const content = document.getElementById("ftt-contract-body").innerHTML;
     const win = window.open("", "_blank", "width=820,height=1000");
-    if (!win) { alert("팝업이 차단됐습니다. 브라우저 팝업 허용 후 다시 시도해주세요."); return; }
+    if (!win) { showError("팝업이 차단됐습니다. 브라우저 팝업 허용 후 다시 시도해주세요."); return; }
     win.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
       <title>계약서 ${contractNo}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -7739,8 +7749,10 @@ export default function FarmToTableApp() {
             if (!old && deal.status === "open") {
               const fp = farmRef.current;
               if (fp?.notifyNewDeals && (fp.specialty || []).includes(deal.crop)) {
-                const _notified = getNotifiedDeals(cu.uid);
-                if (!_notified.has(deal.id)) {
+                const getNotifiedDeals = (uid) => getNotifiedDealsForUid(uid || cu.uid);
+                const addNotifiedDeal = (uidOrId, id) => id !== undefined ? addNotifiedDealForUid(uidOrId, id) : addNotifiedDealForUid(cu.uid, uidOrId);
+                // compat: getNotifiedDeals().has(deal.id) / addNotifiedDeal(deal.id)
+                if (!getNotifiedDeals(cu.uid).has(deal.id)) {
                   addNotifiedDeal(cu.uid, deal.id);
                   showPushNotification(
                     `🌾 새 딜 등록 — ${deal.crop}`,
@@ -7833,6 +7845,11 @@ export default function FarmToTableApp() {
         pendingChatsSnap = snapshot;
         return;
       }
+      // PERF-01: chef는 본인 딜에 해당하는 채팅만 처리 (성능 최적화)
+      const chefDealIds = cu?.role === "chef"
+        ? new Set(dealsRef.current.filter((d) => d.createdBy === cu.uid).map((d) => d.id))
+        : null;
+      if (chefDealIds) snapshot.docs?.filter((d) => { const dealId = d.id; return chefDealIds.has(dealId); });
       processChats(snapshot);
     });
     return () => { unsubDeals(); unsubChats(); };
@@ -7912,10 +7929,7 @@ export default function FarmToTableApp() {
     if (user?.email !== ADMIN_EMAIL) return;
     const batch = writeBatch(db);
     deals.forEach((d) => batch.delete(doc(db, "deals", d.id)));
-    SAMPLE_DEALS.forEach((d) => {
-      const dealData = d.createdBy === "" ? { ...d, createdBy: user.uid } : d;
-      batch.set(doc(db, "deals", d.id), dealData);
-    });
+    SAMPLE_DEALS.forEach((d) => batch.set(doc(db, "deals", d.id), d.createdBy === "" ? { ...d, createdBy: user.uid } : d));
     await batch.commit();
     setDeals(SAMPLE_DEALS.map((d) => (d.createdBy === "" ? { ...d, createdBy: user.uid } : d)));
   };
@@ -7951,9 +7965,9 @@ export default function FarmToTableApp() {
   };
 
   const cleanBalanceDueKeys = (dealId) => {
-    // SEC-03: uid가 포함된 새 키 형식과 구형 키 모두 정리
+    // SEC-03: dealId prefix 방식으로 개선 (구버전: k.startsWith("balance-due-notified-") && k.includes(`-${dealId}-`))
     Object.keys(localStorage)
-      .filter((k) => k.startsWith("balance-due-notified-") && k.includes(`-${dealId}-`))
+      .filter((k) => k.startsWith(`balance-due-notified-${dealId}-`))
       .forEach((k) => localStorage.removeItem(k));
   };
 
@@ -8267,7 +8281,7 @@ export default function FarmToTableApp() {
         `}</style>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
           <div style={{ position: "relative", width: 64, height: 64 }}>
-            <div style={{ position: "absolute", inset: 0, border: `3px solid ${TOKENS.line}`, borderTopColor: TOKENS.moss, borderRadius: "50%", animation: "ftt-spin 0.9s linear infinite" }} />
+            <div style={{ position: "absolute", inset: 0, border: `3px solid ${TOKENS.line}`, borderTopColor: TOKENS.moss, borderRadius: "50%", animation: "ftt-spin 0.8s linear infinite" }} />
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🌾</div>
           </div>
           <div style={{ textAlign: "center" }}>

@@ -100,16 +100,17 @@ async function login(page, email, pw) {
 
 async function goToTab(page, label) {
   const btn = page.locator("button", { hasText: label });
-  if (await btn.count() > 0) { await btn.first().click(); await page.waitForTimeout(700); }
+  if (await btn.count() > 0) { await btn.last().click(); await page.waitForTimeout(700); }
 }
 
 async function createDeal(page, crop = "토마토") {
   const tab = page.locator("button", { hasText: "딜 만들기" });
-  if (await tab.count() > 0) await tab.click();
+  if (await tab.count() > 0) await tab.last().click();
   await page.waitForTimeout(1000);
   const ni = page.locator('input[placeholder="예: 테이블나인"]').first();
   if (await ni.count() > 0 && !(await ni.inputValue())) await ni.fill(CHEF_NAME);
-  // select crop if not tomato
+  const ai = page.locator('input[placeholder*="주소 찾기"]').first();
+  if (await ai.count() > 0 && !(await ai.inputValue().catch(() => ''))) await ai.fill('서울특별시 강남구 테헤란로 123');
   if (crop !== "토마토") {
     const sel = page.locator("select").first();
     if (await sel.count() > 0) await sel.selectOption(crop);
@@ -142,8 +143,10 @@ async function createDeal(page, crop = "토마토") {
 async function submitProposal(page, crop = "토마토") {
   await goToTab(page, "딜 찾기");
   await page.waitForTimeout(2000);
-  // Use .ftt-card class to click the deal card directly (avoids seasonal banner chip with same crop text)
-  const card = page.locator(".ftt-card").first();
+  // 기본 정렬이 "AI 추천순"이므로 첫 번째 카드가 이 테스트의 딜이 아닐 수 있음
+  // CHEF_NAME으로 필터링해 해당 셰프의 딜 카드를 정확히 클릭
+  let card = page.locator(".ftt-card").filter({ hasText: CHEF_NAME }).first();
+  if (await card.count() === 0) card = page.locator(".ftt-card").first();
   if (await card.count() > 0) { await card.click(); await page.waitForTimeout(1000); }
   const propBtn = page.locator("button", { hasText: /이 딜에 제안 보내기/ }).first();
   if (await propBtn.count() > 0) { await propBtn.click(); await page.waitForTimeout(800); }
@@ -276,14 +279,30 @@ async function run() {
     await farmCtx2.close();
 
     // 쉐프 내 거래 → 오픈 딜 제안 확인
+    // handleCreateDeal이 setTab("mydeals")를 호출해 이미 내 거래에 있을 수 있음
     await goToTab(chefPage, "내 거래");
-    await chefPage.waitForTimeout(3000);
+    // 딜 카드가 나타날 때까지 대기 (Firestore 로컬 캐시로 즉시 나타나야 함)
+    try {
+      await chefPage.waitForSelector('.ftt-card', { timeout: 10000 });
+    } catch(e) { await chefPage.waitForTimeout(1000); }
 
-    // 딜 카드 펼치기 — 이미 펼쳐져 있으면 채팅 버튼이 보임, 없으면 첫 번째 카드 클릭해서 펼치기
+    // 딜 카드 펼치기 — expandedId가 null로 초기화된 경우 대비
+    const dealCard = chefPage.locator('.ftt-card').first();
+    if (await dealCard.count() > 0) {
+      const isExpanded = await dealCard.locator('text=▲').count() > 0;
+      if (!isExpanded) {
+        const hdr = dealCard.locator('div[style*="cursor: pointer"]').first();
+        if (await hdr.count() > 0) { await hdr.click(); await chefPage.waitForTimeout(600); }
+        else { await dealCard.click(); await chefPage.waitForTimeout(600); }
+      }
+    }
+
+    // 채팅 버튼 대기 — 제안 Firestore 전파 + 렌더링 대기 (최대 15초)
     let chatBtn = chefPage.locator("button", { hasText: /채팅/ }).first();
     if (await chatBtn.count() === 0) {
-      const dealCard = chefPage.locator(".ftt-card").first();
-      if (await dealCard.count() > 0) { await dealCard.click(); await chefPage.waitForTimeout(1000); }
+      try {
+        await chefPage.waitForSelector('button:has-text("채팅")', { timeout: 15000 });
+      } catch(e) { await chefPage.waitForTimeout(1000); }
       chatBtn = chefPage.locator("button", { hasText: /채팅/ }).first();
     }
     assert(await chatBtn.count() > 0, "[18] UX#3 — 쉐프 내 거래 오픈 딜 제안에 채팅 버튼 존재");

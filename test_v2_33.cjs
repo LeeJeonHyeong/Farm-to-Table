@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_v2_33.cjs
  * v2.33 — setTimeout 매직 넘버 제거 + 알림 내역 Firestore 연동
  *
@@ -76,8 +76,10 @@ async function signup(page, email, pw, role, name) {
 }
 
 async function goToTab(page, label) {
-  const btn = page.locator("button", { hasText: label });
-  if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1200); }
+  const card = page.locator("button.ftt-card", { hasText: label });
+  if (await card.count() > 0) { await card.first().click(); await page.waitForTimeout(1500); return; }
+  const btn = page.locator("button.ftt-tab", { hasText: label });
+  if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1500); }
 }
 
 async function run() {

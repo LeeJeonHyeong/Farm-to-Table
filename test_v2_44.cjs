@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_v2_44.cjs
  * v2.44 — MEDIUM 8개 항목 검증
  *
@@ -16,7 +16,7 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 
-const BASE = "http://localhost:5186";
+const BASE = "http://localhost:5173";
 const APP_JSX = "c:/Users/USER/Desktop/D.N.A/farm-to-table-project/farm-to-table-project/src/App.jsx";
 const TS = Date.now();
 
@@ -52,7 +52,12 @@ async function dismissOverlays(page) {
 
 async function signup(page, email, pw, role, name) {
   await page.goto(BASE);
-  await page.waitForSelector('input[type="email"]', { timeout: 20000 });
+  try {
+    await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+  } catch {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector('input[type="email"]', { timeout: 25000 });
+  }
   const toSignup = page.locator("button", { hasText: /가입/ }).first();
   if (await toSignup.count() > 0) await toSignup.click();
   await page.waitForTimeout(400);
@@ -64,18 +69,20 @@ async function signup(page, email, pw, role, name) {
   const nameInput = page.locator(`input[placeholder="${ph}"]`).first();
   if (await nameInput.count() > 0) await nameInput.fill(name);
   await page.locator("button", { hasText: /가입하기$/ }).last().click();
-  await page.waitForTimeout(3000);
-  if (await page.locator('button[class*="ftt-tab"]').count() === 0) {
+  await page.waitForTimeout(5000);
+  if (await page.locator('button[class*="ftt-tab"], button.ftt-card').count() === 0) {
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', pw);
     await page.locator("button", { hasText: /로그인$/ }).last().click();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
   }
   await dismissOverlays(page);
 }
 
 async function goToTab(page, label) {
-  const btn = page.locator("button", { hasText: label });
+  const card = page.locator("button.ftt-card", { hasText: label });
+  if (await card.count() > 0) { await card.first().click(); await page.waitForTimeout(1500); return; }
+  const btn = page.locator("button.ftt-tab", { hasText: label });
   if (await btn.count() > 0) { await btn.first().click({ force: true }); await page.waitForTimeout(1500); }
 }
 

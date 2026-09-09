@@ -87,14 +87,19 @@ async function logout(page) {
 // 딜 생성 (셰프) — crop 파라미터로 품목 지정
 async function createDeal(page, crop = '토마토') {
   const createTab = page.locator('button', { hasText: '딜 만들기' });
-  if (await createTab.count() > 0) await createTab.click();
+  if (await createTab.count() > 0) await createTab.last().click();
   await page.waitForTimeout(1000);
 
-  // Step 1: 레스토랑명 + 품목
+  // Step 1: 레스토랑명 + 납품 장소 + 품목
   const nameInput = page.locator('input[placeholder="예: 테이블나인"]').first();
   if (await nameInput.count() > 0) {
     const val = await nameInput.inputValue().catch(() => '');
     if (!val) await nameInput.fill(CHEF_NAME);
+  }
+  const addrInput = page.locator('input[placeholder*="주소 찾기"]').first();
+  if (await addrInput.count() > 0) {
+    const addrVal = await addrInput.inputValue().catch(() => '');
+    if (!addrVal) await addrInput.fill('서울특별시 강남구 테헤란로 123');
   }
   if (crop !== '토마토') {
     const cropSelect = page.locator('select').first();
@@ -144,7 +149,7 @@ async function createDeal(page, crop = '토마토') {
 // DealDetailView가 열려 있으면 먼저 목록으로 돌아감
 async function openDealInBrowse(page, crop) {
   const browseTab = page.locator('button', { hasText: '딜 찾기' });
-  if (await browseTab.count() > 0) await browseTab.click();
+  if (await browseTab.count() > 0) await browseTab.last().click();
   await page.waitForTimeout(1500);
 
   // DealDetailView가 열려 있으면 "← 딜 목록으로" 클릭
@@ -201,7 +206,7 @@ async function submitProposal(page, crop = '토마토') {
 // 내 거래 탭에서 crop 딜 확장
 async function expandDealInMyDeals(page, crop) {
   const myDealsTab = page.locator('button', { hasText: '내 거래' });
-  if (await myDealsTab.count() > 0) await myDealsTab.click();
+  if (await myDealsTab.count() > 0) await myDealsTab.last().click();
   await page.waitForTimeout(4000);
 
   const dealCard = page.locator('.ftt-card').filter({ hasText: crop }).first();
@@ -259,7 +264,7 @@ async function selectProposal(page, crop = '토마토') {
 
   await createDeal(page, '토마토');
   const myDealsTabRef = page.locator('button', { hasText: '내 거래' });
-  if (await myDealsTabRef.count() > 0) await myDealsTabRef.click();
+  if (await myDealsTabRef.count() > 0) await myDealsTabRef.last().click();
   await page.waitForTimeout(2000);
   check('딜 A (토마토) 생성 확인', await page.locator('text=토마토').count() > 0);
   await screenshot(page, 'ux_01_deal_a');
@@ -267,7 +272,7 @@ async function selectProposal(page, crop = '토마토') {
   // ══════════════════════════════════════════
   console.log('\n[3] 딜 B (딸기) 생성');
   await createDeal(page, '딸기');
-  if (await myDealsTabRef.count() > 0) await myDealsTabRef.click();
+  if (await myDealsTabRef.count() > 0) await myDealsTabRef.last().click();
   await page.waitForTimeout(2000);
   check('딜 B (딸기) 생성 확인', await page.locator('text=딸기').count() > 0);
   await screenshot(page, 'ux_02_deal_b');
@@ -281,7 +286,7 @@ async function selectProposal(page, crop = '토마토') {
   // ══════════════════════════════════════════
   console.log('\n[5] UX #2: D-day 배지 — 딜 찾기 목록');
   const browseTab = page.locator('button', { hasText: '딜 찾기' });
-  if (await browseTab.count() > 0) await browseTab.click();
+  if (await browseTab.count() > 0) await browseTab.last().click();
   await page.waitForTimeout(2500);
   const dDayCount = await page.locator('text=/D-\\d+|D-day/').count();
   check('UX #2: D-day 배지 (농가 딜 찾기 목록)', dDayCount > 0, `개수: ${dDayCount}`);
@@ -446,7 +451,7 @@ async function selectProposal(page, crop = '토마토') {
   // ══════════════════════════════════════════
   console.log('\n[19] UX #6: 작물 가격 참고 — 딜 생성 Step 4');
   const createTabRef = page.locator('button', { hasText: '딜 만들기' });
-  if (await createTabRef.count() > 0) await createTabRef.click();
+  if (await createTabRef.count() > 0) await createTabRef.last().click();
   await page.waitForTimeout(1000);
 
   // Step 1
@@ -454,6 +459,11 @@ async function selectProposal(page, crop = '토마토') {
   if (await nameInputChk.count() > 0) {
     const val = await nameInputChk.inputValue().catch(() => '');
     if (!val) await nameInputChk.fill(CHEF_NAME);
+  }
+  const addrInputChk = page.locator('input[placeholder*="주소 찾기"]').first();
+  if (await addrInputChk.count() > 0) {
+    const addrVal = await addrInputChk.inputValue().catch(() => '');
+    if (!addrVal) await addrInputChk.fill('서울특별시 강남구 테헤란로 123');
   }
   let nxt = page.locator('button', { hasText: '다음 단계 →' });
   if (await nxt.count() > 0) await nxt.click();
@@ -477,7 +487,7 @@ async function selectProposal(page, crop = '토마토') {
   await screenshot(page, 'ux_15_crop_ref');
 
   // 탭 전환으로 딜 만들기 취소
-  if (await myDealsTabRef.count() > 0) await myDealsTabRef.click();
+  if (await myDealsTabRef.count() > 0) await myDealsTabRef.last().click();
   await page.waitForTimeout(500);
 
   // ══════════════════════════════════════════
@@ -520,7 +530,7 @@ async function selectProposal(page, crop = '토마토') {
 
   // 탭 이동 후 복귀
   const browseFarmTab = page.locator('button', { hasText: '딜 찾기' });
-  if (await browseFarmTab.count() > 0) await browseFarmTab.click();
+  if (await browseFarmTab.count() > 0) await browseFarmTab.last().click();
   await page.waitForTimeout(2000);
   if (await farmProfileTab.count() > 0) await farmProfileTab.click();
   await page.waitForTimeout(2000);
@@ -533,7 +543,7 @@ async function selectProposal(page, crop = '토마토') {
   console.log('\n[23] UX #5: 정기 딜 자동 연장 — matched 상태 미표시 확인');
   await logout(page);
   await login(page, CHEF_EMAIL, PW);
-  if (await myDealsTabRef.count() > 0) await myDealsTabRef.click();
+  if (await myDealsTabRef.count() > 0) await myDealsTabRef.last().click();
   await page.waitForTimeout(3000);
 
   const nextCycleBtnCount = await page.locator('button', { hasText: /↻ 다음 회차 딜 만들기/ }).count();
