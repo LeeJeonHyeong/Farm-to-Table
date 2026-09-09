@@ -7554,6 +7554,8 @@ export default function FarmToTableApp() {
   // 공유 데이터 로드 (auth 확인 후) — DATA-03: user?.uid dep으로 재로그인 시 프로필 재로드
   useEffect(() => {
     if (!authChecked) return;
+    // 규칙상 deals/storage 읽기는 인증이 필요하다. 로그인 전에는 조회하지 않는다.
+    if (!user) return;
     let cancelled = false;
     (async () => {
       try {
@@ -7636,7 +7638,8 @@ export default function FarmToTableApp() {
 
   // 딜·채팅 실시간 동기화
   useEffect(() => {
-    if (loadState !== "ready") return;
+    // 로그아웃 후 미인증 구독이 남아 권한 오류를 내지 않도록 user도 확인한다.
+    if (loadState !== "ready" || !user) return;
     // RACE-01: deals 미도착 시 chats snapshot 보존용 클로저 변수
     let pendingChatsSnap = null;
 
@@ -7853,7 +7856,7 @@ export default function FarmToTableApp() {
       processChats(snapshot);
     });
     return () => { unsubDeals(); unsubChats(); };
-  }, [loadState]);
+  }, [loadState, user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const persistDeal = async (deal) => {
     setSaveState("saving");
@@ -8272,7 +8275,9 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
-  if (!authChecked || loadState === "loading") {
+  // 공유 데이터 로드는 로그인 후에만 일어난다. 로그인 화면이 loadState에 가려지지
+  // 않도록 user 유무를 함께 본다.
+  if (!authChecked || (user && loadState === "loading")) {
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 24, fontFamily: "'IBM Plex Sans', sans-serif" }}>
         <style>{`
@@ -8292,7 +8297,7 @@ export default function FarmToTableApp() {
       </div>
     );
   }
-  if (loadState === "error") {
+  if (user && loadState === "error") {
     const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
     return (
       <div style={{ background: TOKENS.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", fontFamily: "'IBM Plex Sans', sans-serif" }}>

@@ -2,11 +2,13 @@
  * M-3: 모바일 UI 점검 (iPhone 13 뷰포트)
  */
 const { chromium } = require("playwright");
+const { demoCreds } = require("./load_env.cjs");
 
 const BASE = "http://localhost:5173";
-const FARM_EMAIL = "demo.farm@ftt-demo.kr";
-const CHEF_EMAIL = "demo.chef@ftt-demo.kr";
-const PW = "fttDemo2026!";
+const {
+  farmEmail: FARM_EMAIL, farmPw: FARM_PW,
+  chefEmail: CHEF_EMAIL, chefPw: CHEF_PW,
+} = demoCreds();
 
 const MOBILE = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 };
 
@@ -44,7 +46,7 @@ async function run() {
 
   // 셰프 로그인
   await page.fill('input[type="email"]', CHEF_EMAIL);
-  await page.fill('input[type="password"]', PW);
+  await page.fill('input[type="password"]', CHEF_PW);
   await page.locator("button", { hasText: /로그인$/ }).last().click();
   await page.waitForTimeout(3500);
   await dismissOverlays(page);
@@ -81,7 +83,7 @@ async function run() {
   await page.waitForSelector('input[type="email"]', { timeout: 15000 });
 
   await page.fill('input[type="email"]', FARM_EMAIL);
-  await page.fill('input[type="password"]', PW);
+  await page.fill('input[type="password"]', FARM_PW);
   await page.locator("button", { hasText: /로그인$/ }).last().click();
   await page.waitForTimeout(3500);
   await dismissOverlays(page);

@@ -1,7 +1,7 @@
 const { chromium } = require("playwright");
+const { demoCreds } = require("./load_env.cjs");
 const BASE = "http://localhost:5173";
-const CHEF_EMAIL = "demo.chef@ftt-demo.kr";
-const PW = "fttDemo2026!";
+const { chefEmail: CHEF_EMAIL, chefPw: PW } = demoCreds();
 const MOBILE = { width: 390, height: 844, isMobile: true, hasTouch: true };
 
 async function run() {
