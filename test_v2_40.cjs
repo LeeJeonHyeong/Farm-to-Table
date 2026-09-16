@@ -100,8 +100,12 @@ async function run() {
   );
 
   // [3] DATA-02: updateDoc import
+  // import 목록은 이후에도 늘어나므로 줄 전체가 아니라 필요한 심볼만 확인한다.
   assert(
-    code.includes("import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion }"),
+    (function () {
+      const line = code.split("\n").find((l) => l.includes('from "firebase/firestore"'));
+      return !!line && line.includes("updateDoc") && line.includes("arrayUnion");
+    })(),
     "[3] v2.40 — DATA-02: updateDoc import 추가됨"
   );
 

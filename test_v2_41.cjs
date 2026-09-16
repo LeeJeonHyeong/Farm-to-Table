@@ -116,14 +116,14 @@ async function run() {
     "[2] v2.41 — STAB-02: DealDetailView fetch cancelled 플래그 + dep 수정"
   );
 
-  // [3] PERF-01: onSnapshot chats 셰프 필터
+  // [3] PERF-01: 채팅 구독 범위 제한
+  // 이전에는 chats 컬렉션 전체를 구독한 뒤 클라이언트에서 셰프 딜만 걸렀다.
+  // 지금은 쿼리 자체를 참여자로 제한해 남의 대화를 애초에 받지 않는다.
   assert(
-    (function() {
-      const snapIdx = code.indexOf("onSnapshot(collection(db, \"chats\")");
-      const snapCode = code.slice(snapIdx, snapIdx + 600);
-      return snapCode.includes("chefDealIds") && snapCode.includes("chefDealIds.has(dealId)");
-    })(),
-    "[3] v2.41 — PERF-01: onSnapshot chats 핸들러에 chefDealIds 필터 존재"
+    code.includes('where("participants", "array-contains", user.uid)') &&
+    code.includes("onSnapshot(chatsQuery") &&
+    !code.includes("onSnapshot(collection(db, \"chats\")"),
+    "[3] v2.41 — PERF-01: 채팅 구독이 참여자 쿼리로 제한됨"
   );
 
   // [4] PERF-02: chatUnreads useMemo
