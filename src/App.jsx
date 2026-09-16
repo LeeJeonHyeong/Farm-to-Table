@@ -2270,11 +2270,18 @@ function calcDealAttractionScore(deal, farmProfile) {
   return score;
 }
 
-function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, onRateChef, onRespondCounterOffer, chatUnreads = {} }) {
+function MyProposalsScreen({ deals, userName, onOpenChat, onCancelProposal, onViewContract, onTabChange, onShipDeal, onRateChef, onRespondCounterOffer, chatUnreads = {}, focusDealId = null }) {
   const isMobile = useIsMobile();
   const [cancellingId, setCancellingId] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
   const [shipTarget, setShipTarget] = useState(null);
+  // 대시보드에서 특정 거래를 지정해 들어오면 그 제안 상세를 바로 연다.
+  useEffect(() => {
+    if (!focusDealId) return;
+    const deal = deals.find((d) => d.id === focusDealId);
+    const proposal = deal?.proposals.find((p) => p.farmerName === userName);
+    if (deal && proposal) setDetailItem({ deal, proposal });
+  }, [focusDealId]); // eslint-disable-line react-hooks/exhaustive-deps
   const myItems = [];
   for (const deal of deals) {
     const proposal = deal.proposals.find((p) => p.farmerName === userName);
@@ -4325,14 +4332,11 @@ function DealTimeline({ deal }) {
                   {s.sub}
                 </div>
               )}
-              {s.at && (
+              {/* 납품 희망일 단계는 sub 에 이미 날짜가 있으므로 타임스탬프를 덧붙이지 않는다.
+                  (완료 시각은 다음 "납품 · 정산 완료" 단계가 보여준다) */}
+              {s.at && !s.isDelivery && (
                 <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
-                  {s.isDelivery ? s.sub : fmtDateTime(s.at)}
-                </div>
-              )}
-              {!s.at && s.isDelivery && (
-                <div style={{ fontSize: 10, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
-                  {deal.deliveryDate}
+                  {fmtDateTime(s.at)}
                 </div>
               )}
             </div>
@@ -5381,7 +5385,7 @@ function DashboardScreen({ deals, user, onTabChange }) {
                 return (
                   <div
                     key={isChef ? d.id : item.id}
-                    onClick={() => onTabChange?.(isChef ? "mydeals" : "myproposals")}
+                    onClick={() => onTabChange?.(isChef ? "mydeals" : "myproposals", d.id)}
                     style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 72px 88px" : "1fr 80px 90px 80px", gap: 6, padding: "9px 12px", background: idx % 2 === 0 ? "#fff" : TOKENS.card, cursor: "pointer", fontSize: 13 }}
                   >
                     <div style={{ minWidth: 0 }}>
@@ -5425,7 +5429,7 @@ function DashboardScreen({ deals, user, onTabChange }) {
               {recentChefDeals.map((d) => {
                 const statusColor = d.status === "open" ? TOKENS.gold : d.status === "matched" ? TOKENS.moss : d.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
                 return (
-                  <div key={d.id} onClick={() => onTabChange?.("mydeals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: TOKENS.bg, borderRadius: 10, cursor: "pointer" }}>
+                  <div key={d.id} onClick={() => onTabChange?.("mydeals", d.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: TOKENS.bg, borderRadius: 10, cursor: "pointer" }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, color: TOKENS.ink }}>{d.crop}</span>
@@ -5452,7 +5456,7 @@ function DashboardScreen({ deals, user, onTabChange }) {
                 const isPending  = !p.deal.selectedProposalId;
                 const dotColor   = isSelected ? TOKENS.moss : isPending ? TOKENS.gold : TOKENS.inkSoft;
                 return (
-                  <div key={p.id} onClick={() => onTabChange?.("myproposals")} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: TOKENS.bg, borderRadius: 10, cursor: "pointer" }}>
+                  <div key={p.id} onClick={() => onTabChange?.("myproposals", p.deal.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: TOKENS.bg, borderRadius: 10, cursor: "pointer" }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, color: TOKENS.ink }}>{p.deal.crop}</span>
@@ -5480,7 +5484,7 @@ const STATUS_FILTERS = [
   { key: "closed", label: "마감" },
 ];
 
-function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {}, userId = "", onNextCycle, onAnswerInquiry, onSendCounterOffer, newDealId = null }) {
+function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDelivery, onTossPayment, onOpenChat, onEdit, onDelete, onClose, onRateProposal, onClone, onViewContract, onTabChange, chatUnreads = {}, userId = "", onNextCycle, onAnswerInquiry, onSendCounterOffer, newDealId = null, focusDealId = null }) {
   const [expandedId, setExpandedId] = useState(deals[0]?.id ?? null);
   const [deletingId, setDeletingId] = useState(null);
   const [closingId, setClosingId] = useState(null);
@@ -5493,6 +5497,18 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
   const [favFarms, setFavFarms] = useState(() => getFavFarms(userId));
   const [counterTarget, setCounterTarget] = useState(null);
   useEffect(() => { setCompareIds([]); }, [expandedId]);
+  // 대시보드 등에서 특정 거래를 지정해 들어오면 그 카드를 펼치고 화면에 보여준다.
+  // 필터에 가려 안 보일 수 있으므로 전체로 되돌린다.
+  useEffect(() => {
+    if (!focusDealId) return;
+    setStatusFilter("전체");
+    setExpandedId(focusDealId);
+    const t = setTimeout(() => {
+      document.getElementById(`deal-card-${focusDealId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [focusDealId]);
   useEffect(() => {
     if (!userId) return;
     storage.get(favFarmsKey(userId)).then((result) => {
@@ -5675,7 +5691,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
         const statusAccent = deal.status === "open" ? TOKENS.gold : deal.status === "matched" ? TOKENS.moss : deal.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
         const pendingCounterProposals = deal.proposals.filter((p) => p.counterOffer?.status === "pending");
         return (
-          <div key={deal.id} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
+          <div key={deal.id} id={`deal-card-${deal.id}`} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
             {deal.photoURL && (
               <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
                 <img src={deal.photoURL} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
@@ -7357,6 +7373,8 @@ export default function FarmToTableApp() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
   const [newDealId, setNewDealId] = useState(null);
+  // 다른 화면에서 특정 거래로 이동할 때 대상 딜 id
+  const [focusDealId, setFocusDealId] = useState(null);
 
   useEffect(() => {
     _recordNotif = (notif) => {
@@ -8361,7 +8379,10 @@ export default function FarmToTableApp() {
 
   const totalUnreadChats = Object.values(chatUnreads).reduce((s, n) => s + n, 0);
 
-  const handleTabClick = (key) => {
+  // dealId 를 함께 받으면 이동한 화면에서 그 거래를 펼쳐 보여준다.
+  // (대시보드 정산 이력에서 클릭했을 때 목록 맨 위로 가버리던 문제)
+  const handleTabClick = (key, dealId = null) => {
+    setFocusDealId(dealId);
     setChatTarget(null);
     if (key !== "create") setEditingDeal(null);
     if (key === "mydeals" && isChef) {
@@ -9204,7 +9225,7 @@ export default function FarmToTableApp() {
                     <circle cx="53" cy="186" r="5" fill="#8B5C10"/>
                   </svg>
                 )}
-                <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} onRateChef={handleRateChef} onRespondCounterOffer={handleRespondCounterOffer} chatUnreads={chatUnreads} />
+                <MyProposalsScreen deals={deals} userName={user.name} onOpenChat={handleOpenChat} onCancelProposal={handleCancelProposal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={handleTabClick} onShipDeal={handleShipDeal} onRateChef={handleRateChef} onRespondCounterOffer={handleRespondCounterOffer} chatUnreads={chatUnreads} focusDealId={focusDealId} />
               </div>
             )}
             {/* ── 내 거래 ── */}
@@ -9325,7 +9346,7 @@ export default function FarmToTableApp() {
                     <rect x="54" y="211" width="52" height="9" rx="3" fill="#B44A28"/>
                   </svg>
                 )}
-                <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} onAnswerInquiry={handleAnswerInquiry} onSendCounterOffer={handleSendCounterOffer} newDealId={newDealId} />
+                <MyDealsScreen deals={myDeals} onSelectProposal={handleSelectProposal} onCompleteDeal={handleCompleteDeal} onConfirmDelivery={handleConfirmDelivery} onTossPayment={handleTossPayment} onOpenChat={handleOpenChat} onEdit={handleEditDeal} onDelete={handleDeleteDeal} onClose={handleCloseDeal} onRateProposal={handleRateProposal} onClone={handleCloneDeal} onViewContract={(deal, proposal) => setContractTarget({ deal, proposal })} onTabChange={(key) => setTab(key)} chatUnreads={chatUnreads} userId={user.uid} onNextCycle={handleNextCycleDeal} onAnswerInquiry={handleAnswerInquiry} onSendCounterOffer={handleSendCounterOffer} newDealId={newDealId} focusDealId={focusDealId} />
               </div>
             )}
             {/* ── 내 농가 ── */}

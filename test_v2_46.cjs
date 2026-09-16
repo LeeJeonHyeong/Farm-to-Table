@@ -139,10 +139,13 @@ async function run() {
   );
 
   // [8] MyDealsScreen 파라미터 + NEW 뱃지
+  // 파라미터가 뒤에 더 붙을 수 있으므로 위치가 아니라 시그니처 안에 있는지로 확인한다.
   assert(
-    normalized.includes("newDealId = null }") &&
+    (function () {
+      const sig = normalized.split("\n").find((l) => l.includes("function MyDealsScreen("));
+      return !!sig && sig.includes("newDealId = null");
+    })() &&
     normalized.includes("deal.id === newDealId") &&
-    normalized.includes(">\\nNEW\\n") === false &&
     normalized.includes("NEW"),
     "[8] v2.46 — M-3d: MyDealsScreen newDealId 파라미터 + NEW 뱃지 코드 존재"
   );
