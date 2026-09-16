@@ -90,10 +90,15 @@ async function run() {
 
   console.log("── [1~7] 정적 코드 검증 ──\n");
 
-  // [1] RACE-01: pendingChatsSnap 클로저 변수
+  // [1] RACE-01 해소: 채팅을 참여자 쿼리로 받으면서 processChats가 deals를 참조하지
+  // 않게 됐다. 레이스를 보정하는 대신 원인 자체가 사라진 상태를 확인한다.
   assert(
-    normalized.includes("let pendingChatsSnap = null;"),
-    "[1] v2.42 — RACE-01: onSnapshot effect에 pendingChatsSnap 클로저 변수 존재"
+    (function () {
+      const i = normalized.indexOf("const processChats = (snapshot) => {");
+      if (i === -1) return false;
+      return !normalized.slice(i, i + 700).includes("dealsRef");
+    })(),
+    "[1] v2.42 — RACE-01: processChats가 deals 참조 없이 동작 (레이스 원인 제거)"
   );
 
   // [2] RACE-01: dealsRef.current 동기 업데이트
@@ -102,16 +107,17 @@ async function run() {
     "[2] v2.42 — RACE-01: deals 핸들러에서 dealsRef.current 동기 업데이트"
   );
 
-  // [3] RACE-01: chats 핸들러 — chef + 빈 dealsRef → pendingChatsSnap 저장
+  // [3] 채팅 구독이 참여자 기준으로 제한되는지
   assert(
-    normalized.includes("pendingChatsSnap = snapshot;\n        return;"),
-    "[3] v2.42 — RACE-01: chats 핸들러가 deals 미도착 시 snapshot 보존 후 return"
+    normalized.includes('where("participants", "array-contains", user.uid)') &&
+    normalized.includes("onSnapshot(chatsQuery"),
+    "[3] v2.42 — 채팅 구독이 참여자 쿼리로 제한됨"
   );
 
-  // [4] RACE-01: deals 핸들러 끝에 pendingChatsSnap 재처리
+  // [4] deals 대기용 보류 로직이 남아있지 않은지
   assert(
-    normalized.includes("processChats(pendingChatsSnap);\n        pendingChatsSnap = null;"),
-    "[4] v2.42 — RACE-01: deals 도착 후 pendingChatsSnap 재처리"
+    !normalized.includes("pendingChatsSnap"),
+    "[4] v2.42 — RACE-01: deals 대기 보류 로직 제거됨"
   );
 
   // [5] UX-02: RatingPanel onSubmit 후 setSubmitting(false)

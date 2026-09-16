@@ -151,9 +151,9 @@ async function run() {
     "[8] v2.39 — DATA-01: handleSendMessage arrayUnion + merge:true 사용"
   );
 
-  // [9] DATA-02: 함수형 업데이터
+  // [9] DATA-02: 함수형 업데이터 (인자명이 dealId → chatId 로 바뀜)
   assert(
-    code.includes("[...(c[dealId] || []), newMsg]"),
+    code.includes("[...(c[chatId] || []), newMsg]"),
     "[9] v2.39 — DATA-02: setChats 낙관적 업데이트 함수형 업데이터 사용"
   );
 
@@ -180,12 +180,13 @@ async function run() {
     "[12] v2.39 — STAB-03: ImageUpload mountedRef 언마운트 안전 패턴 존재"
   );
 
-  // [13] DATA-03 + PERF-01: user?.uid dep + chefDealIds 필터
+  // [13] DATA-03 + PERF-01: user?.uid dep + 채팅 범위 제한
+  // 채팅 범위 제한은 클라이언트의 chefDealIds 필터에서 participants 쿼리로 대체됐다.
+  // 전체 컬렉션을 받아 거르는 대신 본인 대화만 받으므로 보안·비용 모두 개선된다.
   assert(
     code.includes("[authChecked, user?.uid]") &&
-    code.includes("chefDealIds") &&
-    code.includes("chefDealIds.has(dealId)"),
-    "[13] v2.39 — DATA-03+PERF-01: 데이터 로드 effect user?.uid dep + chefDealIds 필터 존재"
+    code.includes('where("participants", "array-contains", user.uid)'),
+    "[13] v2.39 — DATA-03+PERF-01: 데이터 로드 effect user?.uid dep + 채팅 참여자 범위 제한"
   );
 
   // [14] A11Y-01: role=button + onKeyDown

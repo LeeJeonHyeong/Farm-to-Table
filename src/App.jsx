@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, Fragment, Component } from "react";
 import { storage, db, auth, fbStorage } from "./firebase";
 import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
-import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion } from "firebase/firestore";
+import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, query, where } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 function useIsMobile() {
@@ -884,6 +884,15 @@ function chipBadge(bg, color) {
   };
 }
 
+const WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"];
+
+// "2026-09-24" → "2026-09-24 (목)". 시간대 차이로 하루 밀리지 않도록 로컬 자정으로 파싱한다.
+function formatDateWithDay(iso) {
+  if (!iso) return "";
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? iso : `${iso} (${WEEKDAY_SHORT[d.getDay()]})`;
+}
+
 const inputStyle = {
   width: "100%",
   padding: "10px 13px",
@@ -1524,6 +1533,8 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // 납품일을 고르면 입력을 잠그고, "변경"을 눌렀을 때만 다시 캘린더를 연다.
+  const [dateEditing, setDateEditing] = useState(false);
   const isMobile = useIsMobile();
 
   const [aiText, setAiText] = useState("");
@@ -1915,7 +1926,31 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
             <div>
               <FieldLabel required>희망 납품일</FieldLabel>
-              <input type="date" min={new Date().toISOString().split("T")[0]} value={data.deliveryDate} onChange={(e) => update("deliveryDate", e.target.value)} style={inputStyle} />
+              {data.deliveryDate && !dateEditing ? (
+                <div style={{ ...inputStyle, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: TOKENS.mossSoft, borderColor: TOKENS.moss }}>
+                  <span>📅 {formatDateWithDay(data.deliveryDate)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDateEditing(true)}
+                    style={{ background: "none", border: "none", color: TOKENS.moss, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "2px 4px", textDecoration: "underline", flexShrink: 0 }}
+                  >
+                    변경
+                  </button>
+                </div>
+              ) : (
+                <input
+                  type="date"
+                  min={new Date().toISOString().split("T")[0]}
+                  value={data.deliveryDate}
+                  autoFocus={dateEditing}
+                  onChange={(e) => {
+                    update("deliveryDate", e.target.value);
+                    // 날짜가 확정되면 바로 잠근다. 지우면 입력 상태를 유지한다.
+                    if (e.target.value) setDateEditing(false);
+                  }}
+                  style={inputStyle}
+                />
+              )}
               {errors.deliveryDate && <ErrorText text={errors.deliveryDate} />}
             </div>
             <div>
@@ -2119,6 +2154,8 @@ function ProposalForm({ deal, onSubmit, onCancel, farmProfile, farmerName, lastP
       try {
         onSubmit(deal.id, {
           id: `p${Date.now()}`,
+          // 채팅 참여자 판별에 쓰인다. 이름만으로는 대조할 수 없어 uid를 남긴다.
+          farmUid: userId || null,
           farmerName,
           farmName: data.farmName,
           region: data.region,
@@ -7569,21 +7606,8 @@ export default function FarmToTableApp() {
         const chefResult = user?.uid ? await storage.get(chefProfileKey(user.uid)) : null;
         if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
         else if (!cancelled && !chefResult?.value) setChefProfile(null);
-        if (user?.uid) {
-          // PERF-01: 셰프는 자신의 딜 채팅만 로드 (전체 chats 컬렉션 불필요 로드 방지)
-          const chefDealIds = user.role === "chef"
-            ? new Set(dealDocs.filter((d) => d.createdBy === user.uid).map((d) => d.id))
-            : null;
-          const chatsSnap = await getDocs(collection(db, "chats"));
-          if (!cancelled) {
-            const loaded = {};
-            chatsSnap.forEach((d) => {
-              const dealId = d.id.split("__")[0];
-              if (!chefDealIds || chefDealIds.has(dealId)) loaded[d.id] = d.data().messages || [];
-            });
-            setChats(loaded);
-          }
-        }
+        // 채팅은 아래 onSnapshot 구독이 참여자 기준으로 바로 배달한다.
+        // 여기서 한 번 더 읽으면 같은 데이터를 중복으로 받게 되므로 프리페치하지 않는다.
         if (!cancelled) setLoadState("ready");
       } catch (err) {
         console.error("[로드 오류]", err?.code, err?.message, err);
@@ -7640,21 +7664,13 @@ export default function FarmToTableApp() {
   useEffect(() => {
     // 로그아웃 후 미인증 구독이 남아 권한 오류를 내지 않도록 user도 확인한다.
     if (loadState !== "ready" || !user) return;
-    // RACE-01: deals 미도착 시 chats snapshot 보존용 클로저 변수
-    let pendingChatsSnap = null;
-
     const processChats = (snapshot) => {
       const cu = userRef.current;
-      // PERF-01: chef는 본인 딜 채팅만 수신
-      const chefDealIds = cu?.role === "chef"
-        ? new Set(dealsRef.current.filter((d) => d.createdBy === cu.uid).map((d) => d.id))
-        : null;
+      // 쿼리가 이미 참여자 기준으로 걸러 오므로 여기서 딜 소유권을 다시 볼 필요가 없다.
+      // 그래서 deals 도착을 기다리던 RACE-01 보류 로직도 필요 없어졌다.
       const newChats = {};
       snapshot.forEach((d) => {
-        const dealId = d.id.split("__")[0];
-        if (!chefDealIds || chefDealIds.has(dealId)) {
-          newChats[d.id] = d.data().messages || [];
-        }
+        newChats[d.id] = d.data().messages || [];
       });
       const prev = prevChatsRef.current;
       if (prev && cu) {
@@ -7835,24 +7851,14 @@ export default function FarmToTableApp() {
       }
       prevDealsRef.current = newDeals;
       setDeals(newDeals);
-      // RACE-01: deals 도착 전 저장된 chats snapshot 재처리
-      if (pendingChatsSnap) {
-        processChats(pendingChatsSnap);
-        pendingChatsSnap = null;
-      }
     });
-    const unsubChats = onSnapshot(collection(db, "chats"), (snapshot) => {
-      const cu = userRef.current;
-      // RACE-01: chef이고 deals 미도착 시 snapshot 보존 — deals 도착 후 재처리
-      if (cu?.role === "chef" && dealsRef.current.length === 0) {
-        pendingChatsSnap = snapshot;
-        return;
-      }
-      // PERF-01: chef는 본인 딜에 해당하는 채팅만 처리 (성능 최적화)
-      const chefDealIds = cu?.role === "chef"
-        ? new Set(dealsRef.current.filter((d) => d.createdBy === cu.uid).map((d) => d.id))
-        : null;
-      if (chefDealIds) snapshot.docs?.filter((d) => { const dealId = d.id; return chefDealIds.has(dealId); });
+    // SEC/PERF: 본인이 참여한 대화만 구독한다. 예전에는 chats 컬렉션 전체를 받아
+    // 모든 사용자가 남의 협상 대화를 내려받았고, 문서 수에 비례해 비용도 늘었다.
+    const chatsQuery = query(
+      collection(db, "chats"),
+      where("participants", "array-contains", user.uid)
+    );
+    const unsubChats = onSnapshot(chatsQuery, (snapshot) => {
       processChats(snapshot);
     });
     return () => { unsubDeals(); unsubChats(); };
@@ -8069,17 +8075,28 @@ export default function FarmToTableApp() {
     setToastMsg(`✍️ 서명 완료! ${waitingFor} 서명을 기다립니다.`);
   };
 
-  const handleSendMessage = async (dealId, payload) => {
+  // 인자는 딜 id가 아니라 `${dealId}__${proposalId}` 형태의 chatId 다.
+  const handleSendMessage = async (chatId, payload) => {
     const { text = "", imageURL = null } = typeof payload === "string" ? { text: payload } : payload;
     const newMsg = { id: `m${Date.now()}`, senderName: user.name, senderRole: user.role, text, ts: Date.now() };
     if (imageURL) newMsg.imageURL = imageURL;
     // DATA-02: 함수형 업데이터로 stale closure 방지
-    setChats((c) => ({ ...c, [dealId]: [...(c[dealId] || []), newMsg] }));
+    setChats((c) => ({ ...c, [chatId]: [...(c[chatId] || []), newMsg] }));
     try {
+      // SEC: 보안 규칙이 participants 로 접근을 판별한다. 보낸 사람과 상대방 uid를
+      // 함께 적재하고, farmUid 가 없는 과거 제안은 농가가 보낼 때 본인 uid가 채워진다.
+      const [dealId, proposalId] = chatId.split("__");
+      const deal = dealsRef.current.find((d) => d.id === dealId);
+      const proposal = deal?.proposals?.find((p) => p.id === proposalId);
+      const members = [...new Set([user.uid, deal?.createdBy, proposal?.farmUid].filter(Boolean))];
       // DATA-01: arrayUnion으로 동시 전송 시 overwrite 경쟁 방지
-      await setDoc(doc(db, "chats", dealId), { messages: arrayUnion(newMsg) }, { merge: true });
+      await setDoc(
+        doc(db, "chats", chatId),
+        { messages: arrayUnion(newMsg), participants: arrayUnion(...members) },
+        { merge: true }
+      );
     } catch {
-      setChats((c) => ({ ...c, [dealId]: (c[dealId] || []).filter((m) => m.id !== newMsg.id) }));
+      setChats((c) => ({ ...c, [chatId]: (c[chatId] || []).filter((m) => m.id !== newMsg.id) }));
       setToastMsg("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
     }
   };

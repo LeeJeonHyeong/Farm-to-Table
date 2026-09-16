@@ -36,12 +36,19 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      // 참여자 단위로 좁히지 못하는 상태다. 채팅 문서에는 messages만 있고 메시지에는
-      // senderName/senderRole만 담기며 proposals에도 농가 uid가 없어서, 규칙이 대조할
-      // uid가 데이터에 존재하지 않는다. 또 App.jsx가 chats 컬렉션 전체를 구독하므로
-      // 문서 단위 제한을 걸면 목록 조회 자체가 거부된다.
-      // 좁히려면 participants 필드 추가 + 구독 쿼리 필터링이 함께 필요하다.
-      allow read, write: if isSignedIn();
+      // 대화 참여자만 접근한다. 앱이 where('participants','array-contains', uid) 로
+      // 구독하므로 목록 조회도 이 조건을 만족한다.
+      // participants 가 없는 과거 문서는 접근이 거부된다(정리 대상).
+      allow read: if isSignedIn()
+                  && request.auth.uid in resource.data.participants;
+
+      allow create: if isSignedIn()
+                    && request.auth.uid in request.resource.data.participants;
+
+      // 자신을 참여자에서 빼면서 남의 대화를 고치지 못하도록 양쪽을 함께 본다.
+      allow update: if isSignedIn()
+                    && request.auth.uid in resource.data.participants
+                    && request.auth.uid in request.resource.data.participants;
     }
 
     match /deals/{dealId} {
