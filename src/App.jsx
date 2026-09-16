@@ -1060,8 +1060,9 @@ function RatingPanel({ farmName, onSubmit }) {
   );
 }
 
-function StatusBadge({ status }) {
-  const color = DEAL_STATUS_COLOR[status];
+// muted: 성사 없이 만료된 딜처럼 시선을 끌 이유가 없는 경우 회색으로 낮춘다.
+function StatusBadge({ status, muted = false }) {
+  const color = muted ? TOKENS.inkSoft : DEAL_STATUS_COLOR[status];
   return (
     <span style={{ ...chipBadge(`${color}18`, color), display: "inline-flex", alignItems: "center", gap: 5 }}>
       <span style={{ width: 5, height: 5, borderRadius: 999, background: color, flexShrink: 0 }} />
@@ -5688,10 +5689,16 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
           proposalSort === "score" ? b._score.total - a._score.total : a.price - b.price
         );
         const selectedProposal = deal.proposals.find((p) => p.id === deal.selectedProposalId);
-        const statusAccent = deal.status === "open" ? TOKENS.gold : deal.status === "matched" ? TOKENS.moss : deal.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
+        // 성사되지 않은 채 납품일이 지난 딜. 거래로 이어지지 않아 실질적 의미가 없으므로
+        // 주의를 끄는 색 대신 가라앉는 회색으로 구분한다.
+        // (성사된 딜은 자동 마감 대상이 아니라 여기 해당하지 않는다 — 만료 처리는 status === "open" 만 대상)
+        const isExpiredUnmatched = deal.status === "closed" && deal.closeReason === "expired";
+        const statusAccent = isExpiredUnmatched
+          ? TOKENS.line
+          : deal.status === "open" ? TOKENS.gold : deal.status === "matched" ? TOKENS.moss : deal.status === "done" ? TOKENS.inkSoft : TOKENS.rust;
         const pendingCounterProposals = deal.proposals.filter((p) => p.counterOffer?.status === "pending");
         return (
-          <div key={deal.id} id={`deal-card-${deal.id}`} className="ftt-card" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
+          <div key={deal.id} id={`deal-card-${deal.id}`} className="ftt-card" style={{ background: isExpiredUnmatched ? "#EFEDE3" : TOKENS.card, border: `1px solid ${TOKENS.line}`, borderLeft: `4px solid ${statusAccent}`, borderRadius: 12, padding: 18, boxShadow: isExpiredUnmatched ? "none" : "0 1px 4px rgba(32,40,31,0.05), 0 2px 12px rgba(32,40,31,0.03)" }}>
             {deal.photoURL && (
               <div style={{ float: "right", marginLeft: 12, marginBottom: 4 }}>
                 <img src={deal.photoURL} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover", display: "block" }} />
@@ -5702,7 +5709,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
               onClick={() => setExpandedId(expanded ? null : deal.id)}
             >
               <div>
-                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: TOKENS.ink }}>{deal.crop}</span>
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: isExpiredUnmatched ? TOKENS.inkSoft : TOKENS.ink }}>{deal.crop}</span>
                 <span style={{ fontSize: 12, color: TOKENS.inkSoft, marginLeft: 8 }}>{deal.chefName}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -5713,8 +5720,8 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                   </span>
                 )}
                 {deal.closeReason === "expired" && (
-                  <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px" }}>
-                    납품일 만료
+                  <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.inkSoft, background: TOKENS.line, border: `1px solid ${TOKENS.inkSoft}33`, borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap" }}>
+                    성사 없이 만료
                   </span>
                 )}
                 {deal.id === newDealId && (
@@ -5722,7 +5729,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
                     NEW
                   </span>
                 )}
-                <StatusBadge status={deal.status} />
+                <StatusBadge status={deal.status} muted={isExpiredUnmatched} />
               </div>
             </div>
             <DealSummaryRow deal={deal} />
