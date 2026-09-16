@@ -5692,7 +5692,7 @@ function MyDealsScreen({ deals, onSelectProposal, onCompleteDeal, onConfirmDeliv
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 13, color: TOKENS.inkSoft }}>{expanded ? "▲" : "▼"}</span>
                 {pendingCounterProposals.length > 0 && (
-                  <span className="ftt-badge-pulse" style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px", fontWeight: 700 }}>
+                  <span className="ftt-badge-attention" style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.rust, background: TOKENS.rustSoft, border: `1px solid ${TOKENS.rust}44`, borderRadius: 4, padding: "1px 6px", fontWeight: 700, whiteSpace: "nowrap" }}>
                     💱 역제안 대기 {pendingCounterProposals.length}건
                   </span>
                 )}
@@ -8438,6 +8438,13 @@ export default function FarmToTableApp() {
         .ftt-tab-content { animation: ftt-fade 0.15s ease; }
         @keyframes ftt-pulse { 0%, 100% { transform: scale(1); } 60% { transform: scale(1.3); } }
         .ftt-badge-pulse { animation: ftt-pulse 2s ease-in-out infinite; display: inline-flex; align-items: center; justify-content: center; }
+        /* 폭이 넓은 텍스트 뱃지용 강조. scale 은 레이아웃을 차지하지 않아
+           확대된 글자가 옆 요소 위로 번지므로, 크기가 변하지 않는 링으로 대체한다. */
+        @keyframes ftt-badge-attention {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(187, 74, 46, 0.5); }
+          70%      { box-shadow: 0 0 0 5px rgba(187, 74, 46, 0); }
+        }
+        .ftt-badge-attention { animation: ftt-badge-attention 2s ease-in-out infinite; display: inline-flex; align-items: center; }
 
         /* ===== 선택된 제안 하이라이트 ===== */
         .ftt-proposal-selected {
