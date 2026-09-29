@@ -53,6 +53,10 @@ async function signup(page, email, pw, role, name) {
   const ph = role === 'chef' ? '예: 테이블나인' : '예: 신선팜';
   const nameInput = page.locator(`input[placeholder="${ph}"]`).first();
   if (await nameInput.count() > 0) await nameInput.fill(name);
+  // 가입 시 약관 동의 필수 — 화면에 체크박스가 있으면 모두 체크한다
+
+  for (const cb of await page.locator('input[type="checkbox"]').all()) await cb.check().catch(() => {});
+
   await page.locator('button', { hasText: /가입하기$/ }).last().click();
   await page.waitForTimeout(3000);
   if (await page.locator('button[class*="ftt-tab"]').count() === 0) {

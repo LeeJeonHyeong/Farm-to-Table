@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "test:all": "node run_tests.cjs",
-    "test:quick": "node run_tests.cjs --quick"
+    "test:quick": "node run_tests.cjs --quick",
+    "rules:dev": "firebase deploy --only firestore:rules -P dev",
+    "rules:prod": "firebase deploy --only firestore:rules -P prod",
+    "deploy:prod": "vite build && firebase deploy --only hosting -P prod"
   },
   "dependencies": {
     "firebase": "^12.16.0",

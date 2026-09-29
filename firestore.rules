@@ -33,6 +33,9 @@ service cloud.firestore {
                             && request.resource.data.keys().hasOnly(['value'])
                             && request.resource.data.value is string
                             && request.resource.data.value.size() < 1048576;
+
+      // 회원 탈퇴 시 본인 개인정보를 파기하기 위해 필요하다 (개인정보보호법상 파기 의무).
+      allow delete: if isOwnKey(key) || isAdmin();
     }
 
     match /chats/{chatId} {
