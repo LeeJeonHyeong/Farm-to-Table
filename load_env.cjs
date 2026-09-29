@@ -3,12 +3,19 @@
 const fs = require("fs");
 const path = require("path");
 
+// Vite 와 같은 우선순위로 읽는다: .env.<mode>.local → .env.local
+// 기본 모드는 development 다. Node 스크립트(E2E 포함)가 개발 프로젝트를 쓰게 해
+// 운영 데이터를 건드리지 않도록 하기 위함이다. 운영을 봐야 하면 FTT_ENV=production.
 function loadEnvLocal() {
-  const file = path.join(__dirname, ".env.local");
-  if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim();
+  const mode = process.env.FTT_ENV || "development";
+  for (const name of [`.env.${mode}.local`, ".env.local"]) {
+    const file = path.join(__dirname, name);
+    if (!fs.existsSync(file)) continue;
+    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+      // 앞 파일이 이미 채운 값은 덮어쓰지 않는다 (셸 환경변수가 최우선)
+      if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim();
+    }
   }
 }
 

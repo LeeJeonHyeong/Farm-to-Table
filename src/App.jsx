@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo, Fragment, Component } from "react
 import { storage, db, auth, fbStorage } from "./firebase";
 import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
 import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, query, where } from "firebase/firestore";
-import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { TERMS_OF_SERVICE, PRIVACY_POLICY, TERMS_VERSION, PRIVACY_VERSION, LEGAL_REVIEW_PENDING } from "./legal";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
@@ -6261,9 +6262,78 @@ function ChatScreen({ dealInfo, userName, userRole, messages, onSend, onBack }) 
   );
 }
 
+/* ---------- 계정 · 약관 · 탈퇴 (셰프/농가 공통) ---------- */
+
+function AccountSection({ onWithdraw }) {
+  // Firestore 의 doc/setDoc 과 이름이 겹치지 않도록 legalDoc 으로 둔다
+  const [legalDoc, setLegalDoc] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!pw) { setErr("비밀번호를 입력해주세요."); return; }
+    setBusy(true);
+    const msg = await onWithdraw(pw);
+    setBusy(false);
+    if (msg) setErr(msg);
+  };
+
+  return (
+    <div style={{ marginTop: 28, paddingTop: 20, borderTop: `1px solid ${TOKENS.line}` }}>
+      <div style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
+        계정
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <button onClick={() => setLegalDoc("terms")} style={{ background: "none", border: "none", color: TOKENS.inkSoft, fontSize: 13, textDecoration: "underline", cursor: "pointer", padding: 0 }}>이용약관</button>
+        <button onClick={() => setLegalDoc("privacy")} style={{ background: "none", border: "none", color: TOKENS.inkSoft, fontSize: 13, textDecoration: "underline", cursor: "pointer", padding: 0 }}>개인정보처리방침</button>
+        <button onClick={() => { setOpen(true); setPw(""); setErr(""); }}
+          style={{ marginLeft: "auto", background: "none", border: `1px solid ${TOKENS.rust}55`, color: TOKENS.rust, borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer" }}>
+          회원 탈퇴
+        </button>
+      </div>
+
+      {legalDoc && <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
+
+      {open && (
+        <div onClick={() => !busy && setOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 14, maxWidth: 440, width: "100%", padding: 24 }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: TOKENS.ink, marginBottom: 12 }}>회원 탈퇴</div>
+            <div style={{ fontSize: 13, color: TOKENS.inkSoft, lineHeight: 1.75, marginBottom: 16 }}>
+              프로필·연락처·주소 등 개인정보는 즉시 파기됩니다.<br />
+              다만 <strong style={{ color: TOKENS.ink }}>이미 성사된 거래 기록</strong>은 전자상거래법에 따라
+              보존 의무가 있어, 개인을 알아볼 수 없는 형태로 남습니다.<br />
+              <span style={{ color: TOKENS.rust }}>이 작업은 되돌릴 수 없습니다.</span>
+            </div>
+            <FieldLabel required>비밀번호 확인</FieldLabel>
+            <input type="password" value={pw} autoFocus
+              onChange={(e) => { setPw(e.target.value); setErr(""); }}
+              onKeyDown={(e) => e.key === "Enter" && !busy && submit()}
+              placeholder="본인 확인을 위해 비밀번호를 입력하세요" style={inputStyle} />
+            {err && <ErrorText text={err} />}
+            <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+              <button onClick={() => setOpen(false)} disabled={busy}
+                style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${TOKENS.line}`, borderRadius: 9, fontSize: 14, color: TOKENS.inkSoft, cursor: busy ? "default" : "pointer" }}>
+                취소
+              </button>
+              <button onClick={submit} disabled={busy}
+                style={{ flex: 1, padding: "11px 0", background: busy ? TOKENS.line : TOKENS.rust, color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>
+                {busy ? "처리 중…" : "탈퇴하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- 4-0. 내 레스토랑 (셰프) ---------- */
 
-function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "", onShowOnboarding }) {
+function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "", onShowOnboarding, onWithdraw }) {
   const blank = { restaurantName: defaultRestaurantName, region: "", address: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체", photoURL: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
@@ -6488,6 +6558,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
           {data.description && <p style={{ fontSize: 12, color: TOKENS.inkSoft, margin: 0, lineHeight: 1.6 }}>"{data.description}"</p>}
         </div>
       )}
+      {onWithdraw && <AccountSection onWithdraw={onWithdraw} />}
       </div>
     </div>
   );
@@ -6495,7 +6566,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
 
 /* ---------- 4. 내 농가 등록 ---------- */
 
-function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "", onShowOnboarding }) {
+function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "", onShowOnboarding, onWithdraw }) {
   const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "", certPhotoURL: "", notifyNewDeals: false };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
@@ -6724,6 +6795,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
           />
         </div>
       )}
+      {onWithdraw && <AccountSection onWithdraw={onWithdraw} />}
       </div>
     </div>
   );
@@ -6753,6 +6825,8 @@ function LoginScreen({ onLogin }) {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState({ terms: false, privacy: false });
+  const [legalDoc, setLegalDoc] = useState(null); // "terms" | "privacy" | null
   const isMobile = useIsMobile();
 
   const handleSubmit = async () => {
@@ -6763,6 +6837,7 @@ function LoginScreen({ onLogin }) {
       if (!password) { setError("비밀번호를 입력해주세요."); return; }
       if (password.length < 6) { setError("비밀번호는 6자 이상이어야 합니다."); return; }
       if (!displayName.trim()) { setError(role === "chef" ? "레스토랑명을 입력해주세요." : "농가명을 입력해주세요."); return; }
+      if (!agreed.terms || !agreed.privacy) { setError("이용약관과 개인정보 수집·이용에 동의해주세요."); return; }
     } else {
       if (!email.trim()) { setError("이메일을 입력해주세요."); return; }
       if (!password) { setError("비밀번호를 입력해주세요."); return; }
@@ -6772,7 +6847,13 @@ function LoginScreen({ onLogin }) {
     try {
       if (mode === "signup") {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        await storage.set(`user-profile-${cred.user.uid}`, JSON.stringify({ role, displayName: displayName.trim() }));
+        // 동의 시각과 약관 버전을 함께 남긴다 (개인정보보호법상 동의 입증 자료)
+        await storage.set(`user-profile-${cred.user.uid}`, JSON.stringify({
+          role, displayName: displayName.trim(),
+          agreedAt: Date.now(),
+          termsVersion: TERMS_VERSION,
+          privacyVersion: PRIVACY_VERSION,
+        }));
         onLogin({ uid: cred.user.uid, email: cred.user.email, role, name: displayName.trim() });
       } else {
         const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -7097,6 +7178,34 @@ function LoginScreen({ onLogin }) {
             </>
           )}
 
+          {/* 약관 동의 (가입 시 필수) — 개인정보보호법상 수집·이용 동의 */}
+          {mode === "signup" && (
+            <div style={{ marginTop: 16, padding: "12px 14px", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10 }}>
+              {[
+                { key: "terms", label: "이용약관", doc: "terms" },
+                { key: "privacy", label: "개인정보 수집·이용", doc: "privacy" },
+              ].map(({ key, label, doc }) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: TOKENS.ink, cursor: "pointer", padding: "3px 0" }}>
+                  <input
+                    type="checkbox"
+                    checked={agreed[key]}
+                    onChange={(e) => { setAgreed((a) => ({ ...a, [key]: e.target.checked })); setError(""); }}
+                    style={{ width: 16, height: 16, accentColor: TOKENS.moss, cursor: "pointer", flexShrink: 0 }}
+                  />
+                  <span style={{ color: TOKENS.rust, fontSize: 12 }}>필수</span>
+                  <span>{label}에 동의합니다</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setLegalDoc(doc); }}
+                    style={{ marginLeft: "auto", background: "none", border: "none", color: TOKENS.moss, fontSize: 12, textDecoration: "underline", cursor: "pointer", padding: 0, flexShrink: 0 }}
+                  >
+                    전문 보기
+                  </button>
+                </label>
+              ))}
+            </div>
+          )}
+
           {error && <ErrorText text={error} />}
 
           <button onClick={handleSubmit} disabled={loading}
@@ -7116,6 +7225,48 @@ function LoginScreen({ onLogin }) {
           <p style={{ fontSize: 12, color: TOKENS.inkSoft, textAlign: "center", marginTop: 16, marginBottom: 0 }}>
             로그인 상태는 자동으로 유지됩니다.
           </p>
+        </div>
+      </div>
+      {legalDoc && <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
+    </div>
+  );
+}
+
+/** 약관·개인정보처리방침 전문 뷰어 */
+function LegalDocModal({ doc, onClose }) {
+  const isTerms = doc === "terms";
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 14, maxWidth: 760, width: "100%", maxHeight: "86vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+      >
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: TOKENS.ink }}>
+            {isTerms ? "이용약관" : "개인정보처리방침"}
+          </div>
+          <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+            v{isTerms ? TERMS_VERSION : PRIVACY_VERSION}
+          </span>
+          <button onClick={onClose} aria-label="닫기"
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 20, color: TOKENS.inkSoft, cursor: "pointer", lineHeight: 1 }}>×</button>
+        </div>
+        {LEGAL_REVIEW_PENDING && (
+          <div style={{ padding: "10px 24px", background: TOKENS.goldSoft, borderBottom: `1px solid ${TOKENS.line}`, fontSize: 12, color: "#7A5C20" }}>
+            법률 검토 전 초안입니다. 대괄호 [ ] 부분은 사업자 정보 확정 후 채워야 합니다.
+          </div>
+        )}
+        <div style={{ padding: "20px 24px", overflowY: "auto", fontSize: 13, lineHeight: 1.85, color: TOKENS.ink, whiteSpace: "pre-wrap", fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          {isTerms ? TERMS_OF_SERVICE : PRIVACY_POLICY}
+        </div>
+        <div style={{ padding: "14px 24px", borderTop: `1px solid ${TOKENS.line}`, textAlign: "right" }}>
+          <button onClick={onClose}
+            style={{ padding: "9px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+            닫기
+          </button>
         </div>
       </div>
     </div>
@@ -8123,6 +8274,70 @@ export default function FarmToTableApp() {
     } catch {
       setChats((c) => ({ ...c, [chatId]: (c[chatId] || []).filter((m) => m.id !== newMsg.id) }));
       setToastMsg("메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.");
+    }
+  };
+
+  /**
+   * 회원 탈퇴 — 개인정보는 파기하고, 거래 기록은 익명화해 남긴다.
+   * 전자상거래법상 계약·결제 기록은 5년 보존 의무가 있어 통째로 지울 수 없다.
+   * 반환: 실패 시 사용자에게 보여줄 메시지, 성공 시 null
+   */
+  const handleWithdraw = async (password) => {
+    const cu = auth.currentUser;
+    if (!cu) return "로그인 정보를 확인할 수 없습니다.";
+    try {
+      await reauthenticateWithCredential(cu, EmailAuthProvider.credential(cu.email, password));
+    } catch {
+      return "비밀번호가 올바르지 않습니다.";
+    }
+
+    const uid = cu.uid;
+    try {
+      const batch = writeBatch(db);
+
+      // 1) 내가 만든 딜 — 거래가 성사된 적 없으면 삭제, 있으면 이름만 익명화해 보존
+      dealsRef.current.forEach((d) => {
+        if (d.createdBy !== uid) return;
+        const traded = !!d.selectedProposalId;
+        if (traded) batch.set(doc(db, "deals", d.id), { chefName: "탈퇴한 사용자" }, { merge: true });
+        else batch.delete(doc(db, "deals", d.id));
+      });
+
+      // 2) 남의 딜에 넣은 내 제안 — 기록은 남기고 개인 식별 정보만 지운다
+      dealsRef.current.forEach((d) => {
+        if (d.createdBy === uid) return;
+        const mine = (d.proposals || []).some((p) => p.farmUid === uid || p.farmerName === user.name);
+        if (!mine) return;
+        const proposals = d.proposals.map((p) =>
+          (p.farmUid === uid || p.farmerName === user.name)
+            ? { ...p, farmUid: null, farmerName: "탈퇴한 사용자", farmName: "탈퇴한 사용자", photoURL: null, certPhotoURL: null }
+            : p
+        );
+        batch.set(doc(db, "deals", d.id), { proposals }, { merge: true });
+      });
+
+      await batch.commit();
+
+      // 3) 개인정보가 담긴 storage 문서 파기
+      const keys = [
+        `user-profile-${uid}`, farmProfileKey(uid), chefProfileKey(uid),
+        favFarmsKey(uid), bookmarkKey(uid), notifHistoryKey(uid), notifiedDealsKey(uid),
+        lastMyDealsVisitKey(uid), seenSelectionsKey(uid), lastChatReadKey(uid),
+        pendingTossKey(uid), `pending-toss-${uid}`,
+      ];
+      await Promise.all(keys.map((k) => deleteDoc(doc(db, "storage", k)).catch(() => {})));
+
+      // 4) 로컬 캐시 정리
+      try { Object.keys(localStorage).forEach((k) => { if (k.includes(uid)) localStorage.removeItem(k); }); } catch {}
+
+      // 5) 계정 삭제
+      await deleteUser(cu);
+      setUser(null);
+      setTab("home");
+      return null;
+    } catch (err) {
+      if (err?.code === "auth/requires-recent-login") return "보안을 위해 다시 로그인한 뒤 시도해주세요.";
+      return "탈퇴 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
     }
   };
 
@@ -9467,7 +9682,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="55" cy="282" rx="52" ry="6" fill="#4A7A44" opacity="0.3"/>
                   </svg>
                 )}
-                <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />
+                <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} onWithdraw={handleWithdraw} />
               </div>
             )}
             {/* ── 내 레스토랑 ── */}
@@ -9587,7 +9802,7 @@ export default function FarmToTableApp() {
                     <path d="M58 148 Q72 138 78 122 Q66 132 58 146" fill="#5B7553" opacity="0.75"/>
                   </svg>
                 )}
-                <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} />
+                <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} onWithdraw={handleWithdraw} />
               </div>
             )}
             {/* ── 대시보드 ── */}

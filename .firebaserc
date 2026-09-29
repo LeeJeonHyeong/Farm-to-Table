@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "farm-to-table-de5f5"
+    "default": "farm-to-table-dev",
+    "dev": "farm-to-table-dev",
+    "prod": "farm-to-table-de5f5"
   }
 }

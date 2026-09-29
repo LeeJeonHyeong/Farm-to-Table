@@ -25,16 +25,16 @@ async function dismissOverlays(page) {
 
 async function createAccount(page, email, pw, role, name) {
   await page.goto(BASE);
-  await page.waitForSelector('input[type="email"]', { timeout: 20000 });
-
-  // 이미 로그인돼 있으면 로그아웃
+  // 앞 계정 생성으로 로그인 상태가 남아 있을 수 있다. 로그인 폼이든 앱 화면이든
+  // 먼저 렌더될 때까지 기다린 뒤, 로그인 상태면 로그아웃한다.
+  // (홈 랜딩에서는 탭 바가 display:none 이라 attached 로 판단한다)
+  await page.waitForSelector('input[type="email"], button.ftt-card, button.ftt-tab', { state: "attached", timeout: 25000 });
   const logoutBtn = page.locator("button", { hasText: /로그아웃/ });
   if (await logoutBtn.count() > 0) {
-    await logoutBtn.click();
-    await page.waitForTimeout(2000);
-    await page.goto(BASE);
-    await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+    await logoutBtn.first().click();
+    await page.waitForTimeout(2500);
   }
+  await page.waitForSelector('input[type="email"]', { timeout: 20000 });
 
   const toSignup = page.locator("button", { hasText: /가입/ }).first();
   if (await toSignup.count() > 0) await toSignup.click();
@@ -50,25 +50,31 @@ async function createAccount(page, email, pw, role, name) {
   const nameInput = page.locator(`input[placeholder="${ph}"]`).first();
   if (await nameInput.count() > 0) await nameInput.fill(name);
 
+  // 가입 시 약관 동의 필수 — 화면에 체크박스가 있으면 모두 체크한다
+
+
+  for (const cb of await page.locator('input[type="checkbox"]').all()) await cb.check().catch(() => {});
+
+
   await page.locator("button", { hasText: /가입하기$/ }).last().click();
   await page.waitForTimeout(4000);
 
-  // 이미 존재하면 로그인 시도
-  if (await page.locator('button[class*="ftt-tab"]').count() === 0) {
+  // 이미 존재하면 로그인으로 확인. 가입 모드에서는 제출 버튼이 "가입하기"라
+  // 먼저 로그인 탭으로 전환해야 한다.
+  if (await page.locator('button[class*="ftt-tab"], button.ftt-card').count() === 0) {
     const errText = await page.locator("body").innerText();
-    if (errText.includes("이미") || errText.includes("already") || errText.includes("exists")) {
-      console.log(`  ℹ 이미 존재 — 로그인으로 확인`);
-    }
+    if (/이미|already|exists/.test(errText)) console.log("  ℹ 이미 존재 — 로그인으로 확인");
+    const loginTab = page.locator("button", { hasText: /^로그인$/ }).first();
+    if (await loginTab.count() > 0) { await loginTab.click(); await page.waitForTimeout(600); }
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', pw);
-    await page.locator("button", { hasText: /로그인$/ }).last().click();
-    await page.waitForTimeout(3000);
+    await page.locator("button", { hasText: /^로그인$/ }).last().click();
+    await page.waitForSelector('button[class*="ftt-tab"], button.ftt-card', { state: "attached", timeout: 20000 }).catch(() => {});
   }
 
   await dismissOverlays(page);
 
-  const ok = await page.locator('button[class*="ftt-tab"]').count() > 0;
-  return ok;
+  return (await page.locator('button[class*="ftt-tab"], button.ftt-card').count()) > 0;
 }
 
 async function run() {
