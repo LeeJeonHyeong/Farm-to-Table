@@ -11,7 +11,29 @@ npm run dev
 
 브라우저에서 `http://localhost:5173` 으로 접속하면 됩니다.
 
-> `.env.local` 파일에 Firebase 및 Groq API 키가 설정되어 있어야 합니다.
+> 개발/운영 Firebase 프로젝트가 분리돼 있습니다. `.env.development.local`(개발)과
+> `.env.production.local`(운영)에 Firebase·Groq 키를 넣어 두면 Vite가 모드에 맞는 파일을
+> 자동으로 고릅니다. 항목은 [`.env.example`](.env.example) 참고.
+
+### 배포
+
+운영은 **Vercel**(`https://farm-to-table-farm-to-table1.vercel.app`)에 올라갑니다.
+`master` 에 푸시하면 자동 배포됩니다. Firestore·Auth는 그대로 Firebase를 씁니다.
+
+Vercel 환경변수 — `.env.production.local` 의 `VITE_*` 8개에 더해 서버 전용 2개가 필요합니다.
+**둘 다 `VITE_` 접두사를 붙이면 안 됩니다.** 붙이면 클라이언트 번들에 그대로 실립니다.
+
+| 변수 | 용도 |
+|---|---|
+| `GROQ_API_KEY` | AI 자동 입력·매칭 코멘트 프록시 |
+| `FIREBASE_SERVICE_ACCOUNT` | 이메일 찾기 (서비스 계정 JSON **한 줄**) |
+
+Firebase Console → Authentication → Settings → **승인된 도메인**에 배포 도메인을
+추가해야 로그인이 동작합니다. 빠뜨리면 다른 기능은 멀쩡한데 로그인만 조용히 막힙니다.
+
+Firebase Hosting(`https://farm-to-table-de5f5.web.app`)도 살아 있지만 `/api/*` 서버리스
+함수가 없어 AI 자동 입력이 규칙 파서로 폴백하고 이메일 찾기는 동작하지 않습니다.
+롤백용으로만 남겨 둔 주소입니다.
 
 ## 프로젝트 구조
 
@@ -23,11 +45,14 @@ npm run dev
 ├── firebase.json
 ├── firestore.rules        # Firestore 보안 규칙 (배포됨)
 ├── storage.rules          # Storage 보안 규칙 (Storage 미활성화로 미배포)
-├── run_tests.cjs          # E2E 통합 러너 (test_*.cjs 35개 순차 실행)
-├── load_env.cjs           # .env.local 로더 (Node 스크립트용)
+├── vercel.json            # Vercel SPA 재작성 (/api 제외)
+├── run_tests.cjs          # E2E 통합 러너 (test_*.cjs 순차 실행)
+├── load_env.cjs           # 환경변수 로더 (Node 스크립트용)
 ├── rotate_demo_password.cjs # 데모 계정 비밀번호 교체
-├── api
-│   └── groq/[...path].js  # Groq 프록시 (Vercel 서버리스, 경로·모델·레이트리밋 제한)
+├── static_rewrite_server.cjs # Hosting catch-all 재현 서버 (폴백 테스트용)
+├── api                    # Vercel 서버리스 함수 (외부 의존성 없음)
+│   ├── groq/openai/v1/chat/completions.js  # Groq 프록시 (모델·크기·레이트리밋 고정)
+│   └── account/find-email.js               # 상호명 → 마스킹된 이메일
 ├── public
 │   ├── sw.js               # Service Worker (웹 푸시 알림, 오프라인 캐싱)
 │   ├── manifest.json       # PWA 매니페스트
@@ -56,7 +81,7 @@ npm run dev
 - 인증은 **Firebase Authentication** (이메일/비밀번호) 을 사용합니다.
 - 세션 데이터(`current-user`)만 localStorage에 저장되며, 로그인 상태는 Firebase Auth가 자동 유지합니다.
 - `onSnapshot` 실시간 동기화로 딜 목록과 채팅이 즉시 반영됩니다.
-- AI 자동 입력·매칭 코멘트는 **Groq API (`qwen/qwen3.8-27b`)** 를 사용하며, 실패 시 규칙 기반 한국어 파서로 폴백합니다. 키를 클라이언트에 노출하지 않기 위해 Vercel 서버리스 함수 [`api/groq/[...path].js`](api/groq/[...path].js)를 프록시로 경유하며, 경로·메서드·모델·본문 크기를 고정하고 출처 검사와 레이트리밋을 적용합니다.
+- AI 자동 입력·매칭 코멘트는 **Groq API (`qwen/qwen3.8-27b`)** 를 사용하며, 실패 시 규칙 기반 한국어 파서로 폴백합니다. 키를 클라이언트에 노출하지 않기 위해 Vercel 서버리스 함수 [`api/groq/openai/v1/chat/completions.js`](api/groq/openai/v1/chat/completions.js)를 프록시로 경유하며, 메서드·모델·본문 크기를 고정하고 출처 검사와 레이트리밋을 적용합니다. 응답이 JSON 이 아니면(프록시가 없는 정적 호스팅 등) 규칙 파서로 폴백합니다.
 - **이미지는 Firestore에 base64 data URL로 저장됩니다.** 코드에는 Firebase Storage 업로드 경로(`images/<uid>/<이름>`)가 있으나 이 프로젝트는 Storage를 활성화한 적이 없어 업로드가 항상 실패하고 base64 폴백으로 동작합니다 (향후 과제 참고).
 - **웹 푸시 알림**은 Web Notification API + Service Worker로 구현됩니다 (Firebase Functions 불필요).
 
@@ -99,13 +124,16 @@ allow update: if isOwner() || isAdmin()
 
 allow delete: if isOwner() || isAdmin();
 
-# chats 컬렉션: 인증된 유저만 읽기/쓰기
-#   참여자 단위로 좁히지 못한 상태다. 채팅 문서에는 messages 만 있고 메시지에는
-#   senderName/senderRole 만 담기며 proposals 에도 농가 uid 가 없어 규칙이 대조할
-#   uid 가 데이터에 존재하지 않는다. 또 앱이 chats 컬렉션 전체를 구독하므로 문서
-#   단위 제한을 걸면 목록 조회 자체가 거부된다. participants 필드 추가와 구독
-#   쿼리 필터링이 선행돼야 한다 (향후 과제).
-allow read, write: if isSignedIn();
+# chats 컬렉션: 대화 참여자만
+#   문서에 participants: [셰프uid, 농가uid] 를 두고, 앱이
+#   where('participants','array-contains',uid) 로 구독하므로 목록 조회도 통과한다.
+#   participants 가 없는 과거 문서는 접근이 거부된다 (정리 대상).
+allow read:   if isSignedIn() && request.auth.uid in resource.data.participants;
+allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
+# 자기를 참여자에서 빼면서 남의 대화를 고치지 못하도록 변경 전후를 함께 본다
+allow update: if isSignedIn()
+              && request.auth.uid in resource.data.participants
+              && request.auth.uid in request.resource.data.participants;
 ```
 
 관리자는 규칙에서 이메일로 강제합니다. 앱의 `ADMIN_EMAIL`(`VITE_ADMIN_EMAIL`) 비교는
@@ -167,6 +195,9 @@ UI 표시 전용이며, 규칙 파일은 클라이언트로 전송되지 않습�
 | 납품일 자동 마감 | 납품일이 지난 모집중 딜 자동 마감 처리 + "납품일 만료" 뱃지 |
 | 관리자 화면 | KPI 현황·딜 관리·수수료 정산 대시보드·유저 목록·채팅 로그 (ADMIN_EMAIL 접근제어) |
 | 회원가입 / 로그인 | Firebase Auth 이메일/비밀번호 인증, 역할(셰프·농가) 선택 + 첫 로그인 온보딩 |
+| 비밀번호 재설정 | 로그인 화면 "비밀번호를 잊으셨나요?" → 재설정 메일 발송 (`sendPasswordResetEmail`, 한국어). 미가입 주소도 동일하게 응답해 가입 여부가 드러나지 않음 |
+| 이메일 찾기 | 로그인 화면 "이메일을 잊으셨나요?" → 상호명으로 조회해 `ch*****@naver.com` 형태로만 표시. 결과에서 비밀번호 재설정으로 바로 연결 |
+| 약관 동의 / 회원 탈퇴 | 가입 시 이용약관·개인정보 수집·이용 필수 동의(시각·버전 기록), 탈퇴 시 개인정보 파기 + 거래 기록 익명화 |
 
 ## 거래 가능 품목 (20종)
 
@@ -304,6 +335,11 @@ UI 표시 전용이며, 규칙 파일은 클라이언트로 전송되지 않습�
 | E2E 안정화 | v2.53 홈 랜딩 도입 후 깨진 테스트 13개 수정 — 탭 바가 `display:none`이 되면서 DOM 순서상 숨겨진 `button.ftt-tab`이 보이는 `button.ftt-card`보다 먼저 잡히던 문제(`goToTab` 헬퍼 `ftt-card` 우선 조회로 교체), 로그인·가입 후 고정 대기(5초) → `waitForSelector('button.ftt-card, button.ftt-tab')` 교체로 Firebase 지연 내성 확보 (스위트 후반부에서만 실패하던 원인) → **35/35 통과** |
 | 보안 강화 | 감사에서 확인된 배포 환경 악용 경로 차단 — Firestore 규칙 전면 재작성(storage 교차 쓰기 차단·미인증 읽기 제거·deals 필드 단위 분리로 결제/서명 위조 차단·관리자 서버 강제), Groq 프록시 오픈 릴레이 잠금, 데모 계정 자격증명 저장소 분리 및 비밀번호 교체. 규칙 실서비스 배포 후 E2E 35/35 재검증 |
 | 버그 수정 | 규칙 배포로 드러난 로그인 화면 회귀 — 공유 데이터 로드가 `authChecked`만 확인하고 `user`는 보지 않아 로그인 전에도 `getDocs(deals)`를 호출, 새 규칙이 거부하며 `loadState="error"` → 에러 렌더 분기가 로그인 분기보다 앞에 있어 로그인 폼이 가려졌다. 렌더 분기에 `user` 조건 추가 + 로그인 전 조회 차단 + 로그아웃 후 미인증 구독 정리 |
+| AI 폴백 수정 | Firebase Hosting 에는 `/api/groq` 가 없고 catch-all rewrite 가 `index.html` 을 **200 text/html** 로 돌려준다. 상태 코드만 보던 폴백(`!response.ok`)이 발동하지 않아 `response.json()` 이 HTML 을 파싱하다 예외를 던졌고, 그 원문이 화면에 노출됐다(Safari: `The string did not match the expected pattern.`). Content-Type 검사 추가 + fetch 실패·깨진 JSON 까지 규칙 파서로 폴백 + 예외 원문 대신 사용자 문구. `test_ai_fallback.cjs` 10/10 |
+| Hosting 캐시 헤더 | 헤더 설정이 없어 Firebase 기본값 `max-age=3600` 이 전 경로에 걸렸고, `index.html` 이 1시간 캐시돼 배포가 즉시 반영되지 않았다. `/assets/**` 는 `immutable` 1년(Vite 내용 해시), 그 외는 `no-cache`. **Firebase 는 나중에 매칭된 규칙이 우선**하므로 포괄 규칙(`**`)을 먼저, 구체 규칙을 뒤에 둔다 (반대로 두면 assets 까지 no-cache) |
+| 비밀번호 재설정 | 로그인 화면에 링크·모달 추가. `sendPasswordResetEmail` 기반이라 서버가 필요 없다. `auth.languageCode="ko"` 로 한국어 발송, `auth/user-not-found` 를 성공과 동일 처리해 이메일 캐내기 차단. `test_password_reset.cjs` 11/11 |
+| Vercel 이전 | AI 자동 입력과 이메일 찾기 모두 서버리스 함수가 필요해 호스팅을 Vercel 로 옮겼다. 이전 과정에서 4건을 해결 — 배포 보호(SSO) 해제 / catch-all 미매칭 / Groq 키 오입력 / ESM·CJS 번들 충돌. `test_deploy_smoke.cjs` 10/10 |
+| 이메일 찾기 | 상호명 → 마스킹된 이메일(`ch*****@naver.com`). 서버 자격증명으로만 조회하고 완전 일치만 허용, 분당 10회 제한, 동명 업체 최대 3건. `firebase-admin` 없이 서비스 계정 JWT + Google REST 직접 호출(의존성 0). 단위 18/18 · E2E 9/9 |
 
 ### v1.6 상세 내역
 
@@ -1601,6 +1637,10 @@ UI 표시 전용이며, 규칙 파일은 클라이언트로 전송되지 않습�
 `max_tokens` 상한·출처 검사·레이트리밋·업스트림 오류 본문 차단을 적용했습니다.
 호출부 두 곳이 실패 시 규칙 기반 폴백으로 degrade하므로 거부돼도 앱은 동작합니다.
 
+> 이후 Vercel 이전 과정에서 catch-all 이 한 단계까지만 매칭되는 문제가 드러나
+> 파일 경로를 `api/groq/openai/v1/chat/completions.js` 로 고정했습니다.
+> 적용된 제한은 그대로입니다 (Vercel 이전 상세 내역 참고).
+
 > 한계: 여전히 인증되지 않는 엔드포인트입니다. 출처 검사는 타 사이트 경유 호출과 단순
 > 스크래핑을 막을 뿐 헤더를 위조하는 직접 호출은 막지 못합니다. 완전한 차단에는
 > Firebase ID 토큰 검증이 필요합니다.
@@ -1634,11 +1674,93 @@ Java가 없어 Firestore 에뮬레이터를 띄울 수 없었고, 규칙을 배�
 
 ---
 
+## Vercel 이전 상세 내역
+
+### 왜 옮겼나
+
+AI 자동 입력과 이메일 찾기는 둘 다 **서버리스 함수**가 있어야 동작합니다. Groq 프록시
+`api/` 는 처음부터 Vercel 규격으로 작성돼 있었지만 배포는 Firebase Hosting 으로만 하고
+있어서, 운영 환경에서는 AI 가 한 번도 실제로 돌지 않았습니다(규칙 파서로 폴백).
+이메일 찾기도 같은 이유로 만들 수 없었습니다.
+
+Vercel Hobby 는 무료이고 카드 등록이 필요 없습니다. Firestore·Auth 는 그대로 Firebase 를
+쓰므로 계정·거래 데이터는 영향이 없고, 기존 Hosting 주소도 롤백용으로 살려 뒀습니다.
+
+### 이전 중 막혔던 4가지
+
+**1. 배포 보호 (Vercel Authentication)**
+기본값이 켜져 있어 외부에서 접속하면 Vercel 로그인으로 튕겼습니다. QR 을 찍은 사람은
+앱 대신 로그인 화면을 보게 됩니다. Settings → Deployment Protection 에서 해제.
+
+**2. catch-all 함수 미매칭**
+`/api/groq/openai/v1/chat/completions` 가 플랫폼 404(`X-Vercel-Error: NOT_FOUND`).
+깊이별로 찍어보니 `[...path].js` 가 **한 단계까지만** 매칭됐습니다.
+
+```
+/api/groq/a    → 200 application/json   (핸들러 응답)
+/api/groq/a/b  → 404 text/plain         (플랫폼 404)
+```
+
+파일명은 정확했으나 Vercel 이 단일 세그먼트 동적 경로처럼 다뤘습니다. 앱이 호출하는
+경로는 하나뿐이므로 동적 라우팅을 걷어내고 파일 경로로 고정했습니다
+(`api/groq/openai/v1/chat/completions.js`).
+
+**3. Groq 키 오입력**
+핸들러가 상태 코드를 가려 502 만 보였습니다. 업스트림 코드를 응답에 싣도록 바꾸니
+`{"error":"upstream_error","status":401}` — 키가 틀린 것이었습니다. 코드는 민감하지
+않으므로 그대로 두어 앞으로도 원인 파악이 바로 됩니다(본문은 서버 로그로만).
+
+**4. ESM / CommonJS 번들 충돌**
+이메일 찾기 함수가 호출 즉시 죽었습니다(`FUNCTION_INVOCATION_FAILED`).
+
+```
+require() of ES Module .../jose/dist/webapi/index.js from .../jwks-rsa/src/utils.js
+```
+
+`firebase-admin@14 → jwks-rsa@4(CJS) → jose@6(ESM 전용)` 구조인데, Vercel 번들러가
+`jwks-rsa` 의 동적 import 를 `require()` 로 바꿔 넣어 깨졌습니다. 로컬 Node 에서는
+네이티브 ESM 이라 재현되지 않는 번들링 산물입니다.
+
+버전을 맞춰가며 씨름하는 대신 **의존성을 없앴습니다.** 서비스 계정 JWT 로 액세스 토큰을
+받아 Google REST 를 직접 호출합니다 — Node 18+ 의 `crypto` 와 `fetch` 만 씁니다.
+
+| 호출 | 용도 |
+|---|---|
+| `oauth2.googleapis.com/token` | RS256 JWT → 액세스 토큰 (1시간 캐시) |
+| `firestore…/documents:runQuery` | `__name__` 범위로 `user-profile-*` 만 조회 |
+| `identitytoolkit…/accounts:lookup` | uid → 이메일 |
+
+범위 조회는 `'-'`(0x2D) 다음 문자가 `'.'`(0x2E) 인 점을 이용해
+`[user-profile- , user-profile.)` 로 접두어를 정확히 덮습니다.
+
+### 이메일 찾기 — 노출을 좁힌 방법
+
+이메일은 Firebase Auth 에만 있고 `user-profile-{uid}` 에는 없습니다. 게다가 이 기능을
+쓰는 사람은 로그아웃 상태라 클라이언트 조회가 아예 불가능합니다. 규칙을 풀어 클라이언트에
+맡기면 **누구나 전 회원의 이메일을 긁어갈 수 있으므로** 서버 경로로만 열었습니다.
+
+- **완전 일치만** 허용 (공백·대소문자만 정규화) — 부분 일치를 열면 두세 글자로 회원 목록을 훑을 수 있습니다
+- 앞 2글자만 남기고 마스킹, 마스킹 문자는 **최소 3개**라 길이로 원본을 추정할 수 없습니다
+- 분당 10회 레이트리밋 + 동일 출처 검사, 동명 업체 최대 3건
+- 상호명 자체는 딜·제안 목록에 이미 공개되는 정보라 새로 새는 정보가 아닙니다
+
+### 검증
+
+| 테스트 | 결과 | 비고 |
+|---|---|---|
+| `test_deploy_smoke.cjs` | 10/10 | `BASE=` 로 아무 배포본이나 점검. 정적 호스팅에 돌리면 8/10 으로 **프록시 부재를 정확히 적발** |
+| `test_find_email_e2e.cjs` | 9/9 | 실제 가입 → 로그아웃 → 상호명 조회 → 마스킹 확인 |
+| `test_find_email_unit.mjs` | 18/18 | 정규화·마스킹·복원 불가 (자격증명 불필요) |
+| `test_password_reset.cjs` | 11/11 | 링크 노출 조건·미가입 동일 응답·로그인 회귀 |
+| `test_ai_fallback.cjs` | 10/10 | `static_rewrite_server.cjs` 로 Hosting catch-all 재현 |
+
+---
+
 ## 향후 과제
 
-- **채팅 참여자 제한** — 현재 모든 가입자가 임의 딜의 협상 대화를 읽고 메시지를 주입할 수 있습니다. 채팅 문서에 `participants: [uid, uid]` 필드를 추가하고 구독을 `where('participants','array-contains',uid)` 로 필터링해야 합니다. 앱이 `chats` 컬렉션 전체를 구독하는 성능 문제와 동일한 작업이며, 기존 문서 마이그레이션이 필요합니다.
 - **Firebase Storage 활성화** — 사진이 base64로 Firestore에 저장돼 문서가 비대해집니다. 콘솔에서 Storage를 켜고 `firebase.json`에 `"storage": { "rules": "storage.rules" }` 를 추가하면 정상화됩니다 (규칙은 이미 실제 경로에 맞게 준비돼 있음).
-- **Groq 프록시 인증** — Firebase ID 토큰 검증을 붙여야 키 도용을 실제로 막을 수 있습니다.
+- **서버리스 엔드포인트 인증** — `api/groq/…` 와 `api/account/find-email` 둘 다 출처 검사와 레이트리밋만 걸려 있습니다. 헤더를 위조한 직접 호출은 막지 못하므로, 실제 차단에는 Firebase ID 토큰 검증이 필요합니다. 이메일 찾기는 로그아웃 상태에서 쓰는 기능이라 토큰을 요구할 수 없어, CAPTCHA 같은 별도 수단을 검토해야 합니다.
+- **테스트 계정 정리** — 배포 검증 과정에서 운영 Firebase 에 `smoke_*@test.com`·`findmail_*@test.com` 계정이 생성됩니다. 관리자 화면이나 콘솔에서 주기적으로 정리해야 합니다.
 - **초기 로드 중복 읽기 제거** — 로그인 시 `getDocs(deals)`·`getDocs(chats)` 프리페치 후 `onSnapshot` 첫 스냅샷이 같은 데이터를 다시 배달합니다. 프리페치를 제거하면 초기 읽기가 반감됩니다. 아울러 쿼리에 `where`/`limit`이 없어 모든 클라이언트가 앱 전체의 모든 메시지를 내려받습니다.
 - **테스트 러너 교체** — `run_tests.cjs`가 `execSync` 순차 실행이고 `stdio:"pipe"`로 실패 출력을 버려 실패 시 "오류" 한 줄만 남습니다. `@playwright/test`로 옮기면 병렬 워커(15분→2~3분)·자동 재시도(Firebase 타이밍 flakiness 흡수)·실패 trace를 얻습니다.
 - **App.jsx 분리** — 단일 파일 9,600여 줄입니다. 모든 컴포넌트가 이미 모듈 스코프에 있고 데이터가 props로만 흘러 분리는 기계적인 파일 이동입니다. 다만 테스트 약 20개가 App.jsx **소스 텍스트**를 검사하므로(`code.includes(...)`) 파일을 쪼개면 함께 깨집니다. 테스트 전략 정리가 선행돼야 합니다.
