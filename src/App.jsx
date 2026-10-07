@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, Fragment, Component } from "react
 import { storage, db, auth, fbStorage } from "./firebase";
 import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
 import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, query, where } from "firebase/firestore";
-import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, deleteUser, EmailAuthProvider, reauthenticateWithCredential, sendPasswordResetEmail } from "firebase/auth";
 import { TERMS_OF_SERVICE, PRIVACY_POLICY, TERMS_VERSION, PRIVACY_VERSION, LEGAL_REVIEW_PENDING } from "./legal";
 
 function useIsMobile() {
@@ -6828,7 +6828,98 @@ const AUTH_ERRORS = {
   "auth/too-many-requests": "잠시 후 다시 시도해주세요.",
   "auth/network-request-failed": "네트워크 오류가 발생했습니다.",
   "auth/operation-not-allowed": "이메일/비밀번호 가입이 비활성화되어 있습니다.",
+  "auth/missing-email": "이메일을 입력해주세요.",
 };
+
+/** 비밀번호 재설정 메일 발송 */
+function PasswordResetModal({ initialEmail = "", onClose }) {
+  const [email, setEmail] = useState(initialEmail);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const send = async () => {
+    const addr = email.trim();
+    if (!addr) { setError("이메일을 입력해주세요."); return; }
+    setSending(true);
+    setError("");
+    try {
+      auth.languageCode = "ko"; // 재설정 메일을 한국어로 받는다
+      await sendPasswordResetEmail(auth, addr);
+      setSent(true);
+    } catch (err) {
+      // 가입 여부가 드러나면 이메일 목록을 캐낼 수 있다. '없는 계정'은 성공과 똑같이 처리한다.
+      if (err.code === "auth/user-not-found") {
+        setSent(true);
+      } else {
+        console.error("비밀번호 재설정 메일 발송 실패:", err);
+        setError(AUTH_ERRORS[err.code] || "메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 14, maxWidth: 420, width: "100%", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: TOKENS.ink }}>비밀번호 재설정</div>
+          <button onClick={onClose} aria-label="닫기"
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 20, color: TOKENS.inkSoft, cursor: "pointer", lineHeight: 1 }}>×</button>
+        </div>
+
+        <div style={{ padding: "20px 24px" }}>
+          {sent ? (
+            <>
+              <div style={{ fontSize: 13, lineHeight: 1.75, color: TOKENS.ink }}>
+                <strong>{email.trim()}</strong> 로 재설정 메일을 보냈습니다.<br />
+                메일의 링크를 눌러 새 비밀번호를 설정해 주세요.
+              </div>
+              <div style={{ marginTop: 10, fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.7 }}>
+                메일이 보이지 않으면 스팸함을 확인해 주세요. 가입되지 않은 주소라면 메일이 오지 않습니다.
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, lineHeight: 1.75, color: TOKENS.inkSoft, marginBottom: 14 }}>
+                가입하신 이메일 주소를 입력하시면 비밀번호를 다시 설정할 수 있는 링크를 보내드립니다.
+              </div>
+              <FieldLabel required>이메일</FieldLabel>
+              <input type="email" placeholder="example@email.com" value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && !sending && send()}
+                style={inputStyle} />
+              {error && <ErrorText text={error} />}
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: "14px 24px", borderTop: `1px solid ${TOKENS.line}`, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          {sent ? (
+            <button onClick={onClose}
+              style={{ padding: "9px 24px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+              확인
+            </button>
+          ) : (
+            <>
+              <button onClick={onClose}
+                style={{ padding: "9px 18px", background: "none", color: TOKENS.inkSoft, border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+                취소
+              </button>
+              <button onClick={send} disabled={sending}
+                style={{ padding: "9px 20px", background: sending ? TOKENS.line : TOKENS.ink, color: sending ? TOKENS.inkSoft : TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, cursor: sending ? "default" : "pointer" }}>
+                {sending ? "전송 중…" : "재설정 메일 보내기"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState("login"); // "login" | "signup"
@@ -6841,6 +6932,7 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [agreed, setAgreed] = useState({ terms: false, privacy: false });
   const [legalDoc, setLegalDoc] = useState(null); // "terms" | "privacy" | null
+  const [resetOpen, setResetOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const handleSubmit = async () => {
@@ -7180,6 +7272,15 @@ function LoginScreen({ onLogin }) {
             </button>
           </div>
 
+          {mode === "login" && (
+            <div style={{ textAlign: "right", marginTop: 6 }}>
+              <button type="button" onClick={() => setResetOpen(true)}
+                style={{ background: "none", border: "none", padding: 0, color: TOKENS.moss, fontSize: 12, textDecoration: "underline", cursor: "pointer" }}>
+                비밀번호를 잊으셨나요?
+              </button>
+            </div>
+          )}
+
           {/* 상호명 (가입 시만) */}
           {mode === "signup" && (
             <>
@@ -7242,6 +7343,7 @@ function LoginScreen({ onLogin }) {
         </div>
       </div>
       {legalDoc && <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
+      {resetOpen && <PasswordResetModal initialEmail={email} onClose={() => setResetOpen(false)} />}
     </div>
   );
 }
