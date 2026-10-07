@@ -8,9 +8,9 @@
 // 노출 범위: 상호명은 앱 안에서 이미 공개되는 정보다(딜·제안 목록에 그대로 보인다).
 // 따라서 "그 상호명이 가입했는지"는 새로 새는 정보가 아니고, 이메일은 마스킹해서 내보낸다.
 
-import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+// firebase-admin 은 핸들러 안에서 동적으로 불러온다. 최상단 import 로 두면 모듈 로드가
+// 실패했을 때 함수가 통째로 죽어(FUNCTION_INVOCATION_FAILED) 원인을 알 수 없고,
+// 자격증명이 없을 때도 쓸데없이 무거운 모듈을 끌어온다.
 
 const PREFIX = "user-profile-";
 const MAX_SCAN = 5000;      // 사고로 거대 컬렉션을 긁지 않도록 상한
@@ -61,10 +61,10 @@ export function maskEmail(email) {
   return `${keep}${"*".repeat(Math.max(3, local.length - keep.length))}${domain}`;
 }
 
-function admin() {
-  if (getApps().length) return getApp();
+async function admin() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) return null;
+  if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT 미설정");
+
   let json;
   try {
     json = JSON.parse(raw);
@@ -75,7 +75,14 @@ function admin() {
   if (typeof json.private_key === "string") {
     json.private_key = json.private_key.replace(/\\n/g, "\n");
   }
-  return initializeApp({ credential: cert(json) });
+
+  const { cert, getApp, getApps, initializeApp } = await import("firebase-admin/app");
+  const app = getApps().length ? getApp() : initializeApp({ credential: cert(json) });
+  const [{ getAuth }, { getFirestore }] = await Promise.all([
+    import("firebase-admin/auth"),
+    import("firebase-admin/firestore"),
+  ]);
+  return { app, getAuth, getFirestore };
 }
 
 export default async function handler(req, res) {
@@ -88,16 +95,18 @@ export default async function handler(req, res) {
   const wanted = normalizeName(req.body?.name);
   if (!wanted || wanted.length < 2) return res.status(400).json({ error: "bad_request" });
 
-  let app;
+  let sdk;
   try {
-    app = admin();
+    sdk = await admin();
   } catch (err) {
-    console.error("Admin SDK 초기화 실패:", err.message);
-    return res.status(503).json({ error: "not_configured" });
+    console.error("Admin SDK 초기화 실패:", err);
+    // 설정 누락인지 모듈 로드 실패인지 응답만 보고 구분할 수 있게 사유를 싣는다.
+    // 서비스 계정 값 자체는 담기지 않는다.
+    return res.status(503).json({ error: "not_configured", reason: String(err.message).slice(0, 120) });
   }
-  if (!app) return res.status(503).json({ error: "not_configured" });
 
   try {
+    const { app, getAuth, getFirestore } = sdk;
     const db = getFirestore(app);
     const snap = await db.collection("storage")
       .orderBy("__name__")
