@@ -6831,6 +6831,103 @@ const AUTH_ERRORS = {
   "auth/missing-email": "이메일을 입력해주세요.",
 };
 
+/** 상호명으로 가입 이메일 힌트 찾기 — 서버가 마스킹된 주소만 돌려준다 */
+function FindEmailModal({ onClose, onPick }) {
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null); // { found, hints }
+  const [error, setError] = useState("");
+
+  const search = async () => {
+    const q = name.trim();
+    if (q.length < 2) { setError("상호명을 2자 이상 입력해주세요."); return; }
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const res = await fetch("/api/account/find-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: q }),
+      });
+      const type = res.headers.get("content-type") ?? "";
+      if (!type.includes("application/json")) throw new Error("not-json");
+      const data = await res.json();
+      if (res.status === 503) { setError("이메일 찾기가 아직 설정되지 않았습니다. 관리자에게 문의해주세요."); return; }
+      if (res.status === 429) { setError("요청이 많습니다. 잠시 후 다시 시도해주세요."); return; }
+      if (!res.ok) { setError("조회에 실패했습니다. 잠시 후 다시 시도해주세요."); return; }
+      setResult(data);
+    } catch (err) {
+      console.error("이메일 찾기 실패:", err);
+      setError("조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(32,40,31,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 14, maxWidth: 420, width: "100%", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${TOKENS.line}`, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: TOKENS.ink }}>이메일 찾기</div>
+          <button onClick={onClose} aria-label="닫기"
+            style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 20, color: TOKENS.inkSoft, cursor: "pointer", lineHeight: 1 }}>×</button>
+        </div>
+
+        <div style={{ padding: "20px 24px" }}>
+          <div style={{ fontSize: 13, lineHeight: 1.75, color: TOKENS.inkSoft, marginBottom: 14 }}>
+            가입하실 때 입력한 레스토랑명 또는 농가명을 넣어주세요.
+            개인정보 보호를 위해 주소 일부만 보여드립니다.
+          </div>
+          <FieldLabel required>레스토랑명 · 농가명</FieldLabel>
+          <input type="text" placeholder="예: 테이블나인" value={name}
+            onChange={(e) => { setName(e.target.value); setError(""); setResult(null); }}
+            onKeyDown={(e) => e.key === "Enter" && !loading && search()}
+            style={inputStyle} />
+          {error && <ErrorText text={error} />}
+
+          {result && (result.found ? (
+            <div style={{ marginTop: 14, padding: "12px 14px", background: TOKENS.mossSoft, border: `1px solid ${TOKENS.moss}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginBottom: 6 }}>등록된 이메일</div>
+              {result.hints.map((h) => (
+                <div key={h} style={{ fontSize: 15, fontWeight: 600, color: TOKENS.ink, fontFamily: "'IBM Plex Mono', monospace", padding: "2px 0" }}>{h}</div>
+              ))}
+              <div style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 8, lineHeight: 1.7 }}>
+                기억나는 주소라면 로그인 화면에서 전체 주소를 입력해 주세요.
+                비밀번호가 기억나지 않으면 재설정 메일을 받으실 수 있습니다.
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: 14, fontSize: 13, color: TOKENS.rust, lineHeight: 1.7 }}>
+              해당 상호명으로 가입된 계정을 찾지 못했습니다. 띄어쓰기까지 가입 때와 똑같이 입력했는지 확인해 주세요.
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: "14px 24px", borderTop: `1px solid ${TOKENS.line}`, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose}
+            style={{ padding: "9px 18px", background: "none", color: TOKENS.inkSoft, border: `1px solid ${TOKENS.line}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+            닫기
+          </button>
+          {result?.found ? (
+            <button onClick={onPick}
+              style={{ padding: "9px 20px", background: TOKENS.ink, color: TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+              비밀번호 재설정
+            </button>
+          ) : (
+            <button onClick={search} disabled={loading}
+              style={{ padding: "9px 20px", background: loading ? TOKENS.line : TOKENS.ink, color: loading ? TOKENS.inkSoft : TOKENS.bg, border: "none", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer" }}>
+              {loading ? "찾는 중…" : "찾기"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 비밀번호 재설정 메일 발송 */
 function PasswordResetModal({ initialEmail = "", onClose }) {
   const [email, setEmail] = useState(initialEmail);
@@ -6933,6 +7030,7 @@ function LoginScreen({ onLogin }) {
   const [agreed, setAgreed] = useState({ terms: false, privacy: false });
   const [legalDoc, setLegalDoc] = useState(null); // "terms" | "privacy" | null
   const [resetOpen, setResetOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const handleSubmit = async () => {
@@ -7273,7 +7371,12 @@ function LoginScreen({ onLogin }) {
           </div>
 
           {mode === "login" && (
-            <div style={{ textAlign: "right", marginTop: 6 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+              <button type="button" onClick={() => setFindOpen(true)}
+                style={{ background: "none", border: "none", padding: 0, color: TOKENS.moss, fontSize: 12, textDecoration: "underline", cursor: "pointer" }}>
+                이메일을 잊으셨나요?
+              </button>
+              <span style={{ color: TOKENS.line, fontSize: 12 }}>|</span>
               <button type="button" onClick={() => setResetOpen(true)}
                 style={{ background: "none", border: "none", padding: 0, color: TOKENS.moss, fontSize: 12, textDecoration: "underline", cursor: "pointer" }}>
                 비밀번호를 잊으셨나요?
@@ -7343,6 +7446,8 @@ function LoginScreen({ onLogin }) {
         </div>
       </div>
       {legalDoc && <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
+      {findOpen && <FindEmailModal onClose={() => setFindOpen(false)}
+        onPick={() => { setFindOpen(false); setResetOpen(true); }} />}
       {resetOpen && <PasswordResetModal initialEmail={email} onClose={() => setResetOpen(false)} />}
     </div>
   );
