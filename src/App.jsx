@@ -1443,6 +1443,22 @@ const loadKakaoPostcode = () =>
     document.head.appendChild(s);
   });
 
+// 토스페이먼츠 SDK(56KB) 동적 로드. 결제 단계에 들어간 사용자만 받는다.
+// 연타해도 스크립트가 한 번만 붙도록 진행 중인 Promise 를 재사용한다.
+let _tossLoading = null;
+const loadTossPayments = () => {
+  if (window.TossPayments) return Promise.resolve();
+  if (_tossLoading) return _tossLoading;
+  _tossLoading = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://js.tosspayments.com/v1/payment";
+    s.onload = resolve;
+    s.onerror = () => { _tossLoading = null; reject(new Error("toss-sdk-load-failed")); };
+    document.head.appendChild(s);
+  });
+  return _tossLoading;
+};
+
 const DEAL_FIELD_REQUIRED = {
   chefName: "레스토랑명",
   crop: "품목",
@@ -8438,9 +8454,11 @@ export default function FarmToTableApp() {
     persistDeal(updated);
   };
 
-  const handleTossPayment = (deal, proposal, type) => {
-    if (!window.TossPayments) {
-      setToastMsg("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
+  const handleTossPayment = async (deal, proposal, type) => {
+    try {
+      await loadTossPayments();
+    } catch {
+      setToastMsg("결제 모듈을 불러오지 못했습니다. 네트워크를 확인해 주세요.");
       return;
     }
     const total = proposal.price * deal.quantity;
