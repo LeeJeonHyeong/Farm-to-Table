@@ -14,6 +14,22 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "comment": "기본값: index.html · sw.js · 아이콘은 파일명이 고정이라 캐시되면 배포가 즉시 반영되지 않는다. 매 요청 재검증(ETag)하게 둔다. 뒤에 오는 규칙이 우선하므로 이 포괄 규칙을 먼저 둔다.",
+        "source": "**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      },
+      {
+        "comment": "Vite 가 내용 해시를 붙여 주므로 영구 캐시해도 안전하다. 내용이 바뀌면 파일명이 바뀐다.",
+        "source": "/assets/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      }
     ]
   }
 }
