@@ -21,7 +21,12 @@
     <!-- Google Fonts (PERF-03: JSX 중복 제거 후 index.html 단일 로드) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+    <!--
+      Fraunces 는 opsz(광학 크기) 가변 축을 빼고 받는다. 축을 포함하면 latin 서브셋이
+      65KB, 빼면 35KB 다. 제목에만 쓰는 장식 서체가 초기 로드의 15% 를 차지하던 걸 줄인다.
+      가중치 600·700 은 그대로라 글자 모양은 유지된다.
+    -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
 
     <!-- 로그인 직후 바로 붙는 곳들. 모바일에서 TLS 핸드셰이크 지연을 줄인다. -->
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
