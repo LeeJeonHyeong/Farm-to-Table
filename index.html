@@ -21,9 +21,17 @@
     <!-- Google Fonts (PERF-03: JSX 중복 제거 후 index.html 단일 로드) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
-    <!-- 토스페이먼츠 결제 SDK -->
-    <script src="https://js.tosspayments.com/v1/payment"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+
+    <!-- 로그인 직후 바로 붙는 곳들. 모바일에서 TLS 핸드셰이크 지연을 줄인다. -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+
+    <!--
+      토스페이먼츠 SDK(56KB)는 여기서 받지 않는다. 결제 단계에 들어간 사용자만 쓰는데
+      head 의 동기 스크립트로 두면 모든 첫 진입에 비용을 물린다. App.jsx 의
+      loadTossPayments() 가 결제 직전에 주입한다.
+    -->
   </head>
   <body>
     <div id="root"></div>

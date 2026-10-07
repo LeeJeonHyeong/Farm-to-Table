@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -14,7 +14,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const auth = getAuth(app);
+// getAuth() 는 소셜 로그인용 popupRedirectResolver 를 함께 올린다. 그 과정에서
+// __/auth/iframe.js(93KB)와 apis.google.com(41KB)을 초기 로드에 끌어와 모바일에서
+// 체감이 크게 나빠진다. 이 앱은 이메일/비밀번호만 쓰므로 리졸버 없이 초기화한다.
+// 소셜 로그인을 붙이게 되면 popupRedirectResolver 를 지정해야 한다.
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
 export const fbStorage = getStorage(app);
 
 const LOCAL_KEYS = new Set(["current-user"]);
