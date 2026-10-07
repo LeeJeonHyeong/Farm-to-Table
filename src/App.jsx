@@ -1270,33 +1270,45 @@ JSON 형식:
   "note": "추가사항 또는 null"
 }`;
 
-  const response = await fetch("/api/groq/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "qwen/qwen3.8-27b",
-      messages: [
-        { role: "system", content: systemInstruction },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.1,
-      max_tokens: 512,
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!response.ok) {
-    return parseWithRules(text);
+  let result = null;
+  try {
+    const response = await fetch("/api/groq/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen/qwen3.8-27b",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 512,
+        response_format: { type: "json_object" },
+      }),
+    });
+    // 프록시가 없는 호스팅에서는 catch-all rewrite 때문에 index.html 이 200 text/html 로
+    // 돌아온다. 상태 코드만으로는 걸러지지 않으므로 콘텐츠 타입까지 확인한다.
+    const contentType = response.headers.get("content-type") ?? "";
+    if (response.ok && contentType.includes("application/json")) {
+      result = await response.json();
+    }
+  } catch (err) {
+    console.error("AI 자동 입력 요청 실패:", err);
   }
 
-  const result = await response.json();
+  if (!result) return parseWithRules(text);
+
   const rawText = result.choices?.[0]?.message?.content?.trim() ?? "";
   try {
     return JSON.parse(rawText);
   } catch {
-    const match = rawText.match(/\{[\s\S]*\}/);
-    if (!match) return parseWithRules(text);
-    return JSON.parse(match[0]);
+    try {
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]);
+    } catch (err) {
+      console.error("AI 응답 JSON 파싱 실패:", err);
+    }
+    return parseWithRules(text);
   }
 }
 
@@ -1623,7 +1635,9 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
         setAiParsed(true);
       }
     } catch (err) {
-      setAiError(err.message || "AI 파싱 중 오류가 발생했습니다.");
+      // 예외 원문은 사용자에게 의미가 없어 콘솔로만 남긴다.
+      console.error("AI 자동 입력 처리 실패:", err);
+      setAiError("자동 입력에 실패했습니다. 아래 항목을 직접 입력해 주세요.");
     } finally {
       setAiLoading(false);
     }
