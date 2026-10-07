@@ -4,3 +4,7 @@ dist
 *.local
 firebase-debug.log
 firestore-debug.log
+
+# Firebase 서비스 계정 키 (절대 커밋 금지 — 프로젝트 전체 관리자 권한)
+*firebase-adminsdk*.json
+serviceAccount*.json
