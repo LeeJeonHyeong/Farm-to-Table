@@ -1,11 +1,15 @@
 // Groq 프록시. 서버의 GROQ_API_KEY로 호출하므로, 이 핸들러가 통과시키는 요청은
-// 전부 계정 요금으로 청구된다. 따라서 경로·메서드·모델·크기를 모두 고정한다.
+// 전부 계정 요금으로 청구된다. 따라서 메서드·모델·크기를 모두 고정한다.
+//
+// 경로를 파일 경로로 고정했다. 이전에는 api/groq/[...path].js 하나로 받고 핸들러에서
+// 경로를 검사했는데, Vercel 이 이 catch-all 을 한 단계까지만 매칭해
+// /api/groq/openai/v1/chat/completions 가 플랫폼 404 로 떨어졌다.
 //
 // 한계: 이 엔드포인트는 여전히 인증되지 않는다. 아래 출처 검사는 다른 사이트에서의
 // 브라우저 경유 호출과 단순 스크래핑을 막을 뿐, 헤더를 위조하는 직접 호출은 막지 못한다.
 // 실제 차단에는 Firebase ID 토큰 검증이 필요하다.
 
-const ALLOWED_PATH = "openai/v1/chat/completions";
+const UPSTREAM = "https://api.groq.com/openai/v1/chat/completions";
 const ALLOWED_MODELS = new Set(["qwen/qwen3.8-27b"]);
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TOKENS_CAP = 1024;
@@ -46,10 +50,6 @@ function fromOwnOrigin(req) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
   if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: "not_configured" });
-
-  const segments = Array.isArray(req.query.path) ? req.query.path : [req.query.path];
-  if (segments.join("/") !== ALLOWED_PATH) return res.status(404).json({ error: "not_found" });
-
   if (!fromOwnOrigin(req)) return res.status(403).json({ error: "forbidden" });
 
   const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
   if (forwarded.length > MAX_BODY_BYTES) return res.status(413).json({ error: "payload_too_large" });
 
   try {
-    const upstream = await fetch(`https://api.groq.com/${ALLOWED_PATH}`, {
+    const upstream = await fetch(UPSTREAM, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
