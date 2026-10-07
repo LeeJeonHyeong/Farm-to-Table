@@ -80,11 +80,15 @@ export default async function handler(req, res) {
       body: forwarded,
     });
     if (!upstream.ok) {
-      // 업스트림 오류 본문에는 계정·키 관련 정보가 담길 수 있어 그대로 전달하지 않는다.
-      return res.status(upstream.status === 429 ? 429 : 502).json({ error: "upstream_error" });
+      // 본문에는 계정·키 정보가 담길 수 있어 그대로 전달하지 않는다. 다만 상태 코드만으로는
+      // 원인을 못 가려 배포 때마다 헤매므로, 코드는 돌려주고 본문은 서버 로그로만 남긴다.
+      console.error("Groq 업스트림 오류", upstream.status, (await upstream.text()).slice(0, 300));
+      return res.status(upstream.status === 429 ? 429 : 502)
+                .json({ error: "upstream_error", status: upstream.status });
     }
     return res.status(200).json(await upstream.json());
-  } catch {
+  } catch (err) {
+    console.error("Groq 업스트림 연결 실패", err);
     return res.status(502).json({ error: "upstream_unreachable" });
   }
 }
