@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo, Fragment, Component } from "react";
-import { storage, db, auth, fbStorage } from "./firebase";
-import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
+import { storage, db, auth } from "./firebase";
 import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, query, where } from "firebase/firestore";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, deleteUser, EmailAuthProvider, reauthenticateWithCredential, sendPasswordResetEmail } from "firebase/auth";
 import { TERMS_OF_SERVICE, PRIVACY_POLICY, TERMS_VERSION, PRIVACY_VERSION, LEGAL_REVIEW_PENDING } from "./legal";
@@ -53,7 +52,9 @@ function ImageUpload({ value, onChange, label = "사진 추가", shape = "square
       const dataUrl = canvas.toDataURL("image/webp", 0.82);
       if (storagePath) {
         try {
-          const sRef = storageRef(fbStorage, storagePath);
+          // 사진을 실제로 올릴 때만 Storage SDK 를 받는다 (초기 번들에서 제외)
+          const { getStorage, ref, uploadString, getDownloadURL } = await import("firebase/storage");
+          const sRef = ref(getStorage(), storagePath);
           await uploadString(sRef, dataUrl, "data_url");
           const downloadUrl = await getDownloadURL(sRef);
           if (mountedRef.current) onChange(downloadUrl);
@@ -8086,24 +8087,24 @@ export default function FarmToTableApp() {
     let cancelled = false;
     (async () => {
       try {
-        const snapshot = await getDocs(collection(db, "deals"));
+        // 네 조회는 서로 의존하지 않는다. 순차로 await 하면 모바일에서 왕복 지연이
+        // 그대로 네 번 쌓여 '불러오는 중'이 길어진다. 한 번에 보낸다.
+        const uid = user?.uid;
+        const [snapshot, farmResult, chefResult, cropsResult] = await Promise.all([
+          getDocs(collection(db, "deals")),
+          uid ? storage.get(farmProfileKey(uid)) : null,
+          uid ? storage.get(chefProfileKey(uid)) : null,
+          uid ? storage.get(customCropsKey(uid)) : null,
+        ]);
         if (cancelled) return;
-        const dealDocs = snapshot.docs.map((d) => d.data());
-        setDeals(dealDocs);
-        const farmResult = user?.uid ? await storage.get(farmProfileKey(user.uid)) : null;
-        if (!cancelled && farmResult?.value) setFarm(JSON.parse(farmResult.value));
-        else if (!cancelled && !farmResult?.value) setFarm(null);
-        const chefResult = user?.uid ? await storage.get(chefProfileKey(user.uid)) : null;
-        if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
-        else if (!cancelled && !chefResult?.value) setChefProfile(null);
-        const cropsResult = user?.uid ? await storage.get(customCropsKey(user.uid)) : null;
-        if (!cancelled) {
-          try {
-            const list = cropsResult?.value ? JSON.parse(cropsResult.value) : [];
-            setCustomCrops(Array.isArray(list) ? list.filter((c) => typeof c === "string") : []);
-          } catch {
-            setCustomCrops([]);
-          }
+        setDeals(snapshot.docs.map((d) => d.data()));
+        setFarm(farmResult?.value ? JSON.parse(farmResult.value) : null);
+        setChefProfile(chefResult?.value ? JSON.parse(chefResult.value) : null);
+        try {
+          const list = cropsResult?.value ? JSON.parse(cropsResult.value) : [];
+          setCustomCrops(Array.isArray(list) ? list.filter((c) => typeof c === "string") : []);
+        } catch {
+          setCustomCrops([]);
         }
         // 채팅은 아래 onSnapshot 구독이 참여자 기준으로 바로 배달한다.
         // 여기서 한 번 더 읽으면 같은 데이터를 중복으로 받게 되므로 프리페치하지 않는다.
