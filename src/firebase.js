@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence } from "firebase/auth";
-import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,7 +20,10 @@ export const db = getFirestore(app);
 export const auth = initializeAuth(app, {
   persistence: [indexedDBLocalPersistence, browserLocalPersistence],
 });
-export const fbStorage = getStorage(app);
+// Firebase Storage 는 사진 첨부 때만 쓰인다. 여기서 즉시 올리면 모든 첫 진입이
+// 비용을 물므로 App.jsx 의 업로드 경로에서 동적 import 한다. app 인스턴스가 필요하면
+// getStorage() 가 기본 앱을 집어 간다.
+export { app };
 
 const LOCAL_KEYS = new Set(["current-user"]);
 
