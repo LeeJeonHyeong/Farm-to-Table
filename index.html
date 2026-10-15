@@ -25,8 +25,17 @@
       Fraunces 는 opsz(광학 크기) 가변 축을 빼고 받는다. 축을 포함하면 latin 서브셋이
       65KB, 빼면 35KB 다. 제목에만 쓰는 장식 서체가 초기 로드의 15% 를 차지하던 걸 줄인다.
       가중치 600·700 은 그대로라 글자 모양은 유지된다.
+
+      media="print" → onload 로 all 전환: 폰트 CSS 를 렌더 차단 경로에서 빼고 우선순위를
+      낮춘다. 폰트 99KB 가 전체 전송량의 3분의 1이라, 느린 회선에서 앱 JS 와 대역폭을
+      나눠 쓰며 로그인 화면이 늦게 떴다. 글자는 시스템 폰트로 먼저 보이고 뒤이어 바뀐다
+      (display=swap 과 같은 동작). JS 가 꺼진 환경은 noscript 로 받는다.
     -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+    <link rel="stylesheet" media="print" onload="this.media='all';this.onload=null"
+          href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+    </noscript>
 
     <!-- 로그인 직후 바로 붙는 곳들. 모바일에서 TLS 핸드셰이크 지연을 줄인다. -->
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
