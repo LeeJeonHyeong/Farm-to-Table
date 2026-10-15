@@ -250,6 +250,11 @@ const CROPS = {
 };
 const CROP_OPTIONS = Object.keys(CROPS);
 
+// 목록에 없는 작목을 직접 입력할 때 쓰는 select 센티널. 실제 품목명으로 저장되지 않는다.
+const CUSTOM_CROP_VALUE = "__custom__";
+// 사용자가 추가한 작목 목록 (storage/custom-crops-{uid}). 규칙상 키가 uid 로 끝나야 한다.
+const customCropsKey = (uid) => `custom-crops-${uid}`;
+
 const SEASONAL_CROPS = {
   1:  ["시금치", "비트", "케일"],
   2:  ["시금치", "케일", "로메인"],
@@ -287,6 +292,11 @@ const RIPENESS_STAGES = {
   로즈마리: ["어린순", "성숙순"],
   표고버섯: ["복돈(갓 미개)", "반개", "완전개산"],
 };
+
+// 표준 20개 품목 밖의 작목은 품목별 숙성도 정의가 없다. 숙성도 칸이 비어 거래 조건이
+// 반쪽이 되지 않도록 공통 단계를 쓴다.
+const DEFAULT_RIPENESS_STAGES = ["미숙", "중간", "완숙"];
+const ripenessStagesOf = (crop) => RIPENESS_STAGES[crop] || DEFAULT_RIPENESS_STAGES;
 
 const GRADE_LEVELS = ["보통", "상", "특"];
 const CYCLE_OPTIONS = ["단발성(1회)", "주 1회", "주 2회", "격주"];
@@ -1232,7 +1242,9 @@ async function parseWithAI(text) {
 
   const systemInstruction = `당신은 식자재 주문 요청에서 정보를 추출하는 어시스턴트입니다.
 오늘 날짜: ${todayStr} (${todayDay}). 상대적 날짜 표현(내일, 다음주 수요일, 3일 후 등)은 오늘 기준으로 계산해 YYYY-MM-DD로 변환하세요.
-가능한 품목: 토마토, 딸기, 블루베리, 복숭아, 무화과, 로메인, 케일, 루꼴라, 시금치, 깻잎, 비트, 파프리카, 가지, 애호박, 바질, 고수, 민트, 파슬리, 로즈마리, 표고버섯
+자주 쓰는 품목: 토마토, 딸기, 블루베리, 복숭아, 무화과, 로메인, 케일, 루꼴라, 시금치, 깻잎, 비트, 파프리카, 가지, 애호박, 바질, 고수, 민트, 파슬리, 로즈마리, 표고버섯
+※ 위 목록에 없는 품목이면 **억지로 비슷한 품목으로 바꾸지 말고 텍스트에 적힌 이름 그대로** crop 에 쓰세요.
+   (예: "아스파라거스 2kg" → crop: "아스파라거스"). 품목을 알 수 없을 때만 null 을 쓰세요.
 숙성도 옵션(품목별로 정확히 일치해야 함):
 - 토마토: 그린(미숙), 브레이커, 터닝, 핑크, 라이트레드, 레드(완숙)
 - 딸기: 화이트(미숙), 핑크, 레드 70%, 완숙(레드 100%)
@@ -1249,6 +1261,7 @@ async function parseWithAI(text) {
 - 민트: 어린순, 성숙잎
 - 로즈마리: 어린순, 성숙순
 - 표고버섯: 복돈(갓 미개), 반개, 완전개산
+- 위 목록에 없는 품목: 미숙, 중간, 완숙 중에서 고르고, 단서가 없으면 null
 등급: 보통, 상, 특
 주기: 단발성(1회), 주 1회, 주 2회, 격주`;
 
@@ -1530,9 +1543,10 @@ function StepIndicator({ step }) {
   );
 }
 
-function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null, userId = "", cropPriceRef = {}, profileAddress = "" }) {
+function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = "", editingDeal = null, onUpdate = null, onCancelEdit = null, cloningFrom = null, userId = "", cropPriceRef = {}, profileAddress = "", customCrops = [], onAddCustomCrop = null }) {
   const isEditing = !!editingDeal;
   const isCloning = !!cloningFrom;
+  const cropOptions = [...CROP_OPTIONS, ...customCrops.filter((c) => !CROP_OPTIONS.includes(c))];
   const blank = {
     chefName: defaultChefName, chefRegion: defaultChefRegion, crop: "토마토", sizeCondition: "", ripeness: RIPENESS_STAGES["토마토"][2],
     grade: "상", quantity: "", deliveryDate: "", cycle: "주 1회", targetPrice: "", note: "", photoURL: "",
@@ -1610,10 +1624,24 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     }
   };
 
+  // "+ 직접 입력"을 고르면 품목 칸을 비우고 텍스트 입력을 띄운다.
+  const [cropCustomMode, setCropCustomMode] = useState(false);
+
   const handleCropChange = (crop) => {
-    const stages = RIPENESS_STAGES[crop] || [];
+    if (crop === CUSTOM_CROP_VALUE) {
+      setCropCustomMode(true);
+      setData((d) => ({ ...d, crop: "", ripeness: DEFAULT_RIPENESS_STAGES[1] }));
+      return;
+    }
+    setCropCustomMode(false);
+    const stages = ripenessStagesOf(crop);
     setData((d) => ({ ...d, crop, ripeness: stages[Math.floor(stages.length / 2)] || "" }));
   };
+
+  // 직접 입력 중에는 글자가 바뀔 때마다 품목명을 그대로 반영한다.
+  const handleCustomCropInput = (v) => setData((d) => ({ ...d, crop: v }));
+
+  const cropIsNew = !!data.crop && !cropOptions.includes(data.crop);
 
   const handleAIParse = async () => {
     if (!aiText.trim()) return;
@@ -1623,9 +1651,13 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     setAiNote(null);
     try {
       const parsed = await parseWithAI(aiText);
+      // 목록에 없는 작목이라고 조용히 이전 값으로 되돌리면, 엉뚱한 품목이 선택된 채로
+      // 등록된다. 추출된 이름을 그대로 쓰고 목록에 없다는 사실만 따로 알린다.
+      const parsedCrop = String(parsed.crop ?? "").trim();
+      const newCrop = parsedCrop && !cropOptions.includes(parsedCrop) ? parsedCrop : "";
       setData((prev) => {
-        const crop = CROP_OPTIONS.includes(parsed.crop) ? parsed.crop : prev.crop;
-        const stages = RIPENESS_STAGES[crop] || [];
+        const crop = parsedCrop || prev.crop;
+        const stages = ripenessStagesOf(crop);
         const ripeness = stages.includes(parsed.ripeness)
           ? parsed.ripeness
           : stages[Math.floor(stages.length / 2)] || prev.ripeness;
@@ -1645,8 +1677,11 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
           note: parsed.note || prev.note,
         };
       });
+      if (newCrop) setCropCustomMode(true);
       if (parsed._usedRules) {
         setAiNote("AI 서버 연결 불가 — 키워드 분석으로 자동 입력했습니다.");
+      } else if (newCrop) {
+        setAiNote(`목록에 없는 작목 '${newCrop}'으로 입력했습니다. 아래에서 내 품목 목록에 추가할 수 있습니다.`);
       } else {
         setAiParsed(true);
       }
@@ -1725,7 +1760,7 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
     );
   }
 
-  const stages = RIPENESS_STAGES[data.crop] || [];
+  const stages = ripenessStagesOf(data.crop);
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 14, padding: isMobile ? 14 : 24 }}>
@@ -1892,9 +1927,41 @@ function DealCreateScreen({ onCreate, defaultChefName = "", defaultChefRegion = 
           {errors.deliveryBaseAddr && <ErrorText text={errors.deliveryBaseAddr} />}
 
           <FieldLabel required>품목</FieldLabel>
-          <select value={data.crop} onChange={(e) => handleCropChange(e.target.value)} style={inputStyle}>
-            {CROP_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+          <select
+            value={cropCustomMode || cropIsNew ? CUSTOM_CROP_VALUE : data.crop}
+            onChange={(e) => handleCropChange(e.target.value)}
+            style={inputStyle}
+          >
+            {cropOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            <option value={CUSTOM_CROP_VALUE}>+ 목록에 없는 작목 직접 입력</option>
           </select>
+          {(cropCustomMode || cropIsNew) && (
+            <div style={{ marginTop: 8 }}>
+              <input
+                type="text"
+                value={data.crop}
+                onChange={(e) => handleCustomCropInput(e.target.value)}
+                placeholder="예: 아스파라거스"
+                style={inputStyle}
+              />
+              {cropIsNew && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, color: TOKENS.inkSoft }}>
+                    목록에 없는 작목입니다. 그대로 등록할 수 있습니다.
+                  </span>
+                  {onAddCustomCrop && (
+                    <button
+                      type="button"
+                      onClick={() => { onAddCustomCrop(data.crop); setCropCustomMode(false); }}
+                      style={{ padding: "4px 10px", fontSize: 11, fontWeight: 500, background: TOKENS.moss, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+                    >
+                      내 품목 목록에 추가
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {(() => {
             const month = new Date().getMonth() + 1;
             const seasonal = SEASONAL_CROPS[month] || [];
@@ -2942,6 +3009,12 @@ function DealDetailView({ deal, farmProfile, userName, onSubmitProposal, onBack,
 function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSubmitInquiry, userId }) {
   const [detailDeal, setDetailDeal] = useState(null);
   const [search, setSearch] = useState("");
+  // 셰프가 목록에 없는 작목으로 등록한 딜도 필터로 고를 수 있어야 한다.
+  // 농가마다 내 품목 목록이 다르므로, 실제 올라온 딜에서 뽑아 붙인다.
+  const browseCropExtras = useMemo(
+    () => [...new Set(deals.map((d) => d.crop).filter((c) => c && !CROP_OPTIONS.includes(c)))],
+    [deals]
+  );
   useEffect(() => {
     if (detailDeal) {
       const updated = deals.find((d) => d.id === detailDeal.id);
@@ -3192,7 +3265,7 @@ function DealBrowseScreen({ deals, onSubmitProposal, farmProfile, userName, onSu
       <div style={{ background: TOKENS.card, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: isMobile ? "10px 10px" : "12px 14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", textTransform: "uppercase", letterSpacing: "0.04em", minWidth: 28 }}>품목</span>
-          {["전체", ...CROP_OPTIONS].map((c) => (
+          {["전체", ...CROP_OPTIONS, ...browseCropExtras].map((c) => (
             <button
               key={c}
               type="button"
@@ -6363,7 +6436,8 @@ function AccountSection({ onWithdraw }) {
 
 /* ---------- 4-0. 내 레스토랑 (셰프) ---------- */
 
-function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "", onShowOnboarding, onWithdraw }) {
+function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId = "", onShowOnboarding, onWithdraw, customCrops = [] }) {
+  const cropChoices = [...CROP_OPTIONS, ...customCrops.filter((c) => !CROP_OPTIONS.includes(c))];
   const blank = { restaurantName: defaultRestaurantName, region: "", address: "", description: "", preferCrops: [], preferGrade: "전체", preferCycle: "전체", photoURL: "" };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
@@ -6504,7 +6578,7 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
 
       <FieldLabel>선호 품목 (복수 선택 가능)</FieldLabel>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6, marginBottom: 14 }}>
-        {CROP_OPTIONS.map((c) => (
+        {cropChoices.map((c) => (
           <Chip key={c} label={c} active={data.preferCrops.includes(c)} onClick={() => toggleCrop(c)} />
         ))}
       </div>
@@ -6596,7 +6670,8 @@ function ChefProfileScreen({ profile, onSave, defaultRestaurantName = "", userId
 
 /* ---------- 4. 내 농가 등록 ---------- */
 
-function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "", onShowOnboarding, onWithdraw }) {
+function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], userName = "", userId = "", onShowOnboarding, onWithdraw, customCrops = [] }) {
+  const cropChoices = [...CROP_OPTIONS, ...customCrops.filter((c) => !CROP_OPTIONS.includes(c))];
   const blank = { farmName: defaultFarmName, region: "", cert: "인증 없음", specialty: [], description: "", leadTimeDays: "", photoURL: "", certPhotoURL: "", notifyNewDeals: false };
   const [data, setData] = useState(profile || blank);
   const [errors, setErrors] = useState({});
@@ -6760,7 +6835,7 @@ function FarmProfileScreen({ profile, onSave, defaultFarmName = "", deals = [], 
 
       <FieldLabel>주요 재배 품목 (복수 선택 가능)</FieldLabel>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-        {CROP_OPTIONS.map((c) => (
+        {cropChoices.map((c) => (
           <Chip key={c} label={c} active={data.specialty.includes(c)} onClick={() => toggleSpecialty(c)} />
         ))}
       </div>
@@ -7761,6 +7836,8 @@ export default function FarmToTableApp() {
   const [deals, setDeals] = useState([]);
   const [farm, setFarm] = useState(null);
   const [chefProfile, setChefProfile] = useState(null);
+  // 표준 20개 품목 밖에서 사용자가 추가한 작목
+  const [customCrops, setCustomCrops] = useState([]);
   const [notifHistory, setNotifHistory] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -8019,6 +8096,15 @@ export default function FarmToTableApp() {
         const chefResult = user?.uid ? await storage.get(chefProfileKey(user.uid)) : null;
         if (!cancelled && chefResult?.value) setChefProfile(JSON.parse(chefResult.value));
         else if (!cancelled && !chefResult?.value) setChefProfile(null);
+        const cropsResult = user?.uid ? await storage.get(customCropsKey(user.uid)) : null;
+        if (!cancelled) {
+          try {
+            const list = cropsResult?.value ? JSON.parse(cropsResult.value) : [];
+            setCustomCrops(Array.isArray(list) ? list.filter((c) => typeof c === "string") : []);
+          } catch {
+            setCustomCrops([]);
+          }
+        }
         // 채팅은 아래 onSnapshot 구독이 참여자 기준으로 바로 배달한다.
         // 여기서 한 번 더 읽으면 같은 데이터를 중복으로 받게 되므로 프리페치하지 않는다.
         if (!cancelled) setLoadState("ready");
@@ -8332,6 +8418,26 @@ export default function FarmToTableApp() {
       setSaveState("saved");
     } catch {
       setSaveState("error");
+    }
+  };
+
+  // 목록에 없는 작목을 내 품목 목록에 추가한다. 표준 20개·중복은 받지 않는다.
+  const handleAddCustomCrop = async (raw) => {
+    const name = String(raw ?? "").trim();
+    if (!name || !user?.uid) return;
+    if (CROP_OPTIONS.includes(name) || customCrops.includes(name)) {
+      setToastMsg(`'${name}'은(는) 이미 목록에 있습니다.`);
+      return;
+    }
+    const next = [...customCrops, name];
+    setCustomCrops(next);
+    try {
+      await storage.set(customCropsKey(user.uid), JSON.stringify(next));
+      setToastMsg(`'${name}'을(를) 품목 목록에 추가했습니다.`);
+    } catch (err) {
+      console.error("작목 추가 저장 실패:", err);
+      setCustomCrops(customCrops);            // 저장 실패 시 되돌린다
+      setToastMsg("품목 추가에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     }
   };
 
@@ -9492,7 +9598,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="87" cy="213" rx="4" ry="2.5" fill="#3D6B38" opacity="0.7" transform="rotate(20 87 213)"/>
                   </svg>
                 )}
-                <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} profileAddress={chefProfile?.address || ""} />
+                <DealCreateScreen key={editingDeal?.id ?? (cloningDeal ? `clone-${cloningDeal.id}` : "new")} onCreate={(deal) => { handleCreateDeal(deal); setCloningDeal(null); }} defaultChefName={user.name} editingDeal={editingDeal} onUpdate={handleUpdateDeal} onCancelEdit={editingDeal ? handleCancelEdit : cloningDeal ? handleCancelClone : null} cloningFrom={cloningDeal} userId={user.uid} cropPriceRef={cropPriceRef} profileAddress={chefProfile?.address || ""} customCrops={customCrops} onAddCustomCrop={handleAddCustomCrop} />
               </div>
             )}
             {/* ── 딜 찾기 ── */}
@@ -9921,7 +10027,7 @@ export default function FarmToTableApp() {
                     <ellipse cx="55" cy="282" rx="52" ry="6" fill="#4A7A44" opacity="0.3"/>
                   </svg>
                 )}
-                <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} onWithdraw={handleWithdraw} />
+                <FarmProfileScreen profile={farm} onSave={handleSaveFarm} defaultFarmName={user.name} deals={deals} userName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} onWithdraw={handleWithdraw} customCrops={customCrops} />
               </div>
             )}
             {/* ── 내 레스토랑 ── */}
@@ -10041,7 +10147,7 @@ export default function FarmToTableApp() {
                     <path d="M58 148 Q72 138 78 122 Q66 132 58 146" fill="#5B7553" opacity="0.75"/>
                   </svg>
                 )}
-                <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} onWithdraw={handleWithdraw} />
+                <ChefProfileScreen profile={chefProfile} onSave={handleSaveChefProfile} defaultRestaurantName={user.name} userId={user.uid} onShowOnboarding={() => setShowOnboarding(true)} onWithdraw={handleWithdraw} customCrops={customCrops} />
               </div>
             )}
             {/* ── 대시보드 ── */}
