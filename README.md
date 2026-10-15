@@ -340,6 +340,8 @@ UI 표시 전용이며, 규칙 파일은 클라이언트로 전송되지 않습�
 | 비밀번호 재설정 | 로그인 화면에 링크·모달 추가. `sendPasswordResetEmail` 기반이라 서버가 필요 없다. `auth.languageCode="ko"` 로 한국어 발송, `auth/user-not-found` 를 성공과 동일 처리해 이메일 캐내기 차단. `test_password_reset.cjs` 11/11 |
 | Vercel 이전 | AI 자동 입력과 이메일 찾기 모두 서버리스 함수가 필요해 호스팅을 Vercel 로 옮겼다. 이전 과정에서 4건을 해결 — 배포 보호(SSO) 해제 / catch-all 미매칭 / Groq 키 오입력 / ESM·CJS 번들 충돌. `test_deploy_smoke.cjs` 10/10 |
 | 이메일 찾기 | 상호명 → 마스킹된 이메일(`ch*****@naver.com`). 서버 자격증명으로만 조회하고 완전 일치만 허용, 분당 10회 제한, 동명 업체 최대 3건. `firebase-admin` 없이 서비스 계정 JWT + Google REST 직접 호출(의존성 0). 단위 18/18 · E2E 9/9 |
+| 목록 밖 작목 | AI 자동 입력이 목록에 없는 작목을 받으면 조용히 엉뚱한 항목으로 되돌리던 문제. 직접 입력 선택지(`__custom__`) 추가, 비표준 작목은 기본 숙도 3단계(미숙·중간·완숙) 적용, 사용자별 `custom-crops-{uid}` 에 저장해 다음 딜부터 목록에 노출. `test_custom_crop.cjs` 11/11 |
+| 초기 로드 단축 | QR 진입 후 "불러오는 중"이 길다는 지적에서 출발. ①로그인 직후 순차 조회 4회 → 1회 병렬 + `getAuth`→`initializeAuth`(소셜 리졸버 제거로 `auth/iframe.js` 93KB·`apis.google.com` 41KB 제외) + Firebase Storage 지연 로드, ②웹폰트를 `media="print"`→`onload` 로 렌더 차단 경로에서 제외 + Fraunces `opsz` 가변축 제거(66→50KB), ③Firestore 동적 import. **초기 JS 308 → 165KB(gzip)**, 실측(iPhone 13 에뮬·배포본) 3G 느림 **8.9초 → 5.0초**, 4G 보통 1.9초 |
 
 ### v1.6 상세 내역
 
@@ -1756,11 +1758,53 @@ require() of ES Module .../jose/dist/webapi/index.js from .../jwks-rsa/src/utils
 
 ---
 
+## 초기 로드 최적화
+
+발표자료 QR 로 들어오면 "불러오는 중"이 20초 가까이 머물렀습니다. 현장에서 처음 보는
+사람이 기다리는 구간이라 체감 비중이 큽니다. 원인은 셋이었고 순서대로 걷어냈습니다.
+
+**① 로그인 직후 조회가 순차 4회**
+`getDocs(deals)` → 농가 프로필 → 셰프 프로필을 하나씩 `await` 하고 있었습니다.
+서로 의존이 없으므로 `Promise.all` 1회로 묶었습니다. 같은 커밋에서 `getAuth()` 를
+`initializeAuth()` 로 바꿨습니다 — `getAuth()` 는 소셜 로그인용 `popupRedirectResolver`
+를 함께 올리면서 `__/auth/iframe.js`(93KB)와 `apis.google.com`(41KB)을 초기 로드에
+끌어옵니다. 이 앱은 이메일/비밀번호만 쓰므로 리졸버 없이 초기화합니다. Firebase
+Storage 도 사진 업로드 직전 `import()` 로 미뤘습니다.
+
+**② 웹폰트가 렌더를 막고 있었다**
+폰트 99KB 가 전체 전송량의 3분의 1이라, 느린 회선에서 앱 JS 와 대역폭을 나눠 쓰며
+로그인 화면이 늦게 떴습니다. `media="print"` → `onload="this.media='all'"` 로
+렌더 차단 경로에서 빼고(JS 비활성 환경은 `noscript` 로 보완), Fraunces 의 `opsz`
+가변축을 제거했습니다(66→50KB). 글자는 시스템 폰트로 먼저 보이고 뒤이어 바뀝니다.
+
+**③ 로그인 화면에 필요 없는 Firestore 를 같이 받고 있었다**
+`firebase/firestore` 정적 import 를 동적 import 로 돌려 별도 async 청크로 뺐습니다.
+`db` 를 `export let` 으로 두면 **ES 모듈의 라이브 바인딩** 덕분에 로드 완료 후 값이
+import 한 쪽에도 반영돼, 호출부를 네임스페이스(`FS.*`) 접두사만 붙여 옮길 수 있었습니다.
+모듈 평가 시점에 `loadFirestore()` 를 호출만 걸어 두어(await 하지 않음) 사용자가
+아이디를 입력하는 동안 배경에서 내려받습니다.
+
+> 함정: `vite.config.js` 의 `manualChunks` 에 `firebase/firestore` 가 남아 있으면
+> 동적 import 를 해도 같은 벤더 청크로 묶여 효과가 **0** 입니다. 수동 청크 지정이
+> 코드 스플리팅을 덮어씁니다.
+
+| 지표 | 전 | 후 |
+|---|---|---|
+| 초기 JS (gzip) | 308KB | **165KB** (index 93.9 + react 44.2 + firebase 27.1) |
+| `vendor-firebase` | 167KB | 27KB (firestore 170KB·storage 11.9KB 는 지연) |
+| 3G 느림, QR→홈 | 8.9초 | **5.0초** |
+| 4G 보통, QR→홈 | — | 1.9초 |
+
+실측은 `measure_login_mobile.cjs`(Playwright, iPhone 13 에뮬레이션 + 네트워크 스로틀)로
+배포본에 직접 돌린 값입니다. 전체 E2E 36/36 통과.
+
+---
+
 ## 향후 과제
 
 - **Firebase Storage 활성화** — 사진이 base64로 Firestore에 저장돼 문서가 비대해집니다. 콘솔에서 Storage를 켜고 `firebase.json`에 `"storage": { "rules": "storage.rules" }` 를 추가하면 정상화됩니다 (규칙은 이미 실제 경로에 맞게 준비돼 있음).
 - **서버리스 엔드포인트 인증** — `api/groq/…` 와 `api/account/find-email` 둘 다 출처 검사와 레이트리밋만 걸려 있습니다. 헤더를 위조한 직접 호출은 막지 못하므로, 실제 차단에는 Firebase ID 토큰 검증이 필요합니다. 이메일 찾기는 로그아웃 상태에서 쓰는 기능이라 토큰을 요구할 수 없어, CAPTCHA 같은 별도 수단을 검토해야 합니다.
-- **테스트 계정 정리** — 배포 검증 과정에서 운영 Firebase 에 `smoke_*@test.com`·`findmail_*@test.com` 계정이 생성됩니다. 관리자 화면이나 콘솔에서 주기적으로 정리해야 합니다.
+- **테스트 계정 정리** — 배포 검증 과정에서 운영 Firebase 에 `smoke_*`·`findmail_*`·`perfm_*`·`crop_*@test.com` 계정이 생성됩니다. 관리자 화면이나 콘솔에서 주기적으로 정리해야 합니다.
 - **초기 로드 중복 읽기 제거** — 로그인 시 `getDocs(deals)`·`getDocs(chats)` 프리페치 후 `onSnapshot` 첫 스냅샷이 같은 데이터를 다시 배달합니다. 프리페치를 제거하면 초기 읽기가 반감됩니다. 아울러 쿼리에 `where`/`limit`이 없어 모든 클라이언트가 앱 전체의 모든 메시지를 내려받습니다.
 - **테스트 러너 교체** — `run_tests.cjs`가 `execSync` 순차 실행이고 `stdio:"pipe"`로 실패 출력을 버려 실패 시 "오류" 한 줄만 남습니다. `@playwright/test`로 옮기면 병렬 워커(15분→2~3분)·자동 재시도(Firebase 타이밍 flakiness 흡수)·실패 trace를 얻습니다.
 - **App.jsx 분리** — 단일 파일 9,600여 줄입니다. 모든 컴포넌트가 이미 모듈 스코프에 있고 데이터가 props로만 흘러 분리는 기계적인 파일 이동입니다. 다만 테스트 약 20개가 App.jsx **소스 텍스트**를 검사하므로(`code.includes(...)`) 파일을 쪼개면 함께 깨집니다. 테스트 전략 정리가 선행돼야 합니다.
