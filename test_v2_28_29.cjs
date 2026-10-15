@@ -206,9 +206,11 @@ async function run() {
     "[11] v2.29 — 북마크 Firestore 저장 코드"
   );
 
+  // Firebase Storage 는 사진 첨부 때만 쓰여 초기 번들에서 뺐다. firebase.js 가 eager
+  // export 하지 않고 App.jsx 업로드 경로에서 동적 import 한다.
   assert(
-    firebaseCode.includes("fbStorage") && firebaseCode.includes("getStorage"),
-    "[12] v2.29 — firebase.js fbStorage export 존재"
+    code.includes('import("firebase/storage")') && code.includes("getStorage()"),
+    "[12] v2.29 — Firebase Storage 동적 import (업로드 시점 로드)"
   );
 
   assert(
