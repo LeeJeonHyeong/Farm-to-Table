@@ -24,10 +24,12 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             "vendor-react": ["react", "react-dom"],
+            // firebase/firestore 는 여기 넣지 않는다. 넣으면 동적 import 를 해도
+            // 이 청크에 묶여 첫 진입에 같이 내려간다. 로그인 화면에는 필요 없으므로
+            // 별도 async 청크로 떨어뜨린다 (src/firebase.js 의 loadFirestore).
             "vendor-firebase": [
               "firebase/app",
               "firebase/auth",
-              "firebase/firestore",
             ],
           },
         },

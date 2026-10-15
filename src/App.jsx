@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo, Fragment, Component } from "react";
-import { storage, db, auth } from "./firebase";
-import { doc, onSnapshot, collection, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, query, where } from "firebase/firestore";
+import { storage, db, auth, FS, loadFirestore } from "./firebase";
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, deleteUser, EmailAuthProvider, reauthenticateWithCredential, sendPasswordResetEmail } from "firebase/auth";
 import { TERMS_OF_SERVICE, PRIVACY_POLICY, TERMS_VERSION, PRIVACY_VERSION, LEGAL_REVIEW_PENDING } from "./legal";
 
@@ -4626,7 +4625,7 @@ function AdminScreen({ deals, chats, onDeleteDeal, onCloseDeal, onCompleteDeal }
     if (activeSection !== "users") return;
     if (users.length > 0) return;
     setUsersLoading(true);
-    getDocs(collection(db, "storage")).then((snap) => {
+    loadFirestore().then(() => FS.getDocs(FS.collection(db, "storage"))).then((snap) => {
       const list = [];
       snap.forEach((d) => {
         if (!d.id.startsWith("user-profile-")) return;
@@ -8087,11 +8086,15 @@ export default function FarmToTableApp() {
     let cancelled = false;
     (async () => {
       try {
+        // Firestore 는 지연 로드라 첫 사용 전에 준비를 보장해야 한다.
+        // 로그인 화면이 떠 있는 동안 배경에서 받아 두므로 보통 즉시 resolve 된다.
+        await loadFirestore();
+        if (cancelled) return;
         // 네 조회는 서로 의존하지 않는다. 순차로 await 하면 모바일에서 왕복 지연이
         // 그대로 네 번 쌓여 '불러오는 중'이 길어진다. 한 번에 보낸다.
         const uid = user?.uid;
         const [snapshot, farmResult, chefResult, cropsResult] = await Promise.all([
-          getDocs(collection(db, "deals")),
+          FS.getDocs(FS.collection(db, "deals")),
           uid ? storage.get(farmProfileKey(uid)) : null,
           uid ? storage.get(chefProfileKey(uid)) : null,
           uid ? storage.get(customCropsKey(uid)) : null,
@@ -8126,8 +8129,8 @@ export default function FarmToTableApp() {
     if (expired.length === 0) return;
     const closedDeals = expired.map((d) => ({ ...d, status: "closed", closedAt: Date.now(), closeReason: "expired" }));
     setDeals((prev) => prev.map((d) => { const c = closedDeals.find((x) => x.id === d.id); return c || d; }));
-    const batch = writeBatch(db);
-    closedDeals.forEach((d) => batch.set(doc(db, "deals", d.id), d));
+    const batch = FS.writeBatch(db);
+    closedDeals.forEach((d) => batch.set(FS.doc(db, "deals", d.id), d));
     batch.commit().catch(() => {});
   }, [loadState]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -8190,7 +8193,7 @@ export default function FarmToTableApp() {
       setChats(newChats);
     };
 
-    const unsubDeals = onSnapshot(collection(db, "deals"), (snapshot) => {
+    const unsubDeals = FS.onSnapshot(FS.collection(db, "deals"), (snapshot) => {
       const newDeals = snapshot.docs.map((d) => d.data());
       // RACE-01: ref를 동기적으로 갱신해야 processChats에서 최신 딜 참조 가능
       dealsRef.current = newDeals;
@@ -8354,11 +8357,11 @@ export default function FarmToTableApp() {
     });
     // SEC/PERF: 본인이 참여한 대화만 구독한다. 예전에는 chats 컬렉션 전체를 받아
     // 모든 사용자가 남의 협상 대화를 내려받았고, 문서 수에 비례해 비용도 늘었다.
-    const chatsQuery = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", user.uid)
+    const chatsQuery = FS.query(
+      FS.collection(db, "chats"),
+      FS.where("participants", "array-contains", user.uid)
     );
-    const unsubChats = onSnapshot(chatsQuery, (snapshot) => {
+    const unsubChats = FS.onSnapshot(chatsQuery, (snapshot) => {
       processChats(snapshot);
     });
     return () => { unsubDeals(); unsubChats(); };
@@ -8368,7 +8371,7 @@ export default function FarmToTableApp() {
     setSaveState("saving");
     try {
       // DATA-01: merge:true로 동시 쓰기 시 타 필드 덮어쓰기 방지
-      await setDoc(doc(db, "deals", deal.id), deal, { merge: true });
+      await FS.setDoc(FS.doc(db, "deals", deal.id), deal, { merge: true });
       setSaveState("saved");
     } catch {
       setSaveState("error");
@@ -8378,7 +8381,7 @@ export default function FarmToTableApp() {
   const deleteDealDoc = async (dealId) => {
     setSaveState("saving");
     try {
-      await deleteDoc(doc(db, "deals", dealId));
+      await FS.deleteDoc(FS.doc(db, "deals", dealId));
       setSaveState("saved");
     } catch {
       setSaveState("error");
@@ -8456,9 +8459,9 @@ export default function FarmToTableApp() {
   const handleResetData = async () => {
     // SEC-01: UI 가드(isAdmin &&)만으로는 우회 가능 — 함수 레벨 권한 재확인
     if (user?.email !== ADMIN_EMAIL) return;
-    const batch = writeBatch(db);
-    deals.forEach((d) => batch.delete(doc(db, "deals", d.id)));
-    SAMPLE_DEALS.forEach((d) => batch.set(doc(db, "deals", d.id), d.createdBy === "" ? { ...d, createdBy: user.uid } : d));
+    const batch = FS.writeBatch(db);
+    deals.forEach((d) => batch.delete(FS.doc(db, "deals", d.id)));
+    SAMPLE_DEALS.forEach((d) => batch.set(FS.doc(db, "deals", d.id), d.createdBy === "" ? { ...d, createdBy: user.uid } : d));
     await batch.commit();
     setDeals(SAMPLE_DEALS.map((d) => (d.createdBy === "" ? { ...d, createdBy: user.uid } : d)));
   };
@@ -8480,7 +8483,7 @@ export default function FarmToTableApp() {
     const updated = { ...deal, proposals: [...deal.proposals, proposal] };
     setDeals((prev) => prev.map((d) => d.id === dealId ? updated : d));
     // DATA-02: arrayUnion으로 동시 제안 시 proposals 배열 overwrite 경쟁 방지
-    updateDoc(doc(db, "deals", dealId), { proposals: arrayUnion(proposal) }).catch(() => setSaveState("error"));
+    FS.updateDoc(FS.doc(db, "deals", dealId), { proposals: FS.arrayUnion(proposal) }).catch(() => setSaveState("error"));
     setToastMsg("✅ 제안이 전송됐습니다!");
   };
 
@@ -8612,9 +8615,9 @@ export default function FarmToTableApp() {
       const proposal = deal?.proposals?.find((p) => p.id === proposalId);
       const members = [...new Set([user.uid, deal?.createdBy, proposal?.farmUid].filter(Boolean))];
       // DATA-01: arrayUnion으로 동시 전송 시 overwrite 경쟁 방지
-      await setDoc(
-        doc(db, "chats", chatId),
-        { messages: arrayUnion(newMsg), participants: arrayUnion(...members) },
+      await FS.setDoc(
+        FS.doc(db, "chats", chatId),
+        { messages: FS.arrayUnion(newMsg), participants: FS.arrayUnion(...members) },
         { merge: true }
       );
     } catch {
@@ -8639,14 +8642,14 @@ export default function FarmToTableApp() {
 
     const uid = cu.uid;
     try {
-      const batch = writeBatch(db);
+      const batch = FS.writeBatch(db);
 
       // 1) 내가 만든 딜 — 거래가 성사된 적 없으면 삭제, 있으면 이름만 익명화해 보존
       dealsRef.current.forEach((d) => {
         if (d.createdBy !== uid) return;
         const traded = !!d.selectedProposalId;
-        if (traded) batch.set(doc(db, "deals", d.id), { chefName: "탈퇴한 사용자" }, { merge: true });
-        else batch.delete(doc(db, "deals", d.id));
+        if (traded) batch.set(FS.doc(db, "deals", d.id), { chefName: "탈퇴한 사용자" }, { merge: true });
+        else batch.delete(FS.doc(db, "deals", d.id));
       });
 
       // 2) 남의 딜에 넣은 내 제안 — 기록은 남기고 개인 식별 정보만 지운다
@@ -8659,7 +8662,7 @@ export default function FarmToTableApp() {
             ? { ...p, farmUid: null, farmerName: "탈퇴한 사용자", farmName: "탈퇴한 사용자", photoURL: null, certPhotoURL: null }
             : p
         );
-        batch.set(doc(db, "deals", d.id), { proposals }, { merge: true });
+        batch.set(FS.doc(db, "deals", d.id), { proposals }, { merge: true });
       });
 
       await batch.commit();
@@ -8671,7 +8674,7 @@ export default function FarmToTableApp() {
         lastMyDealsVisitKey(uid), seenSelectionsKey(uid), lastChatReadKey(uid),
         pendingTossKey(uid), `pending-toss-${uid}`,
       ];
-      await Promise.all(keys.map((k) => deleteDoc(doc(db, "storage", k)).catch(() => {})));
+      await Promise.all(keys.map((k) => FS.deleteDoc(FS.doc(db, "storage", k)).catch(() => {})));
 
       // 4) 로컬 캐시 정리
       try { Object.keys(localStorage).forEach((k) => { if (k.includes(uid)) localStorage.removeItem(k); }); } catch {}

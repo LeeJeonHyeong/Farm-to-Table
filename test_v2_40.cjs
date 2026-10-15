@@ -15,6 +15,7 @@ const fs = require("fs");
 
 const BASE = "http://localhost:5173";
 const APP_JSX = "c:/Users/USER/Desktop/D.N.A/farm-to-table-project/farm-to-table-project/src/App.jsx";
+const FIREBASE_JS = "c:/Users/USER/Desktop/D.N.A/farm-to-table-project/farm-to-table-project/src/firebase.js";
 const TS = Date.now();
 
 const FARM_EMAIL = `v240farm_${TS}@test.com`;
@@ -93,24 +94,25 @@ async function run() {
 
   // [1] DATA-01: persistDeal merge:true
   assert(
-    code.includes("await setDoc(doc(db, \"deals\", deal.id), deal, { merge: true })"),
+    code.includes("FS.setDoc(FS.doc(db, \"deals\", deal.id), deal, { merge: true })"),
     "[1] v2.40 — DATA-01: persistDeal setDoc에 { merge: true } 추가됨"
   );
 
   // [2] DATA-02: handleSubmitProposal → updateDoc + arrayUnion
   assert(
-    code.includes("updateDoc(doc(db, \"deals\", dealId), { proposals: arrayUnion(proposal) })"),
+    code.includes("FS.updateDoc(FS.doc(db, \"deals\", dealId), { proposals: FS.arrayUnion(proposal) })"),
     "[2] v2.40 — DATA-02: handleSubmitProposal updateDoc + arrayUnion 사용"
   );
 
-  // [3] DATA-02: updateDoc import
-  // import 목록은 이후에도 늘어나므로 줄 전체가 아니라 필요한 심볼만 확인한다.
+  // [3] DATA-02: updateDoc / arrayUnion 을 쓸 수 있는 상태인지
+  // firebase/firestore 정적 import 는 지연 로드 전환으로 사라졌다. 이제 firebase.js 가
+  // 동적 import 로 네임스페이스(FS)를 채우고 App.jsx 가 FS.* 로 호출한다.
+  const firebaseCode = fs.readFileSync(FIREBASE_JS, "utf8");
   assert(
-    (function () {
-      const line = code.split("\n").find((l) => l.includes('from "firebase/firestore"'));
-      return !!line && line.includes("updateDoc") && line.includes("arrayUnion");
-    })(),
-    "[3] v2.40 — DATA-02: updateDoc import 추가됨"
+    firebaseCode.includes('import("firebase/firestore")')
+      && firebaseCode.includes("Object.assign(FS")
+      && code.includes("FS.updateDoc(") && code.includes("FS.arrayUnion("),
+    "[3] v2.40 — DATA-02: Firestore 네임스페이스 지연 로드 후 updateDoc/arrayUnion 사용"
   );
 
   // [4] SEC-01: handleResetData 함수 레벨 isAdmin 가드
